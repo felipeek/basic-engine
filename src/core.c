@@ -1,3 +1,4 @@
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <dynamic_array.h>
 #include "core.h"
@@ -8,12 +9,48 @@
 
 #define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
 #define PHONG_FRAGMENT_SHADER_PATH "./shaders/phong_shader.fs"
+#define QUAD_VERTEX_SHADER_PATH "./shaders/quad_shader.vs"
+#define QUAD_FRAGMENT_SHADER_PATH "./shaders/quad_shader.fs"
 #define GIM_ENTITY_COLOR (Vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
-static Shader phongShader;
+static Shader phongShader, quadShader;
 static PerspectiveCamera camera;
 static Light* lights;
 static Entity e;
+
+static Mesh screenQuad;
+static u32 texture;
+static u32 fbo;
+
+extern s32 windowWidth;
+extern s32 windowHeight;
+
+static void createFramebuffer() {
+	glGenFramebuffers(1, &fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, windowWidth, windowHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+
+	unsigned int rbo;
+	glGenRenderbuffers(1, &rbo);
+	glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, windowWidth, windowHeight);
+
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+		printf("framebuffer error\n"); return -1;
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
 
 static PerspectiveCamera createCamera()
 {
@@ -47,6 +84,7 @@ extern int coreInit()
 {
 	// Create shader
 	phongShader = graphicsShaderCreate(PHONG_VERTEX_SHADER_PATH, PHONG_FRAGMENT_SHADER_PATH);
+	quadShader = graphicsShaderCreate(QUAD_VERTEX_SHADER_PATH, QUAD_FRAGMENT_SHADER_PATH);
 	// Create camera
 	camera = createCamera();
 	// Create light
@@ -54,6 +92,9 @@ extern int coreInit()
 
 	Mesh m = graphicsMeshCreateFromObjWithColor("./res/horse.obj", 0, (Vec4){1.0f, 0.0f, 0.0f, 0.0f});
 	graphicsEntityCreate(&e, m, (Vec4){0.0f, 0.0f, 0.0f, 1.0f}, (Vec3){0.0f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f});
+
+	screenQuad = graphicsMeshCreateScreenQuad();
+	createFramebuffer();
 
 	return 0;
 }
@@ -70,7 +111,13 @@ extern void coreUpdate(r32 deltaTime)
 
 extern void coreRender()
 {
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 	graphicsEntityRenderPhongShader(phongShader, &camera, &e, lights);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+	graphicsScreenQuadRender(screenQuad, quadShader, texture);
 }
 
 extern void coreInputProcess(boolean* keyState, r32 deltaTime)

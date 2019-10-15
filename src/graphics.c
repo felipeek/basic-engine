@@ -309,6 +309,72 @@ extern void graphicsMeshRender(Shader shader, Mesh mesh)
 	glBindVertexArray(0);
 }
 
+extern Mesh graphicsMeshCreateScreenQuad()
+{
+	Vec2 vertices[4 * 2];
+	vertices[0] = (Vec2){-1.0f, -1.0f};
+	vertices[1] = (Vec2){0.0f, 0.0f};
+	vertices[2] = (Vec2){-1.0f, 1.0f};
+	vertices[3] = (Vec2){0.0f, 1.0f};
+	vertices[4] = (Vec2){1.0f, 1.0f};
+	vertices[5] = (Vec2){1.0f, 1.0f};
+	vertices[6] = (Vec2){1.0f, -1.0f};
+	vertices[7] = (Vec2){1.0f, 0.0f};
+
+	u32 indices[6] = {0, 1, 2, 0, 2, 3};
+
+	Mesh mesh;
+	GLuint VBO, EBO, VAO;
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glGenBuffers(1, &EBO);
+
+	glBindVertexArray(VAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, 4 * 2 * sizeof(Vec2), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, 4 * 2 * sizeof(Vec2), vertices);
+
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(0);
+
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)(2 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(1);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(u32), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, 6 * sizeof(u32), indices);
+
+	glBindVertexArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+	mesh.VAO = VAO;
+	mesh.VBO = VBO;
+	mesh.EBO = EBO;
+	mesh.indexesSize = 6;
+
+	mesh.normalInfo.tangentSpace = false;
+	mesh.normalInfo.useNormalMap = false;
+	mesh.normalInfo.normalMapTexture = 0;
+
+	return mesh;
+}
+
+extern void graphicsScreenQuadRender(Mesh screenQuadMesh, Shader shader, u32 texture)
+{
+	glBindVertexArray(screenQuadMesh.VAO);
+	glUseProgram(shader);
+	GLint screenTexLocation = glGetUniformLocation(shader, "screenTexture");
+	glUniform1i(screenTexLocation, 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glDrawElements(GL_TRIANGLES, screenQuadMesh.indexesSize, GL_UNSIGNED_INT, 0);
+	glUseProgram(0);
+	glBindVertexArray(0);
+}
+
 extern void graphicsMeshChangeDiffuseMap(Mesh* mesh, u32 diffuseMap, boolean deleteDiffuseMap)
 {
 	if (deleteDiffuseMap && mesh->diffuseInfo.useDiffuseMap)
