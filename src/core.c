@@ -11,9 +11,13 @@
 #define PHONG_FRAGMENT_SHADER_PATH "./shaders/phong_shader.fs"
 #define QUAD_VERTEX_SHADER_PATH "./shaders/quad_shader.vs"
 #define QUAD_FRAGMENT_SHADER_PATH "./shaders/quad_shader.fs"
+#define SKYBOX_VERTEX_SHADER_PATH "./shaders/skybox_shader.vs"
+#define SKYBOX_FRAGMENT_SHADER_PATH "./shaders/skybox_shader.fs"
+#define REFLECTION_VERTEX_SHADER_PATH "./shaders/reflection_shader.vs"
+#define REFLECTION_FRAGMENT_SHADER_PATH "./shaders/reflection_shader.fs"
 #define GIM_ENTITY_COLOR (Vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
-static Shader phongShader, quadShader;
+static Shader phongShader, quadShader, skyboxShader, reflectionShader;
 static PerspectiveCamera camera;
 static Light* lights;
 static Entity e;
@@ -24,6 +28,38 @@ static u32 fbo;
 
 extern s32 windowWidth;
 extern s32 windowHeight;
+
+static u32 cubeMap;
+
+static void createCubeMap() {
+	ImageData top = graphicsImageLoad("./res/top.jpg");
+	ImageData bottom = graphicsImageLoad("./res/bottom.jpg");
+	ImageData left = graphicsImageLoad("./res/left.jpg");
+	ImageData right = graphicsImageLoad("./res/right.jpg");
+	ImageData back = graphicsImageLoad("./res/back.jpg");
+	ImageData front = graphicsImageLoad("./res/front.jpg");
+
+	glGenTextures(1, &cubeMap);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cubeMap);
+	glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, GL_RGBA, right.width, right.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, right.data);
+	glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 0, GL_RGBA, left.width, left.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, left.data);
+	glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 0, GL_RGBA, top.width, top.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, top.data);
+	glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, GL_RGBA, bottom.width, bottom.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, bottom.data);
+	glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 0, GL_RGBA, front.width, front.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, front.data);
+	glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, GL_RGBA, back.width, back.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, back.data);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+	graphicsImageFree(&top);
+	graphicsImageFree(&bottom);
+	graphicsImageFree(&left);
+	graphicsImageFree(&right);
+	graphicsImageFree(&back);
+	graphicsImageFree(&front);
+}
 
 static void createFramebuffer() {
 	glGenFramebuffers(1, &fbo);
@@ -85,16 +121,20 @@ extern int coreInit()
 	// Create shader
 	phongShader = graphicsShaderCreate(PHONG_VERTEX_SHADER_PATH, PHONG_FRAGMENT_SHADER_PATH);
 	quadShader = graphicsShaderCreate(QUAD_VERTEX_SHADER_PATH, QUAD_FRAGMENT_SHADER_PATH);
+	skyboxShader = graphicsShaderCreate(SKYBOX_VERTEX_SHADER_PATH, SKYBOX_FRAGMENT_SHADER_PATH);
+	reflectionShader = graphicsShaderCreate(REFLECTION_VERTEX_SHADER_PATH, REFLECTION_FRAGMENT_SHADER_PATH);
+
 	// Create camera
 	camera = createCamera();
 	// Create light
 	lights = createLights();
 
 	Mesh m = graphicsMeshCreateFromObjWithColor("./res/horse.obj", 0, (Vec4){1.0f, 0.0f, 0.0f, 0.0f});
-	graphicsEntityCreate(&e, m, (Vec4){0.0f, 0.0f, 0.0f, 1.0f}, (Vec3){0.0f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f});
+	graphicsEntityCreate(&e, m, (Vec4){0.0f, 0.0f, -3.0f, 1.0f}, (Vec3){0.0f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f});
 
 	screenQuad = graphicsMeshCreateScreenQuad();
 	createFramebuffer();
+	createCubeMap();
 
 	return 0;
 }
@@ -111,13 +151,16 @@ extern void coreUpdate(r32 deltaTime)
 
 extern void coreRender()
 {
+
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-	graphicsEntityRenderPhongShader(phongShader, &camera, &e, lights);
+	graphicsSkyboxRender(skyboxShader, cubeMap, &camera);
+	graphicsEntityRenderReflectionShader(reflectionShader, &camera, &e, cubeMap);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 
 	graphicsScreenQuadRender(screenQuad, quadShader, texture);
+
 }
 
 extern void coreInputProcess(boolean* keyState, r32 deltaTime)

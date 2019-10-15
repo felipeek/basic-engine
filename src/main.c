@@ -114,6 +114,7 @@ extern s32 main(s32 argc, s8** argv)
 
 	glEnable(GL_DEPTH_TEST);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDepthFunc(GL_LEQUAL);
 
 	r64 lastFrame = glfwGetTime();
 	s32 frameNumber = (s32)lastFrame;

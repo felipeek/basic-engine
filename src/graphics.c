@@ -11,7 +11,7 @@ extern ImageData graphicsImageLoad(const s8* imagePath)
 {
 	ImageData imageData;
 
-	stbi_set_flip_vertically_on_load(1);
+	stbi_set_flip_vertically_on_load(0);
 	imageData.data = stbi_load(imagePath, &imageData.width, &imageData.height, &imageData.channels, 4);
 
 	imageData.channels = 4;	// @temporary
@@ -375,6 +375,107 @@ extern void graphicsScreenQuadRender(Mesh screenQuadMesh, Shader shader, u32 tex
 	glBindVertexArray(0);
 }
 
+static u32 createSkyboxVAO()
+{
+	r32 skyboxVertices[] = {
+		// positions          
+		-1.0f,  1.0f, -1.0f,
+		-1.0f, -1.0f, -1.0f,
+		1.0f, -1.0f, -1.0f,
+		1.0f, -1.0f, -1.0f,
+		1.0f,  1.0f, -1.0f,
+		-1.0f,  1.0f, -1.0f,
+
+		-1.0f, -1.0f,  1.0f,
+		-1.0f, -1.0f, -1.0f,
+		-1.0f,  1.0f, -1.0f,
+		-1.0f,  1.0f, -1.0f,
+		-1.0f,  1.0f,  1.0f,
+		-1.0f, -1.0f,  1.0f,
+
+		1.0f, -1.0f, -1.0f,
+		1.0f, -1.0f,  1.0f,
+		1.0f,  1.0f,  1.0f,
+		1.0f,  1.0f,  1.0f,
+		1.0f,  1.0f, -1.0f,
+		1.0f, -1.0f, -1.0f,
+
+		-1.0f, -1.0f,  1.0f,
+		-1.0f,  1.0f,  1.0f,
+		1.0f,  1.0f,  1.0f,
+		1.0f,  1.0f,  1.0f,
+		1.0f, -1.0f,  1.0f,
+		-1.0f, -1.0f,  1.0f,
+
+		-1.0f,  1.0f, -1.0f,
+		1.0f,  1.0f, -1.0f,
+		1.0f,  1.0f,  1.0f,
+		1.0f,  1.0f,  1.0f,
+		-1.0f,  1.0f,  1.0f,
+		-1.0f,  1.0f, -1.0f,
+
+		-1.0f, -1.0f, -1.0f,
+		-1.0f, -1.0f,  1.0f,
+		1.0f, -1.0f, -1.0f,
+		1.0f, -1.0f, -1.0f,
+		-1.0f, -1.0f,  1.0f,
+		1.0f, -1.0f,  1.0f
+	};
+
+	u32 VAO, VBO;
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+
+	glBindVertexArray(VAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(skyboxVertices), skyboxVertices);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(0);
+
+	glBindVertexArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	return VAO;
+}
+
+static u32 skyboxVAO;
+static boolean skyboxVAOInitialized = false;
+
+extern void graphicsSkyboxRender(Shader shader, u32 texture, const PerspectiveCamera* camera)
+{
+	if (!skyboxVAOInitialized) {
+		skyboxVAO = createSkyboxVAO();
+		skyboxVAOInitialized = true;
+	}
+	glUseProgram(shader);
+	GLint skyboxTexLocation = glGetUniformLocation(shader, "cubeTexture");
+	glUniform1i(skyboxTexLocation, 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, texture);
+	GLint viewMatrixLocation = glGetUniformLocation(shader, "viewMatrix");
+	GLint projectionMatrixLocation = glGetUniformLocation(shader, "projectionMatrix");
+	Mat4 viewMatrix = camera->viewMatrix;
+	viewMatrix.data[0][3] = 0.0f;
+	viewMatrix.data[1][3] = 0.0f;
+	viewMatrix.data[2][3] = 0.0f;
+	viewMatrix.data[3][3] = 1.0f;
+	viewMatrix.data[3][2] = 0.0f;
+	viewMatrix.data[3][1] = 0.0f;
+	viewMatrix.data[3][0] = 0.0f;
+	glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, (GLfloat*)viewMatrix.data);
+	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->projectionMatrix.data);
+	glBindVertexArray(skyboxVAO);
+	glDepthMask(GL_FALSE);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+	glDepthMask(GL_TRUE);
+	glUseProgram(0);
+	glBindVertexArray(0);
+}
+
 extern void graphicsMeshChangeDiffuseMap(Mesh* mesh, u32 diffuseMap, boolean deleteDiffuseMap)
 {
 	if (deleteDiffuseMap && mesh->diffuseInfo.useDiffuseMap)
@@ -510,6 +611,25 @@ extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCame
 	GLint projectionMatrixLocation = glGetUniformLocation(shader, "projectionMatrix");
 	glUniform4f(cameraPositionLocation, camera->position.x, camera->position.y, camera->position.z, camera->position.w);
 	glUniform1f(shinenessLocation, 128.0f);
+	glUniformMatrix4fv(modelMatrixLocation, 1, GL_TRUE, (GLfloat*)entity->modelMatrix.data);
+	glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->viewMatrix.data);
+	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->projectionMatrix.data);
+	graphicsMeshRender(shader, entity->mesh);
+	glUseProgram(0);
+}
+
+extern void graphicsEntityRenderReflectionShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, u32 skyboxTex)
+{
+	glUseProgram(shader);
+	GLint cameraPositionLocation = glGetUniformLocation(shader, "cameraPosition");
+	GLint modelMatrixLocation = glGetUniformLocation(shader, "modelMatrix");
+	GLint viewMatrixLocation = glGetUniformLocation(shader, "viewMatrix");
+	GLint projectionMatrixLocation = glGetUniformLocation(shader, "projectionMatrix");
+	GLint skyboxTexLocation = glGetUniformLocation(shader, "skybox");
+	glUniform1i(skyboxTexLocation, 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTex);
+	glUniform4f(cameraPositionLocation, camera->position.x, camera->position.y, camera->position.z, camera->position.w);
 	glUniformMatrix4fv(modelMatrixLocation, 1, GL_TRUE, (GLfloat*)entity->modelMatrix.data);
 	glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->viewMatrix.data);
 	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->projectionMatrix.data);

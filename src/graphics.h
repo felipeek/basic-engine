@@ -89,6 +89,7 @@ extern Mesh graphicsMeshCreateFromObjWithColor(const s8* objPath, NormalMappingI
 extern Mesh graphicsMeshCreateFromObjWithTexture(const s8* objPath, NormalMappingInfo* normalInfo, u32 diffuseMap);
 extern Mesh graphicsMeshCreateScreenQuad();
 extern void graphicsMeshRender(Shader shader, Mesh mesh);
+extern void graphicsSkyboxRender(Shader shader, u32 texture, const PerspectiveCamera* camera);
 extern void graphicsScreenQuadRender(Mesh screenQuadMesh, Shader shader, u32 texture);
 // If mesh already has a diffuse map, the older diffuse map will be deleted if deleteDiffuseMap is true.
 // If mesh has a color instead of a diffuse map, the mesh will lose the color and be set to use the diffuse map.
@@ -104,6 +105,7 @@ extern void graphicsEntitySetRotation(Entity* entity, Vec3 worldRotation);
 extern void graphicsEntitySetScale(Entity* entity, Vec3 worldScale);
 extern void graphicsEntityRenderBasicShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity);
 extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* lights);
+extern void graphicsEntityRenderReflectionShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, u32 skyboxTex);
 extern void graphicsLightCreate(Light* light, Vec4 position, Vec4 ambientColor, Vec4 diffuseColor, Vec4 specularColor);
 extern u32 graphicsTextureCreate(const s8* texturePath);
 extern u32 graphicsTextureCreateFromData(const ImageData* imageData);
