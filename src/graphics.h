@@ -81,12 +81,15 @@ extern void graphicsFloatImageFree(FloatImageData* imageData);
 extern void graphicsImageSave(const s8* imagePath, const ImageData* imageData);
 extern void graphicsFloatImageSave(const s8* imagePath, const FloatImageData* imageData);
 extern Shader graphicsShaderCreate(const s8* vertexShaderPath, const s8* fragmentShaderPath);
+extern Shader graphicsShaderCreateWithGeometryShader(const s8* vertexShaderPath, const s8* fragmentShaderPath, const s8* geometryShaderPath);
 extern Mesh graphicsQuadCreateWithTexture(u32 texture);
 extern Mesh graphicsQuadCreateWithColor(Vec4 color);
 extern Mesh graphicsMeshCreateWithColor(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo, Vec4 diffuseColor);
 extern Mesh graphicsMeshCreateWithTexture(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo, u32 diffuseMap);
 extern Mesh graphicsMeshCreateFromObjWithColor(const s8* objPath, NormalMappingInfo* normalInfo, Vec4 diffuseColor);
 extern Mesh graphicsMeshCreateFromObjWithTexture(const s8* objPath, NormalMappingInfo* normalInfo, u32 diffuseMap);
+extern Mesh graphicsMeshCreateForPointShader(Vec2* vertices, u32 verticesSize, Vec4* color);
+extern void graphicsMeshRenderPointShader(Shader shader, Mesh mesh);
 extern void graphicsMeshRender(Shader shader, Mesh mesh);
 // If mesh already has a diffuse map, the older diffuse map will be deleted if deleteDiffuseMap is true.
 // If mesh has a color instead of a diffuse map, the mesh will lose the color and be set to use the diffuse map.

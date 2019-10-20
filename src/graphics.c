@@ -6,6 +6,7 @@
 #include <stb_image_write.h>
 #include <dynamic_array.h>
 #include <math.h>
+#include <GLFW/glfw3.h>
 
 extern ImageData graphicsImageLoad(const s8* imagePath)
 {
@@ -70,17 +71,23 @@ extern void graphicsFloatImageSave(const s8* imagePath, const FloatImageData* im
 	graphicsImageFree(&id);
 }
 
-extern Shader graphicsShaderCreate(const s8* vertexShaderPath, const s8* fragmentShaderPath)
+extern Shader graphicsShaderCreateWithGeometryShader(const s8* vertexShaderPath, const s8* fragmentShaderPath,
+	const s8* geometryShaderPath)
 {
 	s8* vertexShaderCode = utilReadFile(vertexShaderPath, 0);
 	s8* fragmentShaderCode = utilReadFile(fragmentShaderPath, 0);
+	s8* geometryShaderCode;
+	if (geometryShaderPath != NULL) geometryShaderCode = utilReadFile(geometryShaderPath, 0);
 
 	GLint success;
 	GLchar infoLogBuffer[1024];
 	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
 	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+	GLuint geometryShader;
+	if (geometryShaderPath != NULL) geometryShader = glCreateShader(GL_GEOMETRY_SHADER);
 	glShaderSource(vertexShader, 1, (const GLchar *const*)&vertexShaderCode, 0);
 	glShaderSource(fragmentShader, 1, (const GLchar *const*)&fragmentShaderCode, 0);
+	if (geometryShaderPath != NULL) glShaderSource(geometryShader, 1, (const GLchar *const*)&geometryShaderCode, 0);
 
 	glCompileShader(vertexShader);
 	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
@@ -98,10 +105,22 @@ extern Shader graphicsShaderCreate(const s8* vertexShaderPath, const s8* fragmen
 		printf("Error compiling fragment shader: %s\n", infoLogBuffer);
 	}
 
+	if (geometryShaderPath != NULL)
+	{
+		glCompileShader(geometryShader);
+		glGetShaderiv(geometryShader, GL_COMPILE_STATUS, &success);
+		if (!success)
+		{
+			glGetShaderInfoLog(geometryShader, 1024, 0, infoLogBuffer);
+			printf("Error compiling geometry shader: %s\n", infoLogBuffer);
+		}
+	}
+
 	GLuint shaderProgram = glCreateProgram();
 
 	glAttachShader(shaderProgram, vertexShader);
 	glAttachShader(shaderProgram, fragmentShader);
+	if (geometryShaderPath != NULL) glAttachShader(shaderProgram, geometryShader);
 	glLinkProgram(shaderProgram);
 
 	glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
@@ -113,7 +132,13 @@ extern Shader graphicsShaderCreate(const s8* vertexShaderPath, const s8* fragmen
 
 	free(vertexShaderCode);
 	free(fragmentShaderCode);
+	if (geometryShaderPath != NULL) free(geometryShaderCode);
 	return shaderProgram;
+}
+
+extern Shader graphicsShaderCreate(const s8* vertexShaderPath, const s8* fragmentShaderPath)
+{
+	return graphicsShaderCreateWithGeometryShader(vertexShaderPath, fragmentShaderPath, NULL);
 }
 
 // Vertices must be Vertex[4]
@@ -296,6 +321,47 @@ static void normalsUpdateUniforms(const NormalMappingInfo* normalInfo, Shader sh
 	}
 }
 
+extern void graphicsMeshRenderPointShader(Shader shader, Mesh mesh)
+{
+	glBindVertexArray(mesh.VAO);
+	glUseProgram(shader);
+	glDrawArrays(GL_POINTS, 0, mesh.indexesSize);
+	glUseProgram(0);
+	glBindVertexArray(0);
+}
+
+extern Mesh graphicsMeshCreateForPointShader(Vec2* vertices, u32 verticesSize, Vec4* colors)
+{
+	Mesh mesh;
+	GLuint VBO, VAO;
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+
+	glBindVertexArray(VAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, verticesSize * sizeof(Vec2) + verticesSize * sizeof(Vec4), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, verticesSize * sizeof(Vec2), vertices);
+	glBufferSubData(GL_ARRAY_BUFFER, verticesSize * sizeof(Vec2), verticesSize * sizeof(Vec4), colors);
+
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(0);
+	
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)(verticesSize * sizeof(Vec2)));
+	glEnableVertexAttribArray(1);
+
+	glBindVertexArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	mesh.VAO = VAO;
+	mesh.VBO = VBO;
+	mesh.EBO = -1;
+	mesh.indexesSize = verticesSize;
+
+	return mesh;
+}
+
 // This function must be re-done.
 // This implementation is just temporary, but it's not bug-free and will work only for a limited set of objs.
 extern void graphicsMeshRender(Shader shader, Mesh mesh)
@@ -442,6 +508,8 @@ extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCame
 	GLint modelMatrixLocation = glGetUniformLocation(shader, "modelMatrix");
 	GLint viewMatrixLocation = glGetUniformLocation(shader, "viewMatrix");
 	GLint projectionMatrixLocation = glGetUniformLocation(shader, "projectionMatrix");
+	GLint timeLocation = glGetUniformLocation(shader, "time");
+	glUniform1f(timeLocation, glfwGetTime());
 	glUniform4f(cameraPositionLocation, camera->position.x, camera->position.y, camera->position.z, camera->position.w);
 	glUniform1f(shinenessLocation, 128.0f);
 	glUniformMatrix4fv(modelMatrixLocation, 1, GL_TRUE, (GLfloat*)entity->modelMatrix.data);

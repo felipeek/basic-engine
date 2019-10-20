@@ -8,12 +8,36 @@
 
 #define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
 #define PHONG_FRAGMENT_SHADER_PATH "./shaders/phong_shader.fs"
+#define PHONG_GEOMETRY_SHADER_PATH "./shaders/phong_shader.gs"
+#define POINT_VERTEX_SHADER_PATH "./shaders/point_shader.vs"
+#define POINT_FRAGMENT_SHADER_PATH "./shaders/point_shader.fs"
+#define POINT_GEOMETRY_SHADER_PATH "./shaders/point_shader.gs"
 #define GIM_ENTITY_COLOR (Vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
 static Shader phongShader;
+static Shader pointShader;
 static PerspectiveCamera camera;
 static Light* lights;
 static Entity e;
+
+static Mesh points;
+
+static Mesh createPoints()
+{
+	Vec2 vertices[4] = {
+		{0.5f, 0.5f},
+		{-0.5f, -0.5f},
+		{-0.5f, 0.5f},
+		{0.5f, -0.5f}
+	};
+	Vec4 colors[4] = {
+		{1.0f, 0.0f, 0.0f, 1.0f},
+		{0.0f, 1.0f, 0.0f, 1.0f},
+		{0.0f, 0.0f, 1.0f, 1.0f},
+		{0.0f, 0.0f, 0.0f, 1.0f}
+	};
+	return graphicsMeshCreateForPointShader(vertices, 4, colors);
+}
 
 static PerspectiveCamera createCamera()
 {
@@ -46,7 +70,8 @@ static Light* createLights()
 extern int coreInit()
 {
 	// Create shader
-	phongShader = graphicsShaderCreate(PHONG_VERTEX_SHADER_PATH, PHONG_FRAGMENT_SHADER_PATH);
+	phongShader = graphicsShaderCreateWithGeometryShader(PHONG_VERTEX_SHADER_PATH, PHONG_FRAGMENT_SHADER_PATH, PHONG_GEOMETRY_SHADER_PATH);
+	pointShader = graphicsShaderCreateWithGeometryShader(POINT_VERTEX_SHADER_PATH, POINT_FRAGMENT_SHADER_PATH, POINT_GEOMETRY_SHADER_PATH);
 	// Create camera
 	camera = createCamera();
 	// Create light
@@ -54,6 +79,8 @@ extern int coreInit()
 
 	Mesh m = graphicsMeshCreateFromObjWithColor("./res/horse.obj", 0, (Vec4){1.0f, 0.0f, 0.0f, 0.0f});
 	graphicsEntityCreate(&e, m, (Vec4){0.0f, 0.0f, 0.0f, 1.0f}, (Vec3){0.0f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f});
+
+	points = createPoints();
 
 	return 0;
 }
@@ -71,6 +98,7 @@ extern void coreUpdate(r32 deltaTime)
 extern void coreRender()
 {
 	graphicsEntityRenderPhongShader(phongShader, &camera, &e, lights);
+	//graphicsMeshRenderPointShader(pointShader, points);
 }
 
 extern void coreInputProcess(boolean* keyState, r32 deltaTime)
