@@ -133,7 +133,7 @@ extern s32 main(s32 argc, s8** argv)
 		r64 currentFrame = glfwGetTime();
 		if ((s32)currentFrame > frameNumber)
 		{
-			//printf("FPS: %u\n", fps);
+			printf("FPS: %u\n", fps);
 			fps = 0;
 			frameNumber++;
 		}

@@ -42,6 +42,7 @@ struct MeshStruct
 	s32 indexesSize;
 	NormalMappingInfo normalInfo;
 	DiffuseInfo diffuseInfo;
+	s32 instanceNum;
 };
 
 struct EntityStruct
@@ -83,6 +84,8 @@ extern void graphicsFloatImageSave(const s8* imagePath, const FloatImageData* im
 extern Shader graphicsShaderCreate(const s8* vertexShaderPath, const s8* fragmentShaderPath);
 extern Mesh graphicsQuadCreateWithTexture(u32 texture);
 extern Mesh graphicsQuadCreateWithColor(Vec4 color);
+extern Mesh graphicsSteroidMeshCreateWithColor(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize,
+	NormalMappingInfo* normalInfo, Vec4 diffuseColor, s32 steroidsQuantity, Mat4* modelMatrices);
 extern Mesh graphicsMeshCreateWithColor(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo, Vec4 diffuseColor);
 extern Mesh graphicsMeshCreateWithTexture(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo, u32 diffuseMap);
 extern Mesh graphicsMeshCreateFromObjWithColor(const s8* objPath, NormalMappingInfo* normalInfo, Vec4 diffuseColor);
@@ -102,6 +105,7 @@ extern void graphicsEntitySetRotation(Entity* entity, Vec3 worldRotation);
 extern void graphicsEntitySetScale(Entity* entity, Vec3 worldScale);
 extern void graphicsEntityRenderBasicShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity);
 extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* lights);
+extern void graphicsEntityRenderInstanceShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* lights);
 extern void graphicsLightCreate(Light* light, Vec4 position, Vec4 ambientColor, Vec4 diffuseColor, Vec4 specularColor);
 extern u32 graphicsTextureCreate(const s8* texturePath);
 extern u32 graphicsTextureCreateFromData(const ImageData* imageData);

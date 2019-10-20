@@ -168,6 +168,87 @@ extern Mesh graphicsQuadCreateWithColor(Vec4 color)
 		sizeof(indices) / sizeof(u32), 0, color);
 }
 
+static Mesh createSteroidMesh(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo,
+	Mat4* modelMatrices, s32 steroidsQuantity)
+{
+	Mesh mesh;
+	GLuint VBO, EBO, VAO, instancingVBO;
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glGenBuffers(1, &EBO);
+	glGenBuffers(1, &instancingVBO);
+
+	glBindVertexArray(VAO);
+
+	// create VBO buffer
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, verticesSize * sizeof(Vertex), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, verticesSize * sizeof(Vertex), vertices);
+
+	// create EBO buffer
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesSize * sizeof(u32), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, indicesSize * sizeof(u32), indices);
+
+	// create instanceVBO buffer
+	glBindBuffer(GL_ARRAY_BUFFER, instancingVBO);
+	glBufferData(GL_ARRAY_BUFFER, steroidsQuantity * sizeof(Mat4), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, steroidsQuantity * sizeof(Mat4), modelMatrices);
+
+	// set VertexAttribs that are related to VBO
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 10 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(0);
+
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 10 * sizeof(GLfloat), (void*)(4 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(1);
+
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 10 * sizeof(GLfloat), (void*)(8 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(2);
+
+	// set VertexAttribs that are related to instanceVBO
+	glBindBuffer(GL_ARRAY_BUFFER, instancingVBO);
+
+	glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(Vec4), (void*)(0 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(3);
+
+	glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(Vec4), (void*)(4 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(4);
+
+	glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(Vec4), (void*)(8 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(5);
+
+	glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(Vec4), (void*)(12 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(6);
+
+	glVertexAttribDivisor(3, 1);
+	glVertexAttribDivisor(4, 1);
+	glVertexAttribDivisor(5, 1);
+	glVertexAttribDivisor(6, 1);
+
+	glBindVertexArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	mesh.VAO = VAO;
+	mesh.VBO = VBO;
+	mesh.EBO = EBO;
+	mesh.instanceNum = steroidsQuantity;
+	mesh.indexesSize = indicesSize;
+
+	if (!normalInfo)
+	{
+		mesh.normalInfo.tangentSpace = false;
+		mesh.normalInfo.useNormalMap = false;
+		mesh.normalInfo.normalMapTexture = 0;
+	}
+	else
+		mesh.normalInfo = *normalInfo;
+
+	return mesh;
+}
+
 static Mesh createSimpleMesh(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo)
 {
 	Mesh mesh;
@@ -220,6 +301,15 @@ static Mesh createSimpleMesh(Vertex* vertices, s32 verticesSize, u32* indices, s
 extern Mesh graphicsMeshCreateWithColor(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo, Vec4 diffuseColor)
 {
 	Mesh mesh = createSimpleMesh(vertices, verticesSize, indices, indicesSize, normalInfo);
+	mesh.diffuseInfo.useDiffuseMap = false;
+	mesh.diffuseInfo.diffuseColor = diffuseColor;
+	return mesh;
+}
+
+extern Mesh graphicsSteroidMeshCreateWithColor(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize,
+	NormalMappingInfo* normalInfo, Vec4 diffuseColor, s32 steroidsQuantity, Mat4* modelMatrices)
+{
+	Mesh mesh = createSteroidMesh(vertices, verticesSize, indices, indicesSize, normalInfo, modelMatrices, steroidsQuantity);
 	mesh.diffuseInfo.useDiffuseMap = false;
 	mesh.diffuseInfo.diffuseColor = diffuseColor;
 	return mesh;
@@ -305,6 +395,19 @@ extern void graphicsMeshRender(Shader shader, Mesh mesh)
 	diffuseUpdateUniforms(&mesh.diffuseInfo, shader);
 	normalsUpdateUniforms(&mesh.normalInfo, shader);
 	glDrawElements(GL_TRIANGLES, mesh.indexesSize, GL_UNSIGNED_INT, 0);
+	glUseProgram(0);
+	glBindVertexArray(0);
+}
+
+// This function must be re-done.
+// This implementation is just temporary, but it's not bug-free and will work only for a limited set of objs.
+extern void graphicsInstanceMeshRender(Shader shader, Mesh mesh)
+{
+	glBindVertexArray(mesh.VAO);
+	glUseProgram(shader);
+	diffuseUpdateUniforms(&mesh.diffuseInfo, shader);
+	normalsUpdateUniforms(&mesh.normalInfo, shader);
+	glDrawElementsInstanced(GL_TRIANGLES, mesh.indexesSize, GL_UNSIGNED_INT, 0, mesh.instanceNum);
 	glUseProgram(0);
 	glBindVertexArray(0);
 }
@@ -448,6 +551,22 @@ extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCame
 	glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->viewMatrix.data);
 	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->projectionMatrix.data);
 	graphicsMeshRender(shader, entity->mesh);
+	glUseProgram(0);
+}
+
+extern void graphicsEntityRenderInstanceShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* lights)
+{
+	glUseProgram(shader);
+	lightUpdateUniforms(lights, shader);
+	GLint cameraPositionLocation = glGetUniformLocation(shader, "cameraPosition");
+	GLint shinenessLocation = glGetUniformLocation(shader, "objectShineness");
+	GLint viewMatrixLocation = glGetUniformLocation(shader, "viewMatrix");
+	GLint projectionMatrixLocation = glGetUniformLocation(shader, "projectionMatrix");
+	glUniform4f(cameraPositionLocation, camera->position.x, camera->position.y, camera->position.z, camera->position.w);
+	glUniform1f(shinenessLocation, 128.0f);
+	glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->viewMatrix.data);
+	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->projectionMatrix.data);
+	graphicsInstanceMeshRender(shader, entity->mesh);
 	glUseProgram(0);
 }
 
