@@ -110,4 +110,5 @@ extern void graphicsTextureDelete(u32 textureId);
 extern FloatImageData graphicsImageDataToFloatImageData(ImageData* imageData, r32* memory);
 extern ImageData graphicsFloatImageDataToImageData(const FloatImageData* floatImageData, u8* memory);
 
+extern void graphicsQuadRender(Shader shader, unsigned int tex, boolean hdr);
 #endif

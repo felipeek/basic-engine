@@ -122,7 +122,8 @@ extern s32 main(s32 argc, s8** argv)
 	while (!glfwWindowShouldClose(mainWindow))
 	{
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glClearColor(0.2074f, 0.3168f, 0.3615f, 1.0f);
+		//glClearColor(0.2074f, 0.3168f, 0.3615f, 1.0f);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
 		coreUpdate(deltaTime);
 		coreRender();

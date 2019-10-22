@@ -296,6 +296,61 @@ static void normalsUpdateUniforms(const NormalMappingInfo* normalInfo, Shader sh
 	}
 }
 
+boolean isQuadMeshInitialized = false;
+Mesh quadMesh;
+
+// This function must be re-done.
+// This implementation is just temporary, but it's not bug-free and will work only for a limited set of objs.
+extern void graphicsQuadRender(Shader shader, unsigned int tex, boolean hdr)
+{
+	if (!isQuadMeshInitialized) {
+		Vec2 vertices[6] = {
+			{-1.0f, -1.0f},
+			{1.0f, -1.0f},
+			{-1.0f, 1.0f},
+			{1.0f, -1.0f},
+			{1.0f, 1.0f},
+			{-1.0f, 1.0f}
+		};
+
+		Mesh mesh;
+		GLuint VBO, VAO;
+		glGenVertexArrays(1, &VAO);
+		glGenBuffers(1, &VBO);
+
+		glBindVertexArray(VAO);
+
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(Vec2), 0, GL_STATIC_DRAW);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, 6 * sizeof(Vec2), vertices);
+
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
+		glEnableVertexAttribArray(0);
+
+		glBindVertexArray(0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		mesh.VAO = VAO;
+		mesh.VBO = VBO;
+
+		quadMesh = mesh;
+		isQuadMeshInitialized = true;
+	}
+
+	glBindVertexArray(quadMesh.VAO);
+	glUseProgram(shader);
+	GLint screenTextureLoc = glGetUniformLocation(shader, "screenTexture");
+	GLint hdrLoc = glGetUniformLocation(shader, "hdr");
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glUniform1i(screenTextureLoc, 0);
+	glUniform1i(hdrLoc, hdr);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glUseProgram(0);
+	glBindVertexArray(0);
+}
+
 // This function must be re-done.
 // This implementation is just temporary, but it's not bug-free and will work only for a limited set of objs.
 extern void graphicsMeshRender(Shader shader, Mesh mesh)
