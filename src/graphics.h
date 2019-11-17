@@ -102,6 +102,7 @@ extern void graphicsEntitySetRotation(Entity* entity, Vec3 worldRotation);
 extern void graphicsEntitySetScale(Entity* entity, Vec3 worldScale);
 extern void graphicsEntityRenderBasicShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity);
 extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* lights);
+extern void graphicsEntityRenderGoochShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity);
 extern void graphicsLightCreate(Light* light, Vec4 position, Vec4 ambientColor, Vec4 diffuseColor, Vec4 specularColor);
 extern u32 graphicsTextureCreate(const s8* texturePath);
 extern u32 graphicsTextureCreateFromData(const ImageData* imageData);

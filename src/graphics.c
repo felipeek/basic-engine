@@ -451,6 +451,28 @@ extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCame
 	glUseProgram(0);
 }
 
+extern void graphicsEntityRenderGoochShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity)
+{
+	Vec4 lightColor = (Vec4) {1.0f, 1.0f, 1.0f, 1.0f};
+	Vec4 lightPosition = (Vec4) {0.0f, 3.0f, 0.0f, 1.0f};
+
+	glUseProgram(shader);
+	GLint lightColorLocation = glGetUniformLocation(shader, "lightColor");
+	GLint lightPositionLocation = glGetUniformLocation(shader, "lightPosition");
+	GLint cameraPositionLocation = glGetUniformLocation(shader, "cameraPosition");
+	GLint modelMatrixLocation = glGetUniformLocation(shader, "modelMatrix");
+	GLint viewMatrixLocation = glGetUniformLocation(shader, "viewMatrix");
+	GLint projectionMatrixLocation = glGetUniformLocation(shader, "projectionMatrix");
+	glUniform4f(cameraPositionLocation, camera->position.x, camera->position.y, camera->position.z, camera->position.w);
+	glUniform4f(lightColorLocation, lightColor.x, lightColor.y, lightColor.z, lightColor.w);
+	glUniform4f(lightPositionLocation, lightPosition.x, lightPosition.y, lightPosition.z, lightPosition.w);
+	glUniformMatrix4fv(modelMatrixLocation, 1, GL_TRUE, (GLfloat*)entity->modelMatrix.data);
+	glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->viewMatrix.data);
+	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->projectionMatrix.data);
+	graphicsMeshRender(shader, entity->mesh);
+	glUseProgram(0);
+}
+
 extern u32 graphicsTextureCreateFromData(const ImageData* imageData)
 {
 	u32 textureId;

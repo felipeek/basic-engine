@@ -8,9 +8,11 @@
 
 #define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
 #define PHONG_FRAGMENT_SHADER_PATH "./shaders/phong_shader.fs"
+#define GOOCH_VERTEX_SHADER_PATH "./shaders/gooch_shader.vs"
+#define GOOCH_FRAGMENT_SHADER_PATH "./shaders/gooch_shader.fs"
 #define GIM_ENTITY_COLOR (Vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
-static Shader phongShader;
+static Shader phongShader, goochShader;
 static PerspectiveCamera camera;
 static Light* lights;
 static Entity e;
@@ -47,6 +49,7 @@ extern int coreInit()
 {
 	// Create shader
 	phongShader = graphicsShaderCreate(PHONG_VERTEX_SHADER_PATH, PHONG_FRAGMENT_SHADER_PATH);
+	goochShader = graphicsShaderCreate(GOOCH_VERTEX_SHADER_PATH, GOOCH_FRAGMENT_SHADER_PATH);
 	// Create camera
 	camera = createCamera();
 	// Create light
@@ -70,7 +73,7 @@ extern void coreUpdate(r32 deltaTime)
 
 extern void coreRender()
 {
-	graphicsEntityRenderPhongShader(phongShader, &camera, &e, lights);
+	graphicsEntityRenderGoochShader(goochShader, &camera, &e);
 }
 
 extern void coreInputProcess(boolean* keyState, r32 deltaTime)
