@@ -23,7 +23,7 @@ void main()
 
 	vec4 lightDirection = normalize(lightPosition - fragmentPosition);
 	//vec4 r = 2.0 * dot(normal, lightDirection) * (normal - lightDirection);
-	vec4 r = reflect(lightDirection, normal);
+	vec4 r = reflect(-lightDirection, normal);
 	vec4 v = normalize(cameraPosition - fragmentPosition);
 	float s = clamp((100.0 * dot(r, v) - 97.0), 0.0, 1.0);
 
