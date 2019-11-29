@@ -1,4 +1,4 @@
-#include "graphics_math.h"
+#include "graphics_math.hpp"
 #include <math.h>
 #include <assert.h>
 #include <stdio.h>

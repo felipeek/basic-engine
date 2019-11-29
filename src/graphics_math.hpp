@@ -1,6 +1,6 @@
 #ifndef BASIC_ENGINE_GRAPHICS_MATH_H
 #define BASIC_ENGINE_GRAPHICS_MATH_H
-#include "common.h"
+#include "common.hpp"
 
 typedef struct Mat4Struct Mat4;
 typedef struct Mat3Struct Mat3;

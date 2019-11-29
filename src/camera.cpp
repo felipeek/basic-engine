@@ -1,4 +1,4 @@
-#include "camera.h"
+#include "camera.hpp"
 #include <math.h>
 
 extern s32 windowWidth;

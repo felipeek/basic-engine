@@ -1,10 +1,11 @@
 #include <GLFW/glfw3.h>
 #include <dynamic_array.h>
-#include "core.h"
-#include "graphics.h"
+#include "core.hpp"
+#include "graphics.hpp"
 #include <math.h>
-#include "obj.h"
+#include "obj.hpp"
 #include <stdio.h>
+#include "collada.hpp"
 
 #define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
 #define PHONG_FRAGMENT_SHADER_PATH "./shaders/phong_shader.fs"
@@ -52,7 +53,18 @@ extern int coreInit()
 	// Create light
 	lights = createLights();
 
-	Mesh m = graphicsMeshCreateFromObjWithColor("./res/horse.obj", 0, (Vec4){1.0f, 0.0f, 0.0f, 0.0f});
+	//Mesh m = graphicsMeshCreateFromObjWithColor("./res/horse.obj", 0, (Vec4){1.0f, 0.0f, 0.0f, 0.0f});
+	//graphicsEntityCreate(&e, m, (Vec4){0.0f, 0.0f, 0.0f, 1.0f}, (Vec3){0.0f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f});
+
+	AnimatedVertex** vertices;
+	unsigned int** indices;
+	if (colladaLoad("./res/model.dae", &vertices, &indices)) {
+		printf("Collada fatal error\n");
+		return -1;
+	}
+
+	Mesh m = graphicsMeshAnimatedCreateWithColor(vertices[0], array_get_length(vertices[0]), indices[0], array_get_length(indices[0]), NULL,
+		(Vec4){1.0f, 0.0f, 0.0f, 1.0f});
 	graphicsEntityCreate(&e, m, (Vec4){0.0f, 0.0f, 0.0f, 1.0f}, (Vec3){0.0f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f});
 
 	return 0;

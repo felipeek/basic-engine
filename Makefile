@@ -1,7 +1,7 @@
 IDIR=include
 CC=gcc
 CCXX=g++
-CFLAGS=-I$(IDIR) -g
+CFLAGS=-I$(IDIR) -I/usr/include/libxml2 -g
 
 SRCDIR=src
 OUTDIR=bin
@@ -12,13 +12,13 @@ UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
 	LIBS=-framework OpenGL -lm -lglfw -lglew
 else
-	LIBS=-lm -lglfw -lGLEW -lGL -lpng -lz
+	LIBS=-lm -lglfw -lGLEW -lGL -lpng -lz -lxml2 -lassimp
 endif
 
-_DEPS = camera.h common.h core.h graphics_math.h graphics.h obj.h util.h
+_DEPS = animation.hpp camera.hpp collada.hpp common.hpp core.hpp graphics_math.hpp graphics.hpp quaternion.hpp obj.hpp util.hpp
 DEPS = $(patsubst %,$(SRCDIR)/%,$(_DEPS))
 
-_OBJ = camera.o core.o graphics_math.o graphics.o main.o obj.o util.o
+_OBJ = animation.o camera.o collada.o core.o graphics_math.o graphics.o quaternion.o main.o obj.o util.o
 OBJ = $(patsubst %,$(OBJDIR)/%,$(_OBJ))
 
 all: basic-engine

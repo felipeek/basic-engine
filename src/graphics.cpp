@@ -1,6 +1,6 @@
-#include "graphics.h"
-#include "util.h"
-#include "obj.h"
+#include "graphics.hpp"
+#include "util.hpp"
+#include "obj.hpp"
 #include <GL/glew.h>
 #include <stb_image.h>
 #include <stb_image_write.h>
@@ -41,7 +41,7 @@ extern FloatImageData graphicsFloatImageCopy(const FloatImageData* imageData)
 
 	fid = *imageData;
 
-	fid.data = malloc(sizeof(r32) * fid.width * fid.height * fid.channels);
+	fid.data = (r32*)malloc(sizeof(r32) * fid.width * fid.height * fid.channels);
 	memcpy(fid.data, imageData->data, sizeof(r32) * fid.width * fid.height * fid.channels);
 	
 	return fid;
@@ -168,6 +168,61 @@ extern Mesh graphicsQuadCreateWithColor(Vec4 color)
 		sizeof(indices) / sizeof(u32), 0, color);
 }
 
+static Mesh createSimpleAnimatedMesh(AnimatedVertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo)
+{
+	Mesh mesh;
+	GLuint VBO, EBO, VAO;
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glGenBuffers(1, &EBO);
+
+	glBindVertexArray(VAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, verticesSize * sizeof(AnimatedVertex), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, verticesSize * sizeof(AnimatedVertex), vertices);
+
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(AnimatedVertex), (void*)(0 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(0);
+
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(AnimatedVertex), (void*)(4 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(1);
+
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(AnimatedVertex), (void*)(8 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(2);
+
+	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(AnimatedVertex), (void*)(10 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(3);
+
+	glVertexAttribIPointer(4, 3, GL_INT, sizeof(AnimatedVertex), (void*)(13 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(4);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesSize * sizeof(u32), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, indicesSize * sizeof(u32), indices);
+
+	glBindVertexArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+	mesh.VAO = VAO;
+	mesh.VBO = VBO;
+	mesh.EBO = EBO;
+	mesh.indexesSize = indicesSize;
+
+	if (!normalInfo)
+	{
+		mesh.normalInfo.tangentSpace = false;
+		mesh.normalInfo.useNormalMap = false;
+		mesh.normalInfo.normalMapTexture = 0;
+	}
+	else
+		mesh.normalInfo = *normalInfo;
+
+	return mesh;
+}
+
 static Mesh createSimpleMesh(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo)
 {
 	Mesh mesh;
@@ -214,6 +269,14 @@ static Mesh createSimpleMesh(Vertex* vertices, s32 verticesSize, u32* indices, s
 	else
 		mesh.normalInfo = *normalInfo;
 
+	return mesh;
+}
+
+extern Mesh graphicsMeshAnimatedCreateWithColor(AnimatedVertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo, Vec4 diffuseColor)
+{
+	Mesh mesh = createSimpleAnimatedMesh(vertices, verticesSize, indices, indicesSize, normalInfo);
+	mesh.diffuseInfo.useDiffuseMap = false;
+	mesh.diffuseInfo.diffuseColor = diffuseColor;
 	return mesh;
 }
 

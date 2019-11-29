@@ -1,7 +1,7 @@
 #ifndef BASIC_ENGINE_CORE_H
 #define BASIC_ENGINE_CORE_H
 
-#include "common.h"
+#include "common.hpp"
 
 extern int coreParseArguments(s32 argc, char** argv);
 extern int coreInit();

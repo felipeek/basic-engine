@@ -1,10 +1,10 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 #include <iostream>
-#include "graphics.h"
+#include "graphics.hpp"
 #include <dynamic_array.h>
 
-extern "C" int objParse(const char* objPath, Vertex** vertices, u32** indexes)
+int objParse(const char* objPath, Vertex** vertices, u32** indexes)
 {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;

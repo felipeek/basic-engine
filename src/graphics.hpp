@@ -1,10 +1,12 @@
 #ifndef BASIC_ENGINE_GRAPHICS_H
 #define BASIC_ENGINE_GRAPHICS_H
-#include "graphics_math.h"
-#include "camera.h"
+#include "graphics_math.hpp"
+#include "camera.hpp"
 
 typedef u32 Shader;
+typedef struct AnimatedVertexStruct AnimatedVertex;
 typedef struct VertexStruct Vertex;
+typedef struct VertexWithJointsStruct VertexWithJoints;
 typedef struct NormalMappingInfoStruct NormalMappingInfo;
 typedef struct MeshStruct Mesh;
 typedef struct EntityStruct Entity;
@@ -14,11 +16,33 @@ typedef struct FloatImageDataStruct FloatImageData;
 typedef struct DiffuseInfoStruct DiffuseInfo;
 
 #pragma pack(push, 1)
+struct AnimatedVertexStruct
+{
+	Vec4 position;
+	Vec4 normal;
+	Vec2 textureCoordinates;
+	Vec3 boneWeights;
+	DiscreteVec3 boneIDs;
+};
+#pragma pack(pop)
+
+#pragma pack(push, 1)
 struct VertexStruct
 {
 	Vec4 position;
 	Vec4 normal;
 	Vec2 textureCoordinates;
+};
+#pragma pack(pop)
+
+#pragma pack(push, 1)
+struct VertexWithJointsStruct
+{
+	Vec4 position;
+	Vec4 normal;
+	Vec2 textureCoordinates;
+	DiscreteVec3 jointsID;
+	Vec3 jointsWeights;
 };
 #pragma pack(pop)
 
@@ -84,6 +108,7 @@ extern Shader graphicsShaderCreate(const s8* vertexShaderPath, const s8* fragmen
 extern Mesh graphicsQuadCreateWithTexture(u32 texture);
 extern Mesh graphicsQuadCreateWithColor(Vec4 color);
 extern Mesh graphicsMeshCreateWithColor(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo, Vec4 diffuseColor);
+extern Mesh graphicsMeshAnimatedCreateWithColor(AnimatedVertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo, Vec4 diffuseColor);
 extern Mesh graphicsMeshCreateWithTexture(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo, u32 diffuseMap);
 extern Mesh graphicsMeshCreateFromObjWithColor(const s8* objPath, NormalMappingInfo* normalInfo, Vec4 diffuseColor);
 extern Mesh graphicsMeshCreateFromObjWithTexture(const s8* objPath, NormalMappingInfo* normalInfo, u32 diffuseMap);

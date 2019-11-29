@@ -1,6 +1,7 @@
 #define DYNAMIC_ARRAY_IMPLEMENT
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+#define LIGHT_ARRAY_IMPLEMENT
 #include <dynamic_array.h>
 #include <stb_image.h>
 #include <stb_image_write.h>
@@ -8,7 +9,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <stdio.h>
-#include "core.h"
+#include "core.hpp"
 
 #define WINDOW_TITLE "basic-engine"
 
