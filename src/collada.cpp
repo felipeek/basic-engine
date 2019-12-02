@@ -104,6 +104,7 @@ static void processMesh(aiMesh* mesh, const aiScene* scene, AnimatedVertex** _ve
 	{
 		aiBone* currentBone = mesh->mBones[i];
 		hash_table_insert(&htBoneNameToIndex, mesh->mBones[i]->mName.C_Str(), &i);
+		printf("%d. %s\n", i, mesh->mBones[i]->mName.C_Str());
 	}
 
 	aiString* boneNames = array_create(aiString, 10);
@@ -120,17 +121,28 @@ static void processMesh(aiMesh* mesh, const aiScene* scene, AnimatedVertex** _ve
 			s32 vertexIndex = vertexWeight.mVertexId;
 			AnimatedVertex* animatedVertex = &vertices[vertexIndex];
 
-			if (animatedVertex->boneWeights.x < vertexWeight.mWeight) {
+			// @TODO: don't discard excess...
+			if (animatedVertex->boneWeights.x == 0.0f) {
 				animatedVertex->boneWeights.x = vertexWeight.mWeight;
 				animatedVertex->boneIDs.x = boneID;
-			} else if (animatedVertex->boneWeights.y < vertexWeight.mWeight) {
+			} else if (animatedVertex->boneWeights.y == 0.0f) {
 				animatedVertex->boneWeights.y = vertexWeight.mWeight;
 				animatedVertex->boneIDs.y = boneID;
-			} else if (animatedVertex->boneWeights.z < vertexWeight.mWeight) {
+			} else if (animatedVertex->boneWeights.z == 0.0f) {
 				animatedVertex->boneWeights.z = vertexWeight.mWeight;
 				animatedVertex->boneIDs.z = boneID;
 			}
 		}
+	}
+
+	// normalize weights
+	for (unsigned int i = 0; i < array_get_length(vertices); ++i) {
+		AnimatedVertex* animatedVertex = &vertices[i];
+		float sum = animatedVertex->boneWeights.x + animatedVertex->boneWeights.y + animatedVertex->boneWeights.z;
+		float k = 1.0f / sum;
+		animatedVertex->boneWeights = gmScalarProductVec3(k, animatedVertex->boneWeights);
+		printf("GOT: <%.3f, %.3f, %.3f>\n", animatedVertex->boneWeights.x, animatedVertex->boneWeights.y, animatedVertex->boneWeights.z);
+		printf("with BoneID: <%d, %d, %d>\n", animatedVertex->boneIDs.x, animatedVertex->boneIDs.y, animatedVertex->boneIDs.z);
 	}
 
 	Joint rootJoint;
@@ -151,7 +163,7 @@ static void processMesh(aiMesh* mesh, const aiScene* scene, AnimatedVertex** _ve
 		0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	rootJoint.bindModelSpaceToBoneSpaceTransform = gmMultiplyMat4(&CORRECTION, &(rootJoint.bindModelSpaceToBoneSpaceTransform));
+	//rootJoint.bindModelSpaceToBoneSpaceTransform = gmMultiplyMat4(&CORRECTION, &(rootJoint.bindModelSpaceToBoneSpaceTransform));
 
 	test = (Vec4){0.0f, 0.0f, 0.0f, 1.0f};
 	result = gmMultiplyMat4AndVec4(&rootJoint.bindModelSpaceToBoneSpaceTransform, test);
@@ -197,8 +209,7 @@ static void processMesh(aiMesh* mesh, const aiScene* scene, AnimatedVertex** _ve
 				BonePosition bp;
    				bp.boneID = *(s32*)hash_table_get(&htBoneNameToIndex, meshAnim->mNodeName.C_Str());
 				bp.position = (Vec3){positionVK.mValue.x, positionVK.mValue.y, positionVK.mValue.z};
-				bp.rotation = quaternion_new((Vec3){rotationVK.mValue.x, rotationVK.mValue.y,
-					rotationVK.mValue.z}, rotationVK.mValue.w);
+				bp.rotation = (Quaternion){rotationVK.mValue.x, rotationVK.mValue.y, rotationVK.mValue.z, rotationVK.mValue.w};
 				keyFrameAddBonePosition(currentKeyFrame, bp);
 			}
 		}

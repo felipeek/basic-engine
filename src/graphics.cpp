@@ -384,7 +384,44 @@ extern void graphicsMeshRenderAnimation(Shader shader, Mesh mesh, Animation anim
 	glUseProgram(shader);
 	GLint jointsLocation = glGetUniformLocation(shader, "joints");
 	GLint jointsNumLocation = glGetUniformLocation(shader, "jointsNum");
-	glUniformMatrix4fv(jointsLocation, 20, GL_TRUE, (GLfloat*)joints);
+	//glUniformMatrix4fv(jointsLocation, 20, GL_TRUE, (GLfloat*)joints);
+
+
+	GLint jointsLocation0 = glGetUniformLocation(shader, "joints[0]");
+	GLint jointsLocation1 = glGetUniformLocation(shader, "joints[1]");
+	GLint jointsLocation2 = glGetUniformLocation(shader, "joints[2]");
+	GLint jointsLocation3 = glGetUniformLocation(shader, "joints[3]");
+	GLint jointsLocation4 = glGetUniformLocation(shader, "joints[4]");
+	GLint jointsLocation5 = glGetUniformLocation(shader, "joints[5]");
+	GLint jointsLocation6 = glGetUniformLocation(shader, "joints[6]");
+	GLint jointsLocation7 = glGetUniformLocation(shader, "joints[7]");
+	GLint jointsLocation8 = glGetUniformLocation(shader, "joints[8]");
+	GLint jointsLocation9 = glGetUniformLocation(shader, "joints[9]");
+	GLint jointsLocation10 = glGetUniformLocation(shader, "joints[10]");
+	GLint jointsLocation11 = glGetUniformLocation(shader, "joints[11]");
+	GLint jointsLocation12 = glGetUniformLocation(shader, "joints[12]");
+	GLint jointsLocation13 = glGetUniformLocation(shader, "joints[13]");
+	GLint jointsLocation14 = glGetUniformLocation(shader, "joints[14]");
+	GLint jointsLocation15 = glGetUniformLocation(shader, "joints[15]");
+	GLint jointsLocation16 = glGetUniformLocation(shader, "joints[16]");
+	glUniformMatrix4fv(jointsLocation0, 1, GL_TRUE, (GLfloat*)&joints[0].data);
+	glUniformMatrix4fv(jointsLocation1, 1, GL_TRUE, (GLfloat*)&joints[1].data);
+	glUniformMatrix4fv(jointsLocation2, 1, GL_TRUE, (GLfloat*)&joints[2].data);
+	glUniformMatrix4fv(jointsLocation3, 1, GL_TRUE, (GLfloat*)&joints[3].data);
+	glUniformMatrix4fv(jointsLocation4, 1, GL_TRUE, (GLfloat*)&joints[4].data);
+	glUniformMatrix4fv(jointsLocation5, 1, GL_TRUE, (GLfloat*)&joints[5].data);
+	glUniformMatrix4fv(jointsLocation6, 1, GL_TRUE, (GLfloat*)&joints[6].data);
+	glUniformMatrix4fv(jointsLocation7, 1, GL_TRUE, (GLfloat*)&joints[7].data);
+	glUniformMatrix4fv(jointsLocation8, 1, GL_TRUE, (GLfloat*)&joints[8].data);
+	glUniformMatrix4fv(jointsLocation9, 1, GL_TRUE, (GLfloat*)&joints[9].data);
+	glUniformMatrix4fv(jointsLocation10, 1, GL_TRUE, (GLfloat*)&joints[10].data);
+	glUniformMatrix4fv(jointsLocation11, 1, GL_TRUE, (GLfloat*)&joints[11].data);
+	glUniformMatrix4fv(jointsLocation12, 1, GL_TRUE, (GLfloat*)&joints[12].data);
+	glUniformMatrix4fv(jointsLocation13, 1, GL_TRUE, (GLfloat*)&joints[13].data);
+	glUniformMatrix4fv(jointsLocation14, 1, GL_TRUE, (GLfloat*)&joints[14].data);
+	glUniformMatrix4fv(jointsLocation15, 1, GL_TRUE, (GLfloat*)&joints[15].data);
+	glUniformMatrix4fv(jointsLocation16, 1, GL_TRUE, (GLfloat*)&joints[16].data);
+	
 	glUniform1i(jointsNumLocation, 20);
 	diffuseUpdateUniforms(&mesh.diffuseInfo, shader);
 	normalsUpdateUniforms(&mesh.normalInfo, shader);

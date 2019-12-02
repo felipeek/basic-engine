@@ -21,22 +21,28 @@ uniform int jointsNum;
 
 void main()
 {
-	vec3 normal3D = mat3(inverse(transpose(modelMatrix))) * vertexNormal.xyz;
-	fragmentNormal = vec4(normal3D, 0.0);
 	fragmentTextureCoords = vertexTextureCoords;
-	fragmentPosition = modelMatrix * vertexPosition;
 
 	vec4 totalLocalPos = vec4(0.0);
+	vec4 totalNormal = vec4(0.0);
 
 	for (int i = 0; i < 3; ++i) {
-		if (boneIDs[i] != 0) {
-			totalLocalPos += vertexPosition * boneWeights[i];
-		} else {
+		//if (boneIDs[i] == 6) {
 			mat4 jointTransform = joints[boneIDs[i]];
-			vec4 posePosition = jointTransform * vertexPosition;
+			vec4 posePosition = jointTransform * vec4(vertexPosition.xyz, 1.0);
 			totalLocalPos += posePosition * boneWeights[i];
-		}
+
+			vec4 worldNormal = jointTransform * vec4(vertexNormal.xyz, 0.0);
+			totalNormal += worldNormal * boneWeights[i];
+		//} else {
+		//	totalLocalPos += vertexPosition * boneWeights[i];
+		//	vec4 worldNormal = vertexPosition * vec4(vertexNormal.xyz, 0.0);
+		//	totalNormal += worldNormal * boneWeights[i];
+		//}
 	}
 
+	vec3 normal3D = mat3(inverse(transpose(modelMatrix))) * totalNormal.xyz;
+	fragmentNormal = vec4(normal3D, 0.0);
 	gl_Position = projectionMatrix * viewMatrix * modelMatrix * totalLocalPos;
+	fragmentPosition = modelMatrix * totalLocalPos;
 }

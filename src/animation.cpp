@@ -84,16 +84,6 @@ static void getJointToModelTransforms(Animation animation, Joint* joint,
 			0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	if (isRoot) {
-		translationMatrix.data[1][3] = bp->position.z;
-		translationMatrix.data[2][3] = bp->position.y;
-		Quaternion rot = quaternion_new((Vec3){0.0f, 0.701f, 0.0f}, 0.701f);
-		correctedQuaternion = quaternion_product(&bp->rotation, &rot);
-	}
-
-	Mat4 rotationMatrix = quaternion_get_matrix(&correctedQuaternion);
-
-#if 0
 	Mat4 CORRECTION = (Mat4){
 		1.0f, 0.0f, 0.0f, 0.0f,
 		0.0f, 0.0f, 1.0f, 0.0f,
@@ -101,10 +91,13 @@ static void getJointToModelTransforms(Animation animation, Joint* joint,
 		0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	if (isRoot) {
-		translationMatrix = gmMultiplyMat4(&CORRECTION, &translationMatrix);
-	}
-#endif
+	Mat4 rotationMatrix = quaternion_get_matrix(&correctedQuaternion);
+
+	//if (isRoot) {
+	//	translationMatrix.data[1][3] = bp->position.z;
+	//	translationMatrix.data[2][3] = bp->position.y;
+	//	rotationMatrix = gmMultiplyMat4(&CORRECTION, &rotationMatrix);
+	//}
 
 	Mat4 localTransform = gmMultiplyMat4(&translationMatrix, &rotationMatrix);
 
@@ -125,7 +118,8 @@ void fillTransforms(Joint* joint, Mat4* transforms) {
 	Mat4 bindModelCoordsToBoneCoords = joint->bindModelSpaceToBoneSpaceTransform;
 	Mat4 poseBoneCoordsToModelCoords = joint->aux;
 	//assert(gmInverseMat4(&aux, &poseBoneCoordsToModelCoords) == true);
-	transforms[joint->boneID] = gmMultiplyMat4(&bindModelCoordsToBoneCoords, &poseBoneCoordsToModelCoords);
+	//transforms[joint->boneID] = gmMultiplyMat4(&bindModelCoordsToBoneCoords, &poseBoneCoordsToModelCoords);
+	transforms[joint->boneID] = gmMultiplyMat4(&poseBoneCoordsToModelCoords, &bindModelCoordsToBoneCoords);
 
 	for (s32 i = 0; i < array_get_length(joint->children); ++i) {
 		fillTransforms(&joint->children[i], transforms);
