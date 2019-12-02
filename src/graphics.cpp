@@ -6,6 +6,7 @@
 #include <stb_image_write.h>
 #include <dynamic_array.h>
 #include <math.h>
+#include "animation.hpp"
 
 extern ImageData graphicsImageLoad(const s8* imagePath)
 {
@@ -372,6 +373,28 @@ extern void graphicsMeshRender(Shader shader, Mesh mesh)
 	glBindVertexArray(0);
 }
 
+// This function must be re-done.
+// This implementation is just temporary, but it's not bug-free and will work only for a limited set of objs.
+extern void graphicsMeshRenderAnimation(Shader shader, Mesh mesh, Animation animation)
+{
+	Mat4* joints = (Mat4*)malloc(sizeof(Mat4) * 20);
+	animationGetJointTransforms(animation, &mesh.rootJoint, joints);
+
+	glBindVertexArray(mesh.VAO);
+	glUseProgram(shader);
+	GLint jointsLocation = glGetUniformLocation(shader, "joints");
+	GLint jointsNumLocation = glGetUniformLocation(shader, "jointsNum");
+	glUniformMatrix4fv(jointsLocation, 20, GL_TRUE, (GLfloat*)joints);
+	glUniform1i(jointsNumLocation, 20);
+	diffuseUpdateUniforms(&mesh.diffuseInfo, shader);
+	normalsUpdateUniforms(&mesh.normalInfo, shader);
+	glDrawElements(GL_TRIANGLES, mesh.indexesSize, GL_UNSIGNED_INT, 0);
+	glUseProgram(0);
+	glBindVertexArray(0);
+
+	free(joints);
+}
+
 extern void graphicsMeshChangeDiffuseMap(Mesh* mesh, u32 diffuseMap, boolean deleteDiffuseMap)
 {
 	if (deleteDiffuseMap && mesh->diffuseInfo.useDiffuseMap)
@@ -511,6 +534,24 @@ extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCame
 	glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->viewMatrix.data);
 	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->projectionMatrix.data);
 	graphicsMeshRender(shader, entity->mesh);
+	glUseProgram(0);
+}
+
+extern void graphicsEntityRenderPhongShaderAnimated(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* lights, const Animation animation)
+{
+	glUseProgram(shader);
+	lightUpdateUniforms(lights, shader);
+	GLint cameraPositionLocation = glGetUniformLocation(shader, "cameraPosition");
+	GLint shinenessLocation = glGetUniformLocation(shader, "objectShineness");
+	GLint modelMatrixLocation = glGetUniformLocation(shader, "modelMatrix");
+	GLint viewMatrixLocation = glGetUniformLocation(shader, "viewMatrix");
+	GLint projectionMatrixLocation = glGetUniformLocation(shader, "projectionMatrix");
+	glUniform4f(cameraPositionLocation, camera->position.x, camera->position.y, camera->position.z, camera->position.w);
+	glUniform1f(shinenessLocation, 128.0f);
+	glUniformMatrix4fv(modelMatrixLocation, 1, GL_TRUE, (GLfloat*)entity->modelMatrix.data);
+	glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->viewMatrix.data);
+	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->projectionMatrix.data);
+	graphicsMeshRenderAnimation(shader, entity->mesh, animation);
 	glUseProgram(0);
 }
 

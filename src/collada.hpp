@@ -3,7 +3,8 @@
 
 #include "common.hpp"
 #include "graphics.hpp"
+#include "animation.hpp"
 
-int colladaLoad(const s8* path, AnimatedVertex*** verticesMatrix, unsigned int*** indicesMatrix);
+int colladaLoad(const s8* path, AnimatedVertex*** verticesMatrix, unsigned int*** indicesMatrix, Animation* animation, Joint* rootJoint);
 
 #endif

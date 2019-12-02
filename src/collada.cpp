@@ -9,7 +9,52 @@
 #include "graphics.hpp"
 #include "animation.hpp"
 
-void processMesh(aiMesh* mesh, const aiScene* scene, AnimatedVertex** _vertices, unsigned int** _indices, Animation* _animation)
+static void fetchJoints(aiNode* rootBoneNode, Joint* parentJoint, Hash_Table htBoneNameToIndex) {
+	s32 parentJointID = *(s32*)hash_table_get(&htBoneNameToIndex, rootBoneNode->mName.C_Str());
+	for (unsigned int i = 0; i < rootBoneNode->mNumChildren; ++i) {
+		aiNode* child = rootBoneNode->mChildren[i];
+		s32 childJointID = *(s32*)hash_table_get(&htBoneNameToIndex, child->mName.C_Str());
+		Joint childJoint;
+		childJoint.children = array_create(Joint, 1);
+		childJoint.boneID = childJointID;
+
+		Mat4 childMatrix = *(Mat4*)&child->mTransformation;
+		//childMatrix = gmTransposeMat4(&childMatrix);
+		childJoint.bindModelSpaceToBoneSpaceTransform = gmMultiplyMat4(&parentJoint->bindModelSpaceToBoneSpaceTransform, &childMatrix);
+
+		fetchJoints(child, &childJoint, htBoneNameToIndex);
+
+		Mat4 invertedMatrix;
+		boolean inverted = gmInverseMat4(&childJoint.bindModelSpaceToBoneSpaceTransform, &invertedMatrix);
+		assert(inverted == true);
+		childJoint.bindModelSpaceToBoneSpaceTransform = invertedMatrix;
+
+		array_push(parentJoint->children, &childJoint);
+	}
+}
+
+static aiNode* findRootBone(aiNode* rootNode, aiString* boneNames) {
+	for (unsigned int i = 0; i < rootNode->mNumChildren; ++i) {
+		aiNode* child = rootNode->mChildren[i];
+		for (unsigned int j = 0; j < array_get_length(boneNames); ++j) {
+			aiString currentBoneName = boneNames[j];
+			if (currentBoneName == child->mName) {
+				printf("found root bone! it is: %s\n", currentBoneName.C_Str());
+				return child;
+			}
+		}
+
+		aiNode* childrenResult = findRootBone(child, boneNames);
+		if (findRootBone(child, boneNames) != NULL) {
+			return childrenResult;
+		}
+	}
+
+	return NULL;
+}
+
+static void processMesh(aiMesh* mesh, const aiScene* scene, AnimatedVertex** _vertices, unsigned int** _indices, Animation* _animation,
+	Joint* _rootJoint)
 {
 	AnimatedVertex* vertices = array_create(AnimatedVertex, 100);
 	unsigned int* indices = array_create(unsigned int, 100);
@@ -61,10 +106,15 @@ void processMesh(aiMesh* mesh, const aiScene* scene, AnimatedVertex** _vertices,
 		hash_table_insert(&htBoneNameToIndex, mesh->mBones[i]->mName.C_Str(), &i);
 	}
 
+	aiString* boneNames = array_create(aiString, 10);
+
 	for (unsigned int i = 0; i < mesh->mNumBones; ++i)
 	{
 		aiBone* currentBone = mesh->mBones[i];
 		s32 boneID = *(s32*)hash_table_get(&htBoneNameToIndex, currentBone->mName.C_Str());
+		array_push(boneNames, &currentBone->mName);
+		aiMatrix4x4 boneMatrix = currentBone->mOffsetMatrix;
+		assert(boneID < mesh->mNumBones && boneID >= 0);
 		for (unsigned int j = 0; j < currentBone->mNumWeights; ++j) {
 			aiVertexWeight vertexWeight = currentBone->mWeights[j];
 			s32 vertexIndex = vertexWeight.mVertexId;
@@ -82,6 +132,42 @@ void processMesh(aiMesh* mesh, const aiScene* scene, AnimatedVertex** _vertices,
 			}
 		}
 	}
+
+	Joint rootJoint;
+	aiNode* rootBoneNode = findRootBone(scene->mRootNode, boneNames);
+	rootJoint.bindModelSpaceToBoneSpaceTransform = *(Mat4*)&scene->mRootNode->mChildren[1]->mChildren[0]->mTransformation;
+
+	Vec4 test = (Vec4){0.0f, 0.0f, 0.0f, 1.0f};
+	Vec4 result = gmMultiplyMat4AndVec4(&rootJoint.bindModelSpaceToBoneSpaceTransform, test);
+
+	//rootJoint.bindModelSpaceToBoneSpaceTransform = gmTransposeMat4(&(rootJoint.jointSpaceToModelSpaceTransform));
+	rootJoint.boneID = 0;
+	rootJoint.children = array_create(Joint, 1);
+	
+	Mat4 CORRECTION = (Mat4){
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, -1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	};
+
+	rootJoint.bindModelSpaceToBoneSpaceTransform = gmMultiplyMat4(&CORRECTION, &(rootJoint.bindModelSpaceToBoneSpaceTransform));
+
+	test = (Vec4){0.0f, 0.0f, 0.0f, 1.0f};
+	result = gmMultiplyMat4AndVec4(&rootJoint.bindModelSpaceToBoneSpaceTransform, test);
+
+	// ADJUST JOINT MATRICES
+	fetchJoints(rootBoneNode, &rootJoint, htBoneNameToIndex);
+
+	Mat4 invertedMatrix;
+	boolean inverted = gmInverseMat4(&(rootJoint.bindModelSpaceToBoneSpaceTransform), &invertedMatrix);
+	assert(inverted == true);
+	rootJoint.bindModelSpaceToBoneSpaceTransform = invertedMatrix;
+
+	test = (Vec4){0.0f, 0.0f, 0.0f, 1.0f};
+	result = gmMultiplyMat4AndVec4(&rootJoint.bindModelSpaceToBoneSpaceTransform, test);
+
+	*_rootJoint = rootJoint;
 
 	Animation animation;
 	animationCreate(&animation);
@@ -118,6 +204,8 @@ void processMesh(aiMesh* mesh, const aiScene* scene, AnimatedVertex** _vertices,
 		}
 	}
 
+	*_animation = animation;
+
 	// Fill Indices
 	for (unsigned int i = 0; i < mesh->mNumFaces; ++i)
 		for (unsigned int j = 0; j < mesh->mFaces[i].mNumIndices; ++j)
@@ -136,26 +224,26 @@ void processMesh(aiMesh* mesh, const aiScene* scene, AnimatedVertex** _vertices,
 	*_indices = indices;
 }
 
-void processNode(aiNode* node, const aiScene* scene, AnimatedVertex** verticesMatrix, unsigned int** indicesMatrix)
+void processNode(aiNode* node, const aiScene* scene, AnimatedVertex** verticesMatrix, unsigned int** indicesMatrix, Animation* animation,
+	Joint* rootJoint)
 {
 	for (unsigned int i = 0; i < node->mNumMeshes; ++i)
 	{
 		aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
 		AnimatedVertex* vertices;
 		unsigned int* indices;
-		Animation animation;
-		processMesh(mesh, scene, &vertices, &indices, &animation);
+		processMesh(mesh, scene, &vertices, &indices, animation, rootJoint);
 		array_push(verticesMatrix, &vertices);
 		array_push(indicesMatrix, &indices);
 	}
 
 	for (unsigned int i = 0; i < node->mNumChildren; ++i)
 	{
-		processNode(node->mChildren[i], scene, verticesMatrix, indicesMatrix);
+		processNode(node->mChildren[i], scene, verticesMatrix, indicesMatrix, animation, rootJoint);
 	}
 }
 
-int colladaLoad(const s8* path, AnimatedVertex*** verticesMatrix, unsigned int*** indicesMatrix)
+int colladaLoad(const s8* path, AnimatedVertex*** verticesMatrix, unsigned int*** indicesMatrix, Animation* animation, Joint* rootJoint)
 {
 	Assimp::Importer importer;
 	const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | /*aiProcess_FlipUVs |*/
@@ -173,7 +261,7 @@ int colladaLoad(const s8* path, AnimatedVertex*** verticesMatrix, unsigned int**
 	*verticesMatrix = array_create(AnimatedVertex*, 1);
 	*indicesMatrix = array_create(unsigned int*, 1);
 
-	processNode(node, scene, *verticesMatrix, *indicesMatrix);
+	processNode(node, scene, *verticesMatrix, *indicesMatrix, animation, rootJoint);
 
 	return 0;
 }

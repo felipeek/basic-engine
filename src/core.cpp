@@ -9,17 +9,21 @@
 
 #define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
 #define PHONG_FRAGMENT_SHADER_PATH "./shaders/phong_shader.fs"
+#define ANIMATION_VERTEX_SHADER_PATH "./shaders/animation_shader.vs"
+#define ANIMATION_FRAGMENT_SHADER_PATH "./shaders/animation_shader.fs"
 #define GIM_ENTITY_COLOR (Vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
-static Shader phongShader;
+static Shader phongShader, animationShader;
 static PerspectiveCamera camera;
 static Light* lights;
 static Entity e;
 
+static Animation animation;
+
 static PerspectiveCamera createCamera()
 {
 	PerspectiveCamera camera;
-	Vec4 cameraPosition = (Vec4) {0.0f, 0.0f, 1.0f, 1.0f};
+	Vec4 cameraPosition = (Vec4) {0.0f, 5.0f, 15.0f, 1.0f};
 	Vec4 cameraUp = (Vec4) {0.0f, 1.0f, 0.0f, 1.0f};
 	Vec4 cameraView = (Vec4) {0.0f, 0.0f, -1.0f, 0.0f};
 	r32 cameraNearPlane = -0.01f;
@@ -48,6 +52,7 @@ extern int coreInit()
 {
 	// Create shader
 	phongShader = graphicsShaderCreate(PHONG_VERTEX_SHADER_PATH, PHONG_FRAGMENT_SHADER_PATH);
+	animationShader = graphicsShaderCreate(ANIMATION_VERTEX_SHADER_PATH, ANIMATION_FRAGMENT_SHADER_PATH);
 	// Create camera
 	camera = createCamera();
 	// Create light
@@ -58,14 +63,17 @@ extern int coreInit()
 
 	AnimatedVertex** vertices;
 	unsigned int** indices;
-	if (colladaLoad("./res/model.dae", &vertices, &indices)) {
+	Joint rootJoint;
+	if (colladaLoad("./res/model.dae", &vertices, &indices, &animation, &rootJoint)) {
 		printf("Collada fatal error\n");
 		return -1;
 	}
 
 	Mesh m = graphicsMeshAnimatedCreateWithColor(vertices[0], array_get_length(vertices[0]), indices[0], array_get_length(indices[0]), NULL,
 		(Vec4){1.0f, 0.0f, 0.0f, 1.0f});
-	graphicsEntityCreate(&e, m, (Vec4){0.0f, 0.0f, 0.0f, 1.0f}, (Vec3){0.0f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f});
+	m.animation = animation;
+	m.rootJoint = rootJoint;
+	graphicsEntityCreate(&e, m, (Vec4){0.0f, 0.0f, 0.0f, 1.0f}, (Vec3){-90.0f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f});
 
 	return 0;
 }
@@ -82,7 +90,7 @@ extern void coreUpdate(r32 deltaTime)
 
 extern void coreRender()
 {
-	graphicsEntityRenderPhongShader(phongShader, &camera, &e, lights);
+	graphicsEntityRenderPhongShaderAnimated(animationShader, &camera, &e, lights, animation);
 }
 
 extern void coreInputProcess(boolean* keyState, r32 deltaTime)

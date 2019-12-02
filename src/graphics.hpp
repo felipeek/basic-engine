@@ -2,6 +2,7 @@
 #define BASIC_ENGINE_GRAPHICS_H
 #include "graphics_math.hpp"
 #include "camera.hpp"
+#include "animation.hpp"
 
 typedef u32 Shader;
 typedef struct AnimatedVertexStruct AnimatedVertex;
@@ -66,6 +67,10 @@ struct MeshStruct
 	s32 indexesSize;
 	NormalMappingInfo normalInfo;
 	DiffuseInfo diffuseInfo;
+
+	// used for animation...
+	Animation animation;
+	Joint rootJoint;
 };
 
 struct EntityStruct
@@ -127,6 +132,7 @@ extern void graphicsEntitySetRotation(Entity* entity, Vec3 worldRotation);
 extern void graphicsEntitySetScale(Entity* entity, Vec3 worldScale);
 extern void graphicsEntityRenderBasicShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity);
 extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* lights);
+extern void graphicsEntityRenderPhongShaderAnimated(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* lights, const Animation animation);
 extern void graphicsLightCreate(Light* light, Vec4 position, Vec4 ambientColor, Vec4 diffuseColor, Vec4 specularColor);
 extern u32 graphicsTextureCreate(const s8* texturePath);
 extern u32 graphicsTextureCreateFromData(const ImageData* imageData);
