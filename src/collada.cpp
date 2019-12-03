@@ -141,8 +141,8 @@ static void processMesh(aiMesh* mesh, const aiScene* scene, AnimatedVertex** _ve
 		float sum = animatedVertex->boneWeights.x + animatedVertex->boneWeights.y + animatedVertex->boneWeights.z;
 		float k = 1.0f / sum;
 		animatedVertex->boneWeights = gmScalarProductVec3(k, animatedVertex->boneWeights);
-		printf("GOT: <%.3f, %.3f, %.3f>\n", animatedVertex->boneWeights.x, animatedVertex->boneWeights.y, animatedVertex->boneWeights.z);
-		printf("with BoneID: <%d, %d, %d>\n", animatedVertex->boneIDs.x, animatedVertex->boneIDs.y, animatedVertex->boneIDs.z);
+		//printf("GOT: <%.3f, %.3f, %.3f>\n", animatedVertex->boneWeights.x, animatedVertex->boneWeights.y, animatedVertex->boneWeights.z);
+		//printf("with BoneID: <%d, %d, %d>\n", animatedVertex->boneIDs.x, animatedVertex->boneIDs.y, animatedVertex->boneIDs.z);
 	}
 
 	Joint rootJoint;

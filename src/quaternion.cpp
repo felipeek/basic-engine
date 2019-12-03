@@ -83,7 +83,7 @@ Quaternion quaternion_product(const Quaternion* q1, const Quaternion* q2)
 Quaternion quaternion_normalize(const Quaternion* q)
 {
 	r32 len = sqrtf(q->x * q->x + q->y * q->y + q->z * q->z + q->w * q->w);
-	return quaternion_new((Vec3){q->x / len, q->y / len, q->z / len}, q->w / len);
+	return {q->x / len, q->y / len, q->z / len, q->w / len};
 }
 
 Quaternion quaternion_slerp(const Quaternion* _q1, const Quaternion* _q2, r32 t)
@@ -135,4 +135,25 @@ Quaternion quaternion_slerp(const Quaternion* _q1, const Quaternion* _q2, r32 t)
 	qm.y = (q1.y * ratio_a + q2.y * ratio_b);
 	qm.z = (q1.z * ratio_a + q2.z * ratio_b);
 	return qm;
+}
+
+Quaternion quaternion_nlerp(const Quaternion* _q1, const Quaternion* _q2, r32 t)
+{
+    Quaternion q1 = *_q1, q2 = *_q2, qm;
+	Quaternion result;
+	r32 dot = q1.w * q2.w + q1.x * q2.x + q1.y * q2.y + q1.z * q2.z;
+	r32 blendI = 1.0f - t;
+	if (dot < 0) {
+		result.w = blendI * q1.w + t * -q2.w;
+		result.x = blendI * q1.x + t * -q2.x;
+		result.y = blendI * q1.y + t * -q2.y;
+		result.z = blendI * q1.z + t * -q2.z;
+	} else {
+		result.w = blendI * q1.w + t * q2.w;
+		result.x = blendI * q1.x + t * q2.x;
+		result.y = blendI * q1.y + t * q2.y;
+		result.z = blendI * q1.z + t * q2.z;
+	}
+
+	return quaternion_normalize(&result);
 }
