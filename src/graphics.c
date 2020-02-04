@@ -204,6 +204,11 @@ static Mesh createSimpleMesh(Vertex* vertices, s32 verticesSize, u32* indices, s
 	mesh.VBO = VBO;
 	mesh.EBO = EBO;
 	mesh.indexesSize = indicesSize;
+	mesh.diffuseInfo.useDiffuseMap = false;
+	mesh.normalInfo.useNormalMap = false;
+	mesh.albedoInfo.useAlbedoMap = false;
+	mesh.metallicInfo.useMetallicMap = false;
+	mesh.roughnessInfo.useRoughnessMap = false;
 
 	if (!normalInfo)
 	{
@@ -214,6 +219,19 @@ static Mesh createSimpleMesh(Vertex* vertices, s32 verticesSize, u32* indices, s
 	else
 		mesh.normalInfo = *normalInfo;
 
+	return mesh;
+}
+
+extern Mesh graphicsMeshCreateWithPbrInfo(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize,
+	NormalMappingInfo* normalInfo, u32 metallicMap, u32 albedoMap, u32 roughnessMap)
+{
+	Mesh mesh = createSimpleMesh(vertices, verticesSize, indices, indicesSize, normalInfo);
+	mesh.metallicInfo.useMetallicMap = true;
+	mesh.metallicInfo.metallicMap = metallicMap;
+	mesh.albedoInfo.useAlbedoMap = true;
+	mesh.albedoInfo.albedoMap = albedoMap;
+	mesh.roughnessInfo.useRoughnessMap = true;
+	mesh.roughnessInfo.roughnessMap = roughnessMap;
 	return mesh;
 }
 
@@ -262,8 +280,28 @@ static void lightUpdateUniforms(const Light* lights, Shader shader)
 	glUniform1i(lightQuantityLocation, numberOfLights);
 }
 
+static void pbrLightUpdateUniforms(const PBRLight* lights, Shader shader)
+{
+	s32 numberOfLights = array_get_length(lights);
+	s8 buffer[64];
+	glUseProgram(shader);
+
+	for (s32 i = 0; i < numberOfLights; ++i)
+	{
+		PBRLight light = lights[i];
+		GLint lightPositionLocation = glGetUniformLocation(shader, buildLightUniformName(buffer, i, "position"));
+		GLint colorLocation = glGetUniformLocation(shader, buildLightUniformName(buffer, i, "color"));
+		glUniform3f(lightPositionLocation, light.position.x, light.position.y, light.position.z);
+		glUniform3f(colorLocation, light.color.x, light.color.y, light.color.z);
+	}
+
+	GLint lightQuantityLocation = glGetUniformLocation(shader, "lightQuantity");
+	glUniform1i(lightQuantityLocation, numberOfLights);
+}
+
 static void diffuseUpdateUniforms(const DiffuseInfo* diffuseInfo, Shader shader)
 {
+	if (!diffuseInfo) return;
 	glUseProgram(shader);
 	GLint useDiffuseMapLocation = glGetUniformLocation(shader, "diffuseInfo.useDiffuseMap");
 	GLint diffuseMapLocation = glGetUniformLocation(shader, "diffuseInfo.diffuseMap");
@@ -278,6 +316,60 @@ static void diffuseUpdateUniforms(const DiffuseInfo* diffuseInfo, Shader shader)
 	else
 		glUniform4f(diffuseColorLocation, diffuseInfo->diffuseColor.x, diffuseInfo->diffuseColor.y,
 			diffuseInfo->diffuseColor.z, diffuseInfo->diffuseColor.w);
+}
+
+static void albedoUpdateUniforms(const AlbedoInfo* albedoInfo, Shader shader)
+{
+	if (!albedoInfo) return;
+	glUseProgram(shader);
+	GLint useAlbedoMapLocation = glGetUniformLocation(shader, "albedoInfo.useAlbedoMap");
+	GLint albedoMapLocation = glGetUniformLocation(shader, "albedoInfo.albedoMap");
+	GLint albedoColorLocation = glGetUniformLocation(shader, "albedoInfo.albedoColor");
+	glUniform1i(useAlbedoMapLocation, albedoInfo->useAlbedoMap);
+	if (albedoInfo->useAlbedoMap)
+	{
+		glUniform1i(albedoMapLocation, 5);
+		glActiveTexture(GL_TEXTURE5);
+		glBindTexture(GL_TEXTURE_2D, albedoInfo->albedoMap);
+	}
+	else
+		glUniform3f(albedoColorLocation, albedoInfo->albedoColor.x, albedoInfo->albedoColor.y,
+			albedoInfo->albedoColor.z);
+}
+
+static void metallicUpdateUniforms(const MetallicInfo* metallicInfo, Shader shader)
+{
+	if (!metallicInfo) return;
+	glUseProgram(shader);
+	GLint useMetallicMapLocation = glGetUniformLocation(shader, "metallicInfo.useMetallicMap");
+	GLint metallicMapLocation = glGetUniformLocation(shader, "metallicInfo.metallicMap");
+	GLint metallicLocation = glGetUniformLocation(shader, "metallicInfo.metallic");
+	glUniform1i(useMetallicMapLocation, metallicInfo->useMetallicMap);
+	if (metallicInfo->useMetallicMap)
+	{
+		glUniform1i(metallicMapLocation, 4);
+		glActiveTexture(GL_TEXTURE4);
+		glBindTexture(GL_TEXTURE_2D, metallicInfo->metallicMap);
+	}
+	else
+		glUniform1f(metallicLocation, metallicInfo->metallic);
+}
+
+static void roughnessUpdateUniforms(const RoughnessInfo* roughnessInfo, Shader shader)
+{
+	glUseProgram(shader);
+	GLint useRoughnessMapLocation = glGetUniformLocation(shader, "roughnessInfo.useRoughnessMap");
+	GLint roughnessMapLocation = glGetUniformLocation(shader, "roughnessInfo.roughnessMap");
+	GLint roughnessLocation = glGetUniformLocation(shader, "roughnessInfo.roughness");
+	glUniform1i(useRoughnessMapLocation, roughnessInfo->useRoughnessMap);
+	if (roughnessInfo->useRoughnessMap)
+	{
+		glUniform1i(roughnessMapLocation, 3);
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_2D, roughnessInfo->roughnessMap);
+	}
+	else
+		glUniform1f(roughnessLocation, roughnessInfo->roughness);
 }
 
 static void normalsUpdateUniforms(const NormalMappingInfo* normalInfo, Shader shader)
@@ -303,6 +395,9 @@ extern void graphicsMeshRender(Shader shader, Mesh mesh)
 	glBindVertexArray(mesh.VAO);
 	glUseProgram(shader);
 	diffuseUpdateUniforms(&mesh.diffuseInfo, shader);
+	albedoUpdateUniforms(&mesh.albedoInfo, shader);
+	metallicUpdateUniforms(&mesh.metallicInfo, shader);
+	roughnessUpdateUniforms(&mesh.roughnessInfo, shader);
 	normalsUpdateUniforms(&mesh.normalInfo, shader);
 	glDrawElements(GL_TRIANGLES, mesh.indexesSize, GL_UNSIGNED_INT, 0);
 	glUseProgram(0);
@@ -451,6 +546,24 @@ extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCame
 	glUseProgram(0);
 }
 
+extern void graphicsEntityRenderPbrShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const PBRLight* lights, boolean tweak)
+{
+	glUseProgram(shader);
+	pbrLightUpdateUniforms(lights, shader);
+	GLint cameraPositionLocation = glGetUniformLocation(shader, "cameraPosition");
+	GLint modelMatrixLocation = glGetUniformLocation(shader, "modelMatrix");
+	GLint viewMatrixLocation = glGetUniformLocation(shader, "viewMatrix");
+	GLint projectionMatrixLocation = glGetUniformLocation(shader, "projectionMatrix");
+	GLint tweakLocation = glGetUniformLocation(shader, "tweak");
+	glUniform4f(cameraPositionLocation, camera->position.x, camera->position.y, camera->position.z, camera->position.w);
+	glUniformMatrix4fv(modelMatrixLocation, 1, GL_TRUE, (GLfloat*)entity->modelMatrix.data);
+	glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->viewMatrix.data);
+	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->projectionMatrix.data);
+	glUniform1i(tweakLocation, tweak);
+	graphicsMeshRender(shader, entity->mesh);
+	glUseProgram(0);
+}
+
 extern u32 graphicsTextureCreateFromData(const ImageData* imageData)
 {
 	u32 textureId;
@@ -531,6 +644,12 @@ extern void graphicsLightCreate(Light* light, Vec4 position, Vec4 ambientColor, 
 	light->specularColor = specularColor;
 }
 
+extern void graphicsPBRLightCreate(PBRLight* light, Vec3 position, Vec3 color)
+{
+	light->position = position;
+	light->color = color;
+}
+
 // If memory is null, new memory will be allocated
 extern FloatImageData graphicsImageDataToFloatImageData(ImageData* imageData, r32* memory)
 {
@@ -589,6 +708,19 @@ extern ImageData graphicsFloatImageDataToImageData(const FloatImageData* floatIm
 	id.data = memory;
 
 	return id;
+}
+
+extern Mesh graphicsMeshCreateFromObjWithPbrInfo(const s8* objPath, NormalMappingInfo* normalInfo, u32 albedoMap,
+	u32 metallicMap, u32 roughnessMap)
+{
+	Vertex* vertices;
+	u32* indexes;
+	objParse(objPath, &vertices, &indexes);
+	Mesh m = graphicsMeshCreateWithPbrInfo(vertices, array_get_length(vertices), indexes,
+		array_get_length(indexes), normalInfo, metallicMap, albedoMap, roughnessMap);
+	array_release(vertices);
+	array_release(indexes);
+	return m;
 }
 
 extern Mesh graphicsMeshCreateFromObjWithColor(const s8* objPath, NormalMappingInfo* normalInfo, Vec4 diffuseColor)

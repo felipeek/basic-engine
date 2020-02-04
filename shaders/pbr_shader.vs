@@ -12,14 +12,6 @@ uniform mat4 modelMatrix;
 uniform mat4 viewMatrix;
 uniform mat4 projectionMatrix;
 
-uniform mat4 modelMatrix;
-uniform Light lights[16];
-uniform int lightQuantity;
-uniform NormalMappingInfo normalMappingInfo;
-uniform vec4 cameraPosition;
-uniform float objectShineness;
-uniform DiffuseInfo diffuseInfo;
-
 void main()
 {
 	vec3 normal3D = mat3(inverse(transpose(modelMatrix))) * vertexNormal.xyz;
