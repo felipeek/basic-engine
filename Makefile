@@ -15,10 +15,10 @@ else
 	LIBS=-lm -lglfw -lGLEW -lGL -lpng -lz
 endif
 
-_DEPS = camera.h common.h core.h graphics_math.h graphics.h obj.h util.h
+_DEPS = camera.h common.h core.h graphics_math.h graphics.h obj.h util.h hdr.h
 DEPS = $(patsubst %,$(SRCDIR)/%,$(_DEPS))
 
-_OBJ = camera.o core.o graphics_math.o graphics.o main.o obj.o util.o
+_OBJ = camera.o core.o graphics_math.o graphics.o main.o obj.o util.o hdr.o
 OBJ = $(patsubst %,$(OBJDIR)/%,$(_OBJ))
 
 all: basic-engine

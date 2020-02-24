@@ -4,6 +4,7 @@
 #include "graphics.h"
 #include <math.h>
 #include "obj.h"
+#include "hdr.h"
 #include <stdio.h>
 
 #define BASIC_VERTEX_SHADER_PATH "./shaders/basic_shader.vs"
@@ -14,11 +15,12 @@
 #define PBR_FRAGMENT_SHADER_PATH "./shaders/pbr_shader.fs"
 #define GIM_ENTITY_COLOR (Vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
-static Shader pbrShader, basicShader;
+static Shader pbrShader, basicShader, hdrEnvMapCubeShader;
 static PerspectiveCamera camera;
 static Light* lights;
 static PBRLight* pbrLights;
 static Entity e;
+static Entity hdrEnvMapEntity;
 static Mesh lightMesh;
 static boolean tweak = false;
 
@@ -30,7 +32,7 @@ static PerspectiveCamera createCamera()
 	Vec4 cameraView = (Vec4) {0.0f, 0.0f, -1.0f, 0.0f};
 	r32 cameraNearPlane = -0.01f;
 	r32 cameraFarPlane = -1000.0f;
-	r32 cameraFov = 45.0f;
+	r32 cameraFov = 90.0f;
 	cameraInit(&camera, cameraPosition, cameraUp, cameraView, cameraNearPlane, cameraFarPlane, cameraFov);
 	return camera;
 }
@@ -56,14 +58,14 @@ static PBRLight* createPBRLights()
 	PBRLight* lights = array_create(PBRLight, 1);
 
 	Vec3 lightPosition = (Vec3) {10.0f, 10.0f, 10.0f};
-	Vec3 color = (Vec3) { 500.0f, 0.0, 0.0};
+	Vec3 color = (Vec3) { 500.0f, 500.0, 500.0};
 	graphicsPBRLightCreate(&light, lightPosition, color);
-	array_push(lights, &light);
+	//array_push(lights, &light);
 
 	lightPosition = (Vec3) {-10.0f, 10.0f, 10.0f};
-	color = (Vec3) {0,500.0f,500.0f};
+	color = (Vec3) {500.0f,500.0f,500.0f};
 	graphicsPBRLightCreate(&light, lightPosition, color);
-	array_push(lights, &light);
+	//array_push(lights, &light);
 
 	//lightPosition = (Vec3) {-10.0f, 10.0f, 10.0f};
 	//color = (Vec3) {10.0f, 10.0f, 10.0f};
@@ -78,11 +80,38 @@ static PBRLight* createPBRLights()
 	return lights;
 }
 
+Vec4 cubeVertices[] = {
+	1.0f, 1.0f, 1.0f, 1.0f,
+	1.0f, 1.0f, -1.0f, 1.0f,
+	1.0f, -1.0f, 1.0f, 1.0f,
+	1.0f, -1.0f, -1.0f, 1.0f,
+	-1.0f, 1.0f, 1.0f, 1.0f,
+	-1.0f, 1.0f, -1.0f, 1.0f,
+	-1.0f, -1.0f, 1.0f, 1.0f,
+	-1.0f, -1.0f, -1.0f, 1.0f
+};
+
+u32 cubeIndices[] = {
+	3, 1, 5,
+	7, 3, 5,
+	3, 2, 0,
+	3, 0, 1,
+	6, 0, 4,
+	6, 2, 0,
+	7, 6, 4,
+	7, 4, 5,
+	7, 3, 6,
+	6, 3, 2,
+	5, 1, 4,
+	4, 1, 0
+};
+
 extern int coreInit()
 {
 	// Create shader
 	pbrShader = graphicsShaderCreate(PBR_VERTEX_SHADER_PATH, PBR_FRAGMENT_SHADER_PATH);
 	basicShader = graphicsShaderCreate(BASIC_VERTEX_SHADER_PATH, BASIC_FRAGMENT_SHADER_PATH);
+	hdrEnvMapCubeShader = graphicsShaderCreate("./shaders/hdr_envmap_cube_shader.vs", "./shaders/hdr_envmap_cube_shader.fs");
 	// Create camera
 	camera = createCamera();
 	// Create light
@@ -91,12 +120,43 @@ extern int coreInit()
 
 	lightMesh = graphicsMeshCreateFromObjWithColor("./res/sphere.obj", 0, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
 
+#if 0
+	float* test = calloc(1, 64*64*3 * sizeof(float));
+	for (int i = 0; i < 64*64*3; ++i) test[i] = 0.0f;
+	int i = 31;
+	int j = 77;
+	test[i * 64 + j] = 1000.0f;
+	test[i * 64 + j + 1] = 1000.0f;
+	test[i * 64 + j + 2] = 1000.0f;
+	FloatImageData imageData;
+	imageData.data = test;
+	imageData.channels = 3;
+	imageData.height = 64;
+	imageData.width = 64;
+	graphicsHDRImageStore("./res/signal.hdr", &imageData);
+#endif
+
+	FloatImageData equirectangularMapFid = graphicsHDRImageLoad("./res/Milkyway_small.hdr");
+	FloatImageData irradicanceMapFid = graphicsHDRImageLoad("./res/milky_result.hdr");
+#if 0
+	FloatImageData new = hdrFromEnvironmentMapToIrradianceMap(&equirectangularMapFid);
+	graphicsHDRImageStore("./res/milky_result.hdr", &new);
+#endif
+
+	u32 equirectangularMap = graphicsTextureCreateFromHDRImage(&equirectangularMapFid);
+	u32 irradianceMap = graphicsTextureCreateFromHDRImage(&irradicanceMapFid);
+	Mesh hdrEnvMapMesh = graphicsHDREnvMapMeshCreateWithTexture(cubeVertices, sizeof(cubeVertices),
+		cubeIndices, sizeof(cubeIndices), equirectangularMap);
+
+	graphicsEntityCreate(&hdrEnvMapEntity, hdrEnvMapMesh, (Vec4){0.0f, 0.0f, 0.0f, 1.0f},
+		(Vec3){0.0f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f});
+
 	//Mesh m = graphicsMeshCreateFromObjWithColor("./res/horse.obj", 0, (Vec4){1.0f, 0.0f, 0.0f, 0.0f});
 	u32 albedoMap = graphicsTextureCreate("./res/rustediron2_basecolor.png");
 	u32 metallicMap = graphicsTextureCreate("./res/rustediron2_metallic.png");
 	u32 roughnessMap = graphicsTextureCreate("./res/rustediron2_roughness.png");
-	Mesh m = graphicsMeshCreateFromObjWithPbrInfo("./res/sphere.obj", 0, albedoMap, metallicMap, roughnessMap);
-	graphicsEntityCreate(&e, m, (Vec4){0.0f, 0.0f, 0.0f, 1.0f}, (Vec3){0.0f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f});
+	Mesh m = graphicsMeshCreateFromObjWithPbrInfo("./res/bunny.obj", 0, albedoMap, metallicMap, roughnessMap, irradianceMap);
+	graphicsEntityCreate(&e, m, (Vec4){0.0f, 0.0f, 0.0f, 1.0f}, (Vec3){0.0f, 0.0f, 0.0f}, (Vec3){10.0f, 10.0f, 10.0f});
 
 	return 0;
 }
@@ -115,6 +175,7 @@ extern void coreRender()
 {
 	const r32 GAP = 2.0f;
 
+#if 0
 	for (u32 i = 0; i < 10; ++i) {
 		for (u32 j = 0; j < 10; ++j) {
 			Vec4 position = (Vec4){i * GAP - 5.0f, j * GAP - 5.0f, 0.0f};
@@ -129,6 +190,12 @@ extern void coreRender()
 		graphicsEntityCreate(&l, lightMesh, pos, (Vec3){0.0f, 0.0f, 0.0f}, (Vec3){0.2f, 0.2f, 0.2f});
 		graphicsEntityRenderBasicShader(basicShader, &camera, &l);
 	}
+#endif
+	graphicsEntityRenderPbrShader(pbrShader, &camera, &e, pbrLights, tweak);
+
+	glDepthFunc(GL_LEQUAL);
+	graphicsEntityRenderHDREnvMapShader(hdrEnvMapCubeShader, &camera, &hdrEnvMapEntity);
+	glDepthFunc(GL_LESS);
 }
 
 extern void coreInputProcess(boolean* keyState, r32 deltaTime)

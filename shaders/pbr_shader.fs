@@ -48,6 +48,17 @@ uniform RoughnessInfo roughnessInfo;
 uniform PBRLight lights[16];
 uniform int lightQuantity;
 
+uniform sampler2D irradianceMap;
+
+const vec2 invAtan = vec2(0.1591, 0.3183);
+vec2 sampleSphericalMap(vec4 v)
+{
+    vec2 uv = vec2(atan(v.z, v.x), asin(v.y));
+    uv *= invAtan;
+    uv += 0.5;
+    return uv;
+}
+
 // GGX implementation [NDF]
 float ndfGGX(vec3 N, vec3 H, float roughness)
 {
@@ -90,6 +101,11 @@ vec3 shirleyDiffuseTerm(vec3 albedo, vec3 N, vec3 L, vec3 V) {
 	float NdotV = max(dot(N, V), 0.0);
 
 	return (21.0 / 20.0) * albedo * (1.0 - pow((1.0 - NdotL), 5)) * (1.0 - pow((1.0 - NdotV), 5));
+}
+
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
+{
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
 void main()
@@ -148,13 +164,20 @@ void main()
 		float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0);
 		vec3 specular = numerator / max(denominator, 0.001);
 
-		vec3 dTerm = tweak != 0 ? shirleyDiffuseTerm(albedo, N, L, V) : albedo;
+		//vec3 dTerm = tweak != 0 ? shirleyDiffuseTerm(albedo, N, L, V) : albedo;
+		vec3 dTerm = albedo;//shirleyDiffuseTerm(albedo, N, L, V);
 
 		float NdotL = max(dot(N, L), 0.0);
 		Lo += (kD * dTerm / PI_F + specular) * radiance * NdotL;
 	}
 
-	vec3 ambient = vec3(0.00, 0.0, 0.000) * albedo * ao;
+
+	vec3 kS = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+	vec3 kD = 1.0 - kS;
+	vec2 sampleUV = sampleSphericalMap(vec4(N.x, N.y, N.z, 0.0));
+	vec3 irradiance = texture(irradianceMap, sampleUV).rgb;
+	vec3 diffuse    = irradiance * albedo;
+	vec3 ambient    = tweak != 0 ? (kD * diffuse) * ao : vec3(0,0,0);
     vec3 color = ambient + Lo;
 	
     color = color / (color + vec3(1.0));

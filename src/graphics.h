@@ -72,6 +72,13 @@ struct MeshStruct
 	AlbedoInfo albedoInfo;
 	MetallicInfo metallicInfo;
 	RoughnessInfo roughnessInfo;
+
+	// Equirectangular Map
+	u32 equirectangularMap;
+	boolean useEquirectangularMap;
+	// Irradiance Map
+	u32 irradianceMap;
+	boolean useIrradianceMap;
 };
 
 struct EntityStruct
@@ -110,6 +117,7 @@ struct FloatImageDataStruct
 };
 
 extern ImageData graphicsImageLoad(const s8* imagePath);
+extern FloatImageData graphicsHDRImageLoad(const s8* imagePath);
 extern FloatImageData graphicsFloatImageLoad(const s8* imagePath);
 extern FloatImageData graphicsFloatImageCopy(const FloatImageData* imageData);
 extern void graphicsImageFree(ImageData* imageData);
@@ -121,12 +129,13 @@ extern Mesh graphicsQuadCreateWithTexture(u32 texture);
 extern Mesh graphicsQuadCreateWithColor(Vec4 color);
 extern Mesh graphicsMeshCreateWithColor(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo, Vec4 diffuseColor);
 extern Mesh graphicsMeshCreateWithTexture(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo, u32 diffuseMap);
+extern Mesh graphicsHDREnvMapMeshCreateWithTexture(Vec4* vertices, s32 verticesSize, u32* indices, s32 indicesSize, u32 equirectangularMap);
 extern Mesh graphicsMeshCreateFromObjWithColor(const s8* objPath, NormalMappingInfo* normalInfo, Vec4 diffuseColor);
 extern Mesh graphicsMeshCreateFromObjWithTexture(const s8* objPath, NormalMappingInfo* normalInfo, u32 diffuseMap);
 extern Mesh graphicsMeshCreateWithPbrInfo(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize,
-	NormalMappingInfo* normalInfo, u32 metallicMap, u32 albedoMap, u32 roughnessMap);
+	NormalMappingInfo* normalInfo, u32 metallicMap, u32 albedoMap, u32 roughnessMap, u32 irradianceMap);
 extern Mesh graphicsMeshCreateFromObjWithPbrInfo(const s8* objPath, NormalMappingInfo* normalInfo, u32 albedoMap,
-	u32 metallicMap, u32 roughnessMap);
+	u32 metallicMap, u32 roughnessMap, u32 irradianceMap);
 extern void graphicsMeshRender(Shader shader, Mesh mesh);
 // If mesh already has a diffuse map, the older diffuse map will be deleted if deleteDiffuseMap is true.
 // If mesh has a color instead of a diffuse map, the mesh will lose the color and be set to use the diffuse map.
@@ -143,13 +152,16 @@ extern void graphicsEntitySetScale(Entity* entity, Vec3 worldScale);
 extern void graphicsEntityRenderBasicShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity);
 extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* lights);
 extern void graphicsEntityRenderPbrShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const PBRLight* lights, boolean tweak);
+extern void graphicsEntityRenderHDREnvMapShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity);
 extern void graphicsLightCreate(Light* light, Vec4 position, Vec4 ambientColor, Vec4 diffuseColor, Vec4 specularColor);
 extern void graphicsPBRLightCreate(PBRLight* light, Vec3 position, Vec3 color);
 extern u32 graphicsTextureCreate(const s8* texturePath);
 extern u32 graphicsTextureCreateFromData(const ImageData* imageData);
 extern u32 graphicsTextureCreateFromFloatData(const FloatImageData* imageData);
+extern u32 graphicsTextureCreateFromHDRImage(const FloatImageData* imageData);
 extern void graphicsTextureDelete(u32 textureId);
 extern FloatImageData graphicsImageDataToFloatImageData(ImageData* imageData, r32* memory);
 extern ImageData graphicsFloatImageDataToImageData(const FloatImageData* floatImageData, u8* memory);
+extern void graphicsHDRImageStore(const s8* imagePath, const FloatImageData* imageData);
 
 #endif

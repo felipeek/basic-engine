@@ -6,6 +6,7 @@
 #include <stb_image_write.h>
 #include <dynamic_array.h>
 #include <math.h>
+#include <assert.h>
 
 extern ImageData graphicsImageLoad(const s8* imagePath)
 {
@@ -33,6 +34,24 @@ extern FloatImageData graphicsFloatImageLoad(const s8* imagePath)
 	graphicsImageFree(&imageData);
 
 	return fid;
+}
+
+extern FloatImageData graphicsHDRImageLoad(const s8* imagePath)
+{
+	FloatImageData fid;
+
+	stbi_set_flip_vertically_on_load(1);
+	fid.data = stbi_loadf(imagePath, &fid.width, &fid.height, &fid.channels, 0);
+	assert(fid.channels == 3);
+	fid.channels = 3;	// @temporary
+
+	return fid;
+}
+
+extern void graphicsHDRImageStore(const s8* imagePath, const FloatImageData* imageData)
+{
+	stbi_flip_vertically_on_write(1);
+	stbi_write_hdr(imagePath, imageData->width, imageData->height, imageData->channels, imageData->data);
 }
 
 extern FloatImageData graphicsFloatImageCopy(const FloatImageData* imageData)
@@ -168,6 +187,49 @@ extern Mesh graphicsQuadCreateWithColor(Vec4 color)
 		sizeof(indices) / sizeof(u32), 0, color);
 }
 
+static Mesh createHDREnvironmentMapSimpleMesh(Vec4* vertices, s32 verticesSize, u32* indices, s32 indicesSize)
+{
+	Mesh mesh;
+	GLuint VBO, EBO, VAO;
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glGenBuffers(1, &EBO);
+
+	glBindVertexArray(VAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, verticesSize * sizeof(Vec4), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, verticesSize * sizeof(Vec4), vertices);
+
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(0);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesSize * sizeof(u32), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, indicesSize * sizeof(u32), indices);
+
+	glBindVertexArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+	mesh.VAO = VAO;
+	mesh.VBO = VBO;
+	mesh.EBO = EBO;
+	mesh.indexesSize = indicesSize;
+	mesh.diffuseInfo.useDiffuseMap = false;
+	mesh.normalInfo.useNormalMap = false;
+	mesh.albedoInfo.useAlbedoMap = false;
+	mesh.metallicInfo.useMetallicMap = false;
+	mesh.roughnessInfo.useRoughnessMap = false;
+	mesh.normalInfo.tangentSpace = false;
+	mesh.normalInfo.useNormalMap = false;
+	mesh.normalInfo.normalMapTexture = 0;
+	mesh.useEquirectangularMap = false;
+
+	return mesh;
+}
+
 static Mesh createSimpleMesh(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo)
 {
 	Mesh mesh;
@@ -209,6 +271,7 @@ static Mesh createSimpleMesh(Vertex* vertices, s32 verticesSize, u32* indices, s
 	mesh.albedoInfo.useAlbedoMap = false;
 	mesh.metallicInfo.useMetallicMap = false;
 	mesh.roughnessInfo.useRoughnessMap = false;
+	mesh.useEquirectangularMap = false;
 
 	if (!normalInfo)
 	{
@@ -223,7 +286,7 @@ static Mesh createSimpleMesh(Vertex* vertices, s32 verticesSize, u32* indices, s
 }
 
 extern Mesh graphicsMeshCreateWithPbrInfo(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize,
-	NormalMappingInfo* normalInfo, u32 metallicMap, u32 albedoMap, u32 roughnessMap)
+	NormalMappingInfo* normalInfo, u32 metallicMap, u32 albedoMap, u32 roughnessMap, u32 irradianceMap)
 {
 	Mesh mesh = createSimpleMesh(vertices, verticesSize, indices, indicesSize, normalInfo);
 	mesh.metallicInfo.useMetallicMap = true;
@@ -232,6 +295,8 @@ extern Mesh graphicsMeshCreateWithPbrInfo(Vertex* vertices, s32 verticesSize, u3
 	mesh.albedoInfo.albedoMap = albedoMap;
 	mesh.roughnessInfo.useRoughnessMap = true;
 	mesh.roughnessInfo.roughnessMap = roughnessMap;
+	mesh.irradianceMap = irradianceMap;
+	mesh.useIrradianceMap = true;
 	return mesh;
 }
 
@@ -248,6 +313,14 @@ extern Mesh graphicsMeshCreateWithTexture(Vertex* vertices, s32 verticesSize, u3
 	Mesh mesh = createSimpleMesh(vertices, verticesSize, indices, indicesSize, normalInfo);
 	mesh.diffuseInfo.useDiffuseMap = true;
 	mesh.diffuseInfo.diffuseMap = diffuseMap;
+	return mesh;
+}
+
+extern Mesh graphicsHDREnvMapMeshCreateWithTexture(Vec4* vertices, s32 verticesSize, u32* indices, s32 indicesSize, u32 equirectangularMap)
+{
+	Mesh mesh = createHDREnvironmentMapSimpleMesh(vertices, verticesSize, indices, indicesSize);
+	mesh.equirectangularMap = equirectangularMap;
+	mesh.useEquirectangularMap = true;
 	return mesh;
 }
 
@@ -399,6 +472,18 @@ extern void graphicsMeshRender(Shader shader, Mesh mesh)
 	metallicUpdateUniforms(&mesh.metallicInfo, shader);
 	roughnessUpdateUniforms(&mesh.roughnessInfo, shader);
 	normalsUpdateUniforms(&mesh.normalInfo, shader);
+	if (mesh.useEquirectangularMap) {
+		GLint equirectangularMapLocation = glGetUniformLocation(shader, "equirectangularMap");
+		glUniform1i(equirectangularMapLocation, 0);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, mesh.equirectangularMap);
+	}
+	if (mesh.useIrradianceMap) {
+		GLint irradianceMapLocation = glGetUniformLocation(shader, "irradianceMap");
+		glUniform1i(irradianceMapLocation, 11);
+		glActiveTexture(GL_TEXTURE11);
+		glBindTexture(GL_TEXTURE_2D, mesh.irradianceMap);
+	}
 	glDrawElements(GL_TRIANGLES, mesh.indexesSize, GL_UNSIGNED_INT, 0);
 	glUseProgram(0);
 	glBindVertexArray(0);
@@ -515,6 +600,17 @@ extern void graphicsEntitySetScale(Entity* entity, Vec3 worldScale)
 	recalculateModelMatrix(entity);
 }
 
+extern void graphicsEntityRenderHDREnvMapShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity)
+{
+	glUseProgram(shader);
+	GLint viewMatrixLocation = glGetUniformLocation(shader, "viewMatrix");
+	GLint projectionMatrixLocation = glGetUniformLocation(shader, "projectionMatrix");
+	glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->viewMatrix.data);
+	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->projectionMatrix.data);
+	graphicsMeshRender(shader, entity->mesh);
+	glUseProgram(0);
+}
+
 extern void graphicsEntityRenderBasicShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity)
 {
 	glUseProgram(shader);
@@ -621,6 +717,28 @@ extern u32 graphicsTextureCreateFromFloatData(const FloatImageData* imageData)
 	return textureId;
 }
 
+extern u32 graphicsTextureCreateFromHDRImage(const FloatImageData* imageData)
+{
+	u32 textureId;
+
+	glGenTextures(1, &textureId);
+	glBindTexture(GL_TEXTURE_2D, textureId);
+	assert(imageData->channels == 3);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, imageData->width, imageData->height, 0, GL_RGB, GL_FLOAT, imageData->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	return textureId;
+}
+
 extern u32 graphicsTextureCreate(const s8* texturePath)
 {
 	ImageData imageData = graphicsImageLoad(texturePath);
@@ -711,13 +829,13 @@ extern ImageData graphicsFloatImageDataToImageData(const FloatImageData* floatIm
 }
 
 extern Mesh graphicsMeshCreateFromObjWithPbrInfo(const s8* objPath, NormalMappingInfo* normalInfo, u32 albedoMap,
-	u32 metallicMap, u32 roughnessMap)
+	u32 metallicMap, u32 roughnessMap, u32 irradianceMap)
 {
 	Vertex* vertices;
 	u32* indexes;
 	objParse(objPath, &vertices, &indexes);
 	Mesh m = graphicsMeshCreateWithPbrInfo(vertices, array_get_length(vertices), indexes,
-		array_get_length(indexes), normalInfo, metallicMap, albedoMap, roughnessMap);
+		array_get_length(indexes), normalInfo, metallicMap, albedoMap, roughnessMap, irradianceMap);
 	array_release(vertices);
 	array_release(indexes);
 	return m;
