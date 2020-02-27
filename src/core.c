@@ -13,7 +13,7 @@
 static Shader phongShader;
 static PerspectiveCamera camera;
 static Light* lights;
-static Entity e;
+static Entity e, floorEntity;
 
 static PerspectiveCamera createCamera()
 {
@@ -37,11 +37,33 @@ static Light* createLights()
 	Vec4 ambientColor = (Vec4) {0.1f, 0.1f, 0.1f, 1.0f};
 	Vec4 diffuseColor = (Vec4) {0.8, 0.8, 0.8, 1.0f};
 	Vec4 specularColor = (Vec4) {0.5f, 0.5f, 0.5f, 1.0f};
-	graphicsLightCreate(&light, lightPosition, ambientColor, diffuseColor, specularColor);
+	graphicsPointLightCreate(&light, lightPosition, ambientColor, diffuseColor, specularColor);
+	//array_push(lights, &light);
+
+	Vec4 lightDirection = (Vec4) {1.0f, -1.0f, 0.0f, 1.0f};
+	ambientColor = (Vec4) {0.0f, 0.0f, 0.0f, 1.0f};
+	diffuseColor = (Vec4) {0.8, 0.8, 0.8, 1.0f};
+	specularColor = (Vec4) {0.5f, 0.5f, 0.5f, 1.0f};
+	graphicsDirectionalLightCreate(&light, lightDirection, ambientColor, diffuseColor, specularColor);
 	array_push(lights, &light);
 
 	return lights;
 }
+
+static Vertex floorVertices[] = {
+	{ -1.0f, 0.0f, -1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f },
+	{ -1.0f, 0.0f, 1.0f, 1.0f , 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f },
+	{ 1.0f, 0.0f, -1.0f, 1.0f , 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f },
+	{ 1.0f, 0.0f, 1.0f, 1.0f , 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f }
+};
+
+static u32 floorIndices[] = {
+	0, 2, 1,
+	1, 2, 3
+};
+
+static Vec4 FLOOR_COLOR = (Vec4) { 0.4f, 0.4f, 0.4f, 1.0f };
+static r32 FLOOR_SIZE = 10.0f;
 
 extern int coreInit()
 {
@@ -54,6 +76,9 @@ extern int coreInit()
 
 	Mesh m = graphicsMeshCreateFromObjWithColor("./res/horse.obj", 0, (Vec4){1.0f, 0.0f, 0.0f, 0.0f});
 	graphicsEntityCreate(&e, m, (Vec4){0.0f, 0.0f, 0.0f, 1.0f}, (Vec3){0.0f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f});
+
+	Mesh floorMesh = graphicsMeshCreateWithColor(floorVertices, sizeof(floorVertices), floorIndices, sizeof(floorIndices), NULL, FLOOR_COLOR);
+	graphicsEntityCreate(&floorEntity, floorMesh, (Vec4){0.0f, -0.415f, 0.0f, 1.0f}, (Vec3){0.0f, 0.0f, 0.0f}, (Vec3){FLOOR_SIZE,FLOOR_SIZE,FLOOR_SIZE});
 
 	return 0;
 }
@@ -71,6 +96,7 @@ extern void coreUpdate(r32 deltaTime)
 extern void coreRender()
 {
 	graphicsEntityRenderPhongShader(phongShader, &camera, &e, lights);
+	graphicsEntityRenderPhongShader(phongShader, &camera, &floorEntity, lights);
 }
 
 extern void coreInputProcess(boolean* keyState, r32 deltaTime)

@@ -4,10 +4,14 @@ in vec4 fragmentPosition;
 in vec4 fragmentNormal;
 in vec2 fragmentTextureCoords;
 
+#define POINT_LIGHT 0
+#define DIRECTIONAL_LIGHT 1
+
 // Light
 struct Light
 {
-	vec4 position;
+	int type;
+	vec4 positionOrDirection;
 	vec4 ambientColor;
 	vec4 diffuseColor;
 	vec4 specularColor;
@@ -71,7 +75,7 @@ vec3 getPointColorOfLight(Light light)
 	vec4 realDiffuseColor = diffuseInfo.useDiffuseMap ? texture(diffuseInfo.diffuseMap, fragmentTextureCoords) :
 		diffuseInfo.diffuseColor;
 
-	vec4 fragmentToPointLightVec = normalize(light.position - fragmentPosition);
+	vec4 fragmentToPointLightVec = normalize(light.positionOrDirection - fragmentPosition);
 
 	// Ambient Color
 	vec4 pointAmbientColor = light.ambientColor * realDiffuseColor;
@@ -86,7 +90,7 @@ vec3 getPointColorOfLight(Light light)
 	vec4 pointSpecularColor = pointSpecularContribution * light.specularColor * vec4(1.0, 1.0, 1.0, 1.0);
 
 	// Attenuation
-	float pointLightDistance = length(light.position - fragmentPosition);
+	float pointLightDistance = length(light.positionOrDirection - fragmentPosition);
 	float pointAttenuation = 1.0 / (1.0 + 0.0014 * pointLightDistance +
 		0.000007 * pointLightDistance * pointLightDistance);
 
@@ -96,18 +100,45 @@ vec3 getPointColorOfLight(Light light)
 
 	vec4 pointColor = pointAmbientColor + pointDiffuseColor;// + pointSpecularColor;
 	return pointColor.xyz;
-	finalColor = vec4(pointColor.xyz, 1.0);
+}
+
+vec3 getDirectionalColorOfLight(Light light)
+{
+	vec4 normal = getCorrectNormal();
+	vec4 realDiffuseColor = diffuseInfo.useDiffuseMap ? texture(diffuseInfo.diffuseMap, fragmentTextureCoords) :
+		diffuseInfo.diffuseColor;
+
+	vec4 fragmentToPointLightVec = - normalize(light.positionOrDirection);
+
+	// Ambient Color
+	vec4 pointAmbientColor = light.ambientColor * realDiffuseColor;
+
+	// Diffuse Color
+	float pointDiffuseContribution = max(0, dot(fragmentToPointLightVec, normal));
+	vec4 pointDiffuseColor = pointDiffuseContribution * light.diffuseColor * realDiffuseColor;
+	
+	// Specular Color
+	vec4 fragmentToCameraVec = normalize(cameraPosition - fragmentPosition);
+	float pointSpecularContribution = pow(max(dot(fragmentToCameraVec, reflect(-fragmentToPointLightVec, normal)), 0.0), objectShineness);
+	vec4 pointSpecularColor = pointSpecularContribution * light.specularColor * vec4(1.0, 1.0, 1.0, 1.0);
+
+	vec4 pointColor = pointAmbientColor + pointDiffuseColor;// + pointSpecularColor;
+	return pointColor.xyz;
 }
 
 void main()
 {
-	finalColor = vec4(0.0, 0.0, 0.0, 1.0);
+	finalColor = vec4(0.0, 0.0, 0.0, 0.0);
 
 	for (int i = 0; i < lightQuantity; ++i)
 	{
-		vec3 pointColor = getPointColorOfLight(lights[i]);
-		finalColor.x += pointColor.x;
-		finalColor.y += pointColor.y;
-		finalColor.z += pointColor.z;
+		Light light = lights[i];
+		vec3 color = vec3(0.0, 0.0, 0.0);
+
+		if (light.type == POINT_LIGHT) {
+			finalColor.xyz += getPointColorOfLight(light);
+		} else if (light.type == DIRECTIONAL_LIGHT) {
+			finalColor.xyz += getDirectionalColorOfLight(light);
+		}
 	}
 }

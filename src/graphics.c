@@ -248,11 +248,17 @@ static void lightUpdateUniforms(const Light* lights, Shader shader)
 	for (s32 i = 0; i < numberOfLights; ++i)
 	{
 		Light light = lights[i];
-		GLint lightPositionLocation = glGetUniformLocation(shader, buildLightUniformName(buffer, i, "position"));
+		GLint lightTypeLocation = glGetUniformLocation(shader, buildLightUniformName(buffer, i, "type"));
+		GLint lightPositionOrDirectionLocation = glGetUniformLocation(shader, buildLightUniformName(buffer, i, "positionOrDirection"));
 		GLint ambientColorLocation = glGetUniformLocation(shader, buildLightUniformName(buffer, i, "ambientColor"));
 		GLint diffuseColorLocation = glGetUniformLocation(shader, buildLightUniformName(buffer, i, "diffuseColor"));
 		GLint specularColorLocation = glGetUniformLocation(shader, buildLightUniformName(buffer, i, "specularColor"));
-		glUniform4f(lightPositionLocation, light.position.x, light.position.y, light.position.z, light.position.w);
+		glUniform1i(lightTypeLocation, light.lightType);
+		if (light.lightType == POINT_LIGHT) {
+			glUniform4f(lightPositionOrDirectionLocation, light.position.x, light.position.y, light.position.z, light.position.w);
+		} else if (light.lightType == DIRECTIONAL_LIGHT) {
+			glUniform4f(lightPositionOrDirectionLocation, light.direction.x, light.direction.y, light.direction.z, light.direction.w);
+		}
 		glUniform4f(ambientColorLocation, light.ambientColor.x, light.ambientColor.y, light.ambientColor.z, light.ambientColor.w);
 		glUniform4f(diffuseColorLocation, light.diffuseColor.x, light.diffuseColor.y, light.diffuseColor.z, light.diffuseColor.w);
 		glUniform4f(specularColorLocation, light.specularColor.x, light.specularColor.y, light.specularColor.z, light.specularColor.w);
@@ -523,9 +529,19 @@ extern void graphicsTextureDelete(u32 textureId)
 	glDeleteTextures(1, &textureId);
 }
 
-extern void graphicsLightCreate(Light* light, Vec4 position, Vec4 ambientColor, Vec4 diffuseColor, Vec4 specularColor)
+extern void graphicsPointLightCreate(Light* light, Vec4 position, Vec4 ambientColor, Vec4 diffuseColor, Vec4 specularColor)
 {
+	light->lightType = POINT_LIGHT;
 	light->position = position;
+	light->ambientColor = ambientColor;
+	light->diffuseColor = diffuseColor;
+	light->specularColor = specularColor;
+}
+
+extern void graphicsDirectionalLightCreate(Light* light, Vec4 direction, Vec4 ambientColor, Vec4 diffuseColor, Vec4 specularColor)
+{
+	light->lightType = DIRECTIONAL_LIGHT;
+	light->direction = direction;
 	light->ambientColor = ambientColor;
 	light->diffuseColor = diffuseColor;
 	light->specularColor = specularColor;
