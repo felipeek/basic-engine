@@ -52,6 +52,7 @@ static void recalculateViewMatrix(PerspectiveCamera* camera)
 
 static void recalculateProjectionMatrix(PerspectiveCamera* camera)
 {
+#if 1
 	r32 near = camera->nearPlane;
 	r32 far = camera->farPlane;
 	r32 top = (r32)fabs(near) * atanf(gmRadians(camera->fov) / 2.0f);
@@ -76,6 +77,23 @@ static void recalculateProjectionMatrix(PerspectiveCamera* camera)
 	// Need to transpose when sending to shader
 	Mat4 MP = gmMultiplyMat4(&M, &P);
 	camera->projectionMatrix = gmScalarProductMat4(-1, &MP);
+#else
+	r32 right = 10.0f;
+	r32 left = -10.0f;
+	r32 top = 10.0f;
+	r32 bottom = -10.0f;
+	r32 near = 1.0f;
+	r32 far = 7.5f;
+
+	Mat4 ortho = {
+		2.0f / (right - left), 0.0f, 0.0f, -(right + left)/(right - left),
+		0.0f, 2.0f / (top - bottom), 0.0f, -(top + bottom)/(top - bottom),
+		0.0f, 0.0f, -2.0f / (far - near), -(far + near)/(far - near),
+		0.0f, 0.0f, 0.0f, 1.0f
+	};
+
+	camera->projectionMatrix = ortho;
+#endif
 }
 
 static void recalculateView(PerspectiveCamera* camera)

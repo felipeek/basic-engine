@@ -7,10 +7,12 @@ layout (location = 2) in vec2 vertexTextureCoords;
 out vec4 fragmentPosition;
 out vec4 fragmentNormal;
 out vec2 fragmentTextureCoords;
+out vec4 fragmentPosLightSpace;
 
 uniform mat4 modelMatrix;
 uniform mat4 viewMatrix;
 uniform mat4 projectionMatrix;
+uniform mat4 lightSpaceMatrix;
 
 void main()
 {
@@ -18,5 +20,6 @@ void main()
 	fragmentNormal = vec4(normal3D, 0.0);
 	fragmentTextureCoords = vertexTextureCoords;
 	fragmentPosition = modelMatrix * vertexPosition;
+	fragmentPosLightSpace = lightSpaceMatrix * modelMatrix * vertexPosition;
 	gl_Position = projectionMatrix * viewMatrix * modelMatrix * vertexPosition;
 }

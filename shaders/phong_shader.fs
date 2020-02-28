@@ -3,6 +3,7 @@
 in vec4 fragmentPosition;
 in vec4 fragmentNormal;
 in vec2 fragmentTextureCoords;
+in vec4 fragmentPosLightSpace;
 
 #define POINT_LIGHT 0
 #define DIRECTIONAL_LIGHT 1
@@ -40,6 +41,7 @@ uniform NormalMappingInfo normalMappingInfo;
 uniform vec4 cameraPosition;
 uniform float objectShineness;
 uniform DiffuseInfo diffuseInfo;
+uniform sampler2D shadowMap;
 // Specular map will not be used (<1,1,1,1> assumed)
 
 out vec4 finalColor;
@@ -67,6 +69,32 @@ vec4 getCorrectNormal()
 		normal = normalize(fragmentNormal);
 
 	return normal;
+}
+
+float shadowCalculation(vec4 fragmentPosLightSpace, vec4 normal, vec4 lightDir) {
+	// perform perspective divide
+    vec3 projCoords = fragmentPosLightSpace.xyz / fragmentPosLightSpace.w;
+    // transform to [0,1] range
+    projCoords = projCoords * 0.5 + 0.5;
+	float currentDepth = projCoords.z;
+	if (currentDepth > 1.0) return 0.0;
+
+	float shadow = 0.0;
+	vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+	for (int x = -2; x <= 2; ++x)
+	{
+		for (int y = -2; y <= 2; ++y)
+		{
+			// get closest depth value from light's perspective (using [0,1] range fragPosLight as coords)
+			float closestDepth = texture(shadowMap, projCoords.xy + vec2(x,y) * texelSize).r; 
+			// get depth of current fragment from light's perspective
+			// check whether current frag pos is in shadow
+			float bias = max(0.01 * (1.0 - dot(normal, lightDir)), 0.005);  
+			shadow += currentDepth - bias > closestDepth ? 1.0 : 0.0;
+		}
+	}
+
+    return shadow / (5 * 5);
 }
 
 vec3 getPointColorOfLight(Light light)
@@ -98,6 +126,7 @@ vec3 getPointColorOfLight(Light light)
 	pointDiffuseColor *= pointAttenuation;
 	pointSpecularColor *= pointAttenuation;
 
+	//float shadow = shadowCalculation(fragmentPosLightSpace, normal, fragmentToPointLightVec);
 	vec4 pointColor = pointAmbientColor + pointDiffuseColor;// + pointSpecularColor;
 	return pointColor.xyz;
 }
@@ -122,7 +151,8 @@ vec3 getDirectionalColorOfLight(Light light)
 	float pointSpecularContribution = pow(max(dot(fragmentToCameraVec, reflect(-fragmentToPointLightVec, normal)), 0.0), objectShineness);
 	vec4 pointSpecularColor = pointSpecularContribution * light.specularColor * vec4(1.0, 1.0, 1.0, 1.0);
 
-	vec4 pointColor = pointAmbientColor + pointDiffuseColor;// + pointSpecularColor;
+	float shadow = shadowCalculation(fragmentPosLightSpace, normal, fragmentToPointLightVec);
+	vec4 pointColor = pointAmbientColor + (1.0 - shadow) * pointDiffuseColor;// + pointSpecularColor;
 	return pointColor.xyz;
 }
 

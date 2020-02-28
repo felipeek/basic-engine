@@ -426,6 +426,119 @@ extern void graphicsEntitySetScale(Entity* entity, Vec3 worldScale)
 	recalculateModelMatrix(entity);
 }
 
+static Mat4 getLightSpaceMatrixForLight(const Light* light)
+{
+	r32 right = 10.0f;
+	r32 left = -10.0f;
+	r32 top = 10.0f;
+	r32 bottom = -10.0f;
+	r32 near = 1.0f;
+	r32 far = 10.5f;
+
+	Mat4 ortho = {
+		2.0f / (right - left), 0.0f, 0.0f, -(right + left)/(right - left),
+		0.0f, 2.0f / (top - bottom), 0.0f, -(top + bottom)/(top - bottom),
+		0.0f, 0.0f, -2.0f / (far - near), -(far + near)/(far - near),
+		0.0f, 0.0f, 0.0f, 1.0f
+	};
+
+	const r32 DISTANCE = 5.0f;
+	Vec4 lightPosition = gmScalarProductVec4(-1.0f, light->direction);
+	lightPosition = gmNormalizeVec4(lightPosition);
+	lightPosition = gmScalarProductVec4(DISTANCE, lightPosition);
+	lightPosition.w = 1.0f;
+
+	Vec3 upVec3 = (Vec3) { 0.0f, 1.0f, 0.0f };
+	Vec4 w = gmScalarProductVec4(-1, gmNormalizeVec4(light->direction));
+	Vec3 wVec3 = (Vec3) { w.x, w.y, w.z };
+	Vec3 upWCross = gmCrossProduct(upVec3, wVec3);
+	Vec4 u = gmNormalizeVec4((Vec4) { upWCross.x, upWCross.y, upWCross.z, 0.0f });
+	Vec3 uVec3 = (Vec3) { u.x, u.y, u.z };
+	Vec3 vVec3 = gmCrossProduct(wVec3, uVec3);
+	Vec4 v = (Vec4) { vVec3.x, vVec3.y, vVec3.z, 0.0f };
+	// Useless, but conceptually correct.
+	Vec4 worldToCameraVec = gmSubtractVec4(lightPosition, (Vec4) { 0.0f, 0.0f, 0.0f, 1.0f });
+
+	// Need to transpose when sending to shader
+	Mat4 view = (Mat4) {
+		u.x, u.y, u.z, -gmDotProductVec4(u, worldToCameraVec),
+			v.x, v.y, v.z, -gmDotProductVec4(v, worldToCameraVec),
+			w.x, w.y, w.z, -gmDotProductVec4(w, worldToCameraVec),
+			0.0f, 0.0f, 0.0f, 1.0f
+	};
+
+	return gmMultiplyMat4(&ortho, &view);
+}
+
+extern void graphicsEntityRenderDepthShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* light)
+{
+	glUseProgram(shader);
+	GLint modelMatrixLocation = glGetUniformLocation(shader, "modelMatrix");
+	GLint lightSpaceMatrixLocation = glGetUniformLocation(shader, "lightSpaceMatrix");
+	glUniformMatrix4fv(modelMatrixLocation, 1, GL_TRUE, (GLfloat*)entity->modelMatrix.data);
+	Mat4 lightSpaceMatrix = getLightSpaceMatrixForLight(light);
+	glUniformMatrix4fv(lightSpaceMatrixLocation, 1, GL_TRUE, (GLfloat*)lightSpaceMatrix.data);
+	graphicsMeshRender(shader, entity->mesh);
+	glUseProgram(0);
+}
+
+static Mesh createQuadMesh() {
+	r32 quadPositions[] = {-1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 1.0f, 1.0f};
+	u32 quadIndices[] = {0, 2, 1, 1, 2, 3};
+	Mesh mesh;
+	GLuint VBO, EBO, VAO;
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glGenBuffers(1, &EBO);
+
+	glBindVertexArray(VAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quadPositions), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(quadPositions), quadPositions);
+
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(0);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quadIndices), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, sizeof(quadIndices), quadIndices);
+
+	glBindVertexArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+	mesh.VAO = VAO;
+	mesh.VBO = VBO;
+	mesh.EBO = EBO;
+	mesh.indexesSize = sizeof(quadIndices);
+
+	return mesh;
+}
+
+static void quadRender(Shader shader) {
+	static Mesh quadMesh;
+	static boolean quadMeshInitialised = false;
+	if (!quadMeshInitialised) {
+		quadMesh = createQuadMesh();
+	}
+
+	glBindVertexArray(quadMesh.VAO);
+	glDrawElements(GL_TRIANGLES, quadMesh.indexesSize, GL_UNSIGNED_INT, 0);
+}
+
+extern void graphicsEntityRenderQuadShader(Shader shader, const PerspectiveCamera* camera, const u32 texture)
+{
+	glUseProgram(shader);
+	GLint texLocation = glGetUniformLocation(shader, "tex");
+	glUniform1i(texLocation, 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	quadRender(shader);
+	glUseProgram(0);
+}
+
 extern void graphicsEntityRenderBasicShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity)
 {
 	glUseProgram(shader);
@@ -439,7 +552,7 @@ extern void graphicsEntityRenderBasicShader(Shader shader, const PerspectiveCame
 	glUseProgram(0);
 }
 
-extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* lights)
+extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* lights, u32 shadowMap)
 {
 	glUseProgram(shader);
 	lightUpdateUniforms(lights, shader);
@@ -448,11 +561,18 @@ extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCame
 	GLint modelMatrixLocation = glGetUniformLocation(shader, "modelMatrix");
 	GLint viewMatrixLocation = glGetUniformLocation(shader, "viewMatrix");
 	GLint projectionMatrixLocation = glGetUniformLocation(shader, "projectionMatrix");
+	GLint lightSpaceMatrixLocation = glGetUniformLocation(shader, "lightSpaceMatrix");
+	GLint shadowMapLocation = glGetUniformLocation(shader, "shadowMap");
 	glUniform4f(cameraPositionLocation, camera->position.x, camera->position.y, camera->position.z, camera->position.w);
 	glUniform1f(shinenessLocation, 128.0f);
 	glUniformMatrix4fv(modelMatrixLocation, 1, GL_TRUE, (GLfloat*)entity->modelMatrix.data);
 	glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->viewMatrix.data);
 	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->projectionMatrix.data);
+	Mat4 lightSpaceMatrix = getLightSpaceMatrixForLight(lights); // will take first light lul
+	glUniformMatrix4fv(lightSpaceMatrixLocation, 1, GL_TRUE, (GLfloat*)lightSpaceMatrix.data);
+	glUniform1i(shadowMapLocation, 1);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, shadowMap);
 	graphicsMeshRender(shader, entity->mesh);
 	glUseProgram(0);
 }
