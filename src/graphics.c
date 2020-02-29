@@ -5,7 +5,10 @@
 #include <stb_image.h>
 #include <stb_image_write.h>
 #include <dynamic_array.h>
+#include <assert.h>
 #include <math.h>
+
+const r32 FAR_PLANE = 25.0f;
 
 extern ImageData graphicsImageLoad(const s8* imagePath)
 {
@@ -108,10 +111,69 @@ extern Shader graphicsShaderCreate(const s8* vertexShaderPath, const s8* fragmen
 	if (!success)
 	{
 		glGetShaderInfoLog(shaderProgram, 1024, 0, infoLogBuffer);
+		printf("Erraor linking program: %s\n", infoLogBuffer);
+	}
+
+	free(vertexShaderCode);
+	free(fragmentShaderCode);
+	return shaderProgram;
+}
+
+extern Shader graphicsShaderCreateWithGeometry(const s8* vertexShaderPath, const s8* geometryShaderPath, const s8* fragmentShaderPath)
+{
+	s8* vertexShaderCode = utilReadFile(vertexShaderPath, 0);
+	s8* geometryShaderCode = utilReadFile(geometryShaderPath, 0);
+	s8* fragmentShaderCode = utilReadFile(fragmentShaderPath, 0);
+
+	GLint success;
+	GLchar infoLogBuffer[1024];
+	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+	GLuint geometryShader = glCreateShader(GL_GEOMETRY_SHADER);
+	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(vertexShader, 1, (const GLchar *const*)&vertexShaderCode, 0);
+	glShaderSource(geometryShader, 1, (const GLchar *const*)&geometryShaderCode, 0);
+	glShaderSource(fragmentShader, 1, (const GLchar *const*)&fragmentShaderCode, 0);
+
+	glCompileShader(vertexShader);
+	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+	if (!success)
+	{
+		glGetShaderInfoLog(vertexShader, 1024, 0, infoLogBuffer);
+		printf("Error compiling vertex shader: %s\n", infoLogBuffer);
+	}
+
+	glCompileShader(geometryShader);
+	glGetShaderiv(geometryShader, GL_COMPILE_STATUS, &success);
+	if (!success)
+	{
+		glGetShaderInfoLog(geometryShader, 1024, 0, infoLogBuffer);
+		printf("Error compiling geometry shader: %s\n", infoLogBuffer);
+	}
+
+	glCompileShader(fragmentShader);
+	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+	if (!success)
+	{
+		glGetShaderInfoLog(fragmentShader, 1024, 0, infoLogBuffer);
+		printf("Error compiling fragment shader: %s\n", infoLogBuffer);
+	}
+
+	GLuint shaderProgram = glCreateProgram();
+
+	glAttachShader(shaderProgram, vertexShader);
+	glAttachShader(shaderProgram, geometryShader);
+	glAttachShader(shaderProgram, fragmentShader);
+	glLinkProgram(shaderProgram);
+
+	glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+	if (!success)
+	{
+		glGetShaderInfoLog(shaderProgram, 1024, 0, infoLogBuffer);
 		printf("Error linking program: %s\n", infoLogBuffer);
 	}
 
 	free(vertexShaderCode);
+	free(geometryShaderCode);
 	free(fragmentShaderCode);
 	return shaderProgram;
 }
@@ -470,14 +532,96 @@ static Mat4 getLightSpaceMatrixForLight(const Light* light)
 	return gmMultiplyMat4(&ortho, &view);
 }
 
+static Mat4 getLightSpaceMatrixForLightWithPerspectiveProjection(const Light* light, s32 shadowTexWidth,
+	s32 shadowTexHeight, Vec4 lightDirection, Vec4 up, r32 far)
+{
+	r32 near = -1.0f;
+	r32 fov = 90.0f;
+	r32 top = (r32)fabs(near) * atanf(gmRadians(fov));
+	r32 bottom = -top;
+	r32 right = top * ((r32)shadowTexWidth / (r32)shadowTexHeight);
+	r32 left = -right;
+
+	Mat4 P = (Mat4) {
+		near, 0, 0, 0,
+			0, near, 0, 0,
+			0, 0, near + far, -near * far,
+			0, 0, 1, 0
+	};
+
+	Mat4 M = (Mat4) {
+		2.0f / (right - left), 0, 0, -(right + left) / (right - left),
+			0, 2.0f / (top - bottom), 0, -(top + bottom) / (top - bottom),
+			0, 0, 2.0f / (far - near), -(far + near) / (far - near),
+			0, 0, 0, 1
+	};
+
+	// Need to transpose when sending to shader
+	Mat4 MP = gmMultiplyMat4(&M, &P);
+	Mat4 projectionMatrix = gmScalarProductMat4(-1, &MP);
+
+	// view calculation
+	Vec3 upVec3 = (Vec3) { up.x, up.y, up.z };
+	Vec4 w = gmScalarProductVec4(-1, gmNormalizeVec4(lightDirection));
+	Vec3 wVec3 = (Vec3) { w.x, w.y, w.z };
+	Vec3 upWCross = gmCrossProduct(upVec3, wVec3);
+	Vec4 u = gmNormalizeVec4((Vec4) { upWCross.x, upWCross.y, upWCross.z, 0.0f });
+	Vec3 uVec3 = (Vec3) { u.x, u.y, u.z };
+	Vec3 vVec3 = gmCrossProduct(wVec3, uVec3);
+	Vec4 v = (Vec4) { vVec3.x, vVec3.y, vVec3.z, 0.0f };
+	// Useless, but conceptually correct.
+	Vec4 worldToCameraVec = gmSubtractVec4(light->position, (Vec4) { 0.0f, 0.0f, 0.0f, 1.0f });
+
+	// Need to transpose when sending to shader
+	Mat4 view = (Mat4) {
+		u.x, u.y, u.z, -gmDotProductVec4(u, worldToCameraVec),
+			v.x, v.y, v.z, -gmDotProductVec4(v, worldToCameraVec),
+			w.x, w.y, w.z, -gmDotProductVec4(w, worldToCameraVec),
+			0.0f, 0.0f, 0.0f, 1.0f
+	};
+
+	return gmMultiplyMat4(&projectionMatrix, &view);
+}
+
 extern void graphicsEntityRenderDepthShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* light)
 {
+	assert(light->lightType == DIRECTIONAL_LIGHT);
 	glUseProgram(shader);
 	GLint modelMatrixLocation = glGetUniformLocation(shader, "modelMatrix");
 	GLint lightSpaceMatrixLocation = glGetUniformLocation(shader, "lightSpaceMatrix");
 	glUniformMatrix4fv(modelMatrixLocation, 1, GL_TRUE, (GLfloat*)entity->modelMatrix.data);
 	Mat4 lightSpaceMatrix = getLightSpaceMatrixForLight(light);
 	glUniformMatrix4fv(lightSpaceMatrixLocation, 1, GL_TRUE, (GLfloat*)lightSpaceMatrix.data);
+	graphicsMeshRender(shader, entity->mesh);
+	glUseProgram(0);
+}
+
+extern void graphicsEntityRenderDepthPointShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* light,
+	s32 shadowTexWidth, s32 shadowTexHeight)
+{
+	assert(light->lightType == POINT_LIGHT);
+	glUseProgram(shader);
+	GLint modelMatrixLocation = glGetUniformLocation(shader, "modelMatrix");
+	GLint shadowTransformsLocation = glGetUniformLocation(shader, "shadowMatrices");
+	GLint farPlaneLocation = glGetUniformLocation(shader, "farPlane");
+	GLint lightPositionLocation = glGetUniformLocation(shader, "lightPosition");
+	glUniformMatrix4fv(modelMatrixLocation, 1, GL_TRUE, (GLfloat*)entity->modelMatrix.data);
+	Mat4 shadowTransforms[6];
+	shadowTransforms[0] = getLightSpaceMatrixForLightWithPerspectiveProjection(light, shadowTexWidth, shadowTexHeight, 
+		(Vec4){1.0f, 0.0f, 0.0f, 0.0f}, (Vec4){0.0f, -1.0f, 0.0f, 0.0f}, -FAR_PLANE);
+	shadowTransforms[1] = getLightSpaceMatrixForLightWithPerspectiveProjection(light, shadowTexWidth, shadowTexHeight, 
+		(Vec4){-1.0f, 0.0f, 0.0f, 0.0f}, (Vec4){0.0f, -1.0f, 0.0f, 0.0f}, -FAR_PLANE);
+	shadowTransforms[2] = getLightSpaceMatrixForLightWithPerspectiveProjection(light, shadowTexWidth, shadowTexHeight, 
+		(Vec4){0.0f, 1.0f, 0.0f, 0.0f}, (Vec4){0.0f, 0.0f, 1.0f, 0.0f}, -FAR_PLANE);
+	shadowTransforms[3] = getLightSpaceMatrixForLightWithPerspectiveProjection(light, shadowTexWidth, shadowTexHeight, 
+		(Vec4){0.0f, -1.0f, 0.0f, 0.0f}, (Vec4){0.0f, 0.0f, -1.0f, 0.0f}, -FAR_PLANE);
+	shadowTransforms[4] = getLightSpaceMatrixForLightWithPerspectiveProjection(light, shadowTexWidth, shadowTexHeight, 
+		(Vec4){0.0f, 0.0f, 1.0f, 0.0f}, (Vec4){0.0f, -1.0f, 0.0f, 0.0f}, -FAR_PLANE);
+	shadowTransforms[5] = getLightSpaceMatrixForLightWithPerspectiveProjection(light, shadowTexWidth, shadowTexHeight, 
+		(Vec4){0.0f, 0.0f, -1.0f, 0.0f}, (Vec4){0.0f, -1.0f, 0.0f, 0.0f}, -FAR_PLANE);
+	glUniformMatrix4fv(shadowTransformsLocation, 6, GL_TRUE, (GLfloat*)shadowTransforms);
+	glUniform1f(farPlaneLocation, FAR_PLANE);
+	glUniform4fv(lightPositionLocation, 1, (GLfloat*)&light->position);
 	graphicsMeshRender(shader, entity->mesh);
 	glUseProgram(0);
 }
@@ -552,7 +696,7 @@ extern void graphicsEntityRenderBasicShader(Shader shader, const PerspectiveCame
 	glUseProgram(0);
 }
 
-extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* lights, u32 shadowMap)
+extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* lights, u32 shadowCubeMap)
 {
 	glUseProgram(shader);
 	lightUpdateUniforms(lights, shader);
@@ -562,17 +706,17 @@ extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCame
 	GLint viewMatrixLocation = glGetUniformLocation(shader, "viewMatrix");
 	GLint projectionMatrixLocation = glGetUniformLocation(shader, "projectionMatrix");
 	GLint lightSpaceMatrixLocation = glGetUniformLocation(shader, "lightSpaceMatrix");
-	GLint shadowMapLocation = glGetUniformLocation(shader, "shadowMap");
+	GLint shadowMapLocation = glGetUniformLocation(shader, "shadowCubeMap");
+	GLint farPlaneLocation = glGetUniformLocation(shader, "farPlane");
 	glUniform4f(cameraPositionLocation, camera->position.x, camera->position.y, camera->position.z, camera->position.w);
 	glUniform1f(shinenessLocation, 128.0f);
+	glUniform1f(farPlaneLocation, FAR_PLANE);
 	glUniformMatrix4fv(modelMatrixLocation, 1, GL_TRUE, (GLfloat*)entity->modelMatrix.data);
 	glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->viewMatrix.data);
 	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->projectionMatrix.data);
-	Mat4 lightSpaceMatrix = getLightSpaceMatrixForLight(lights); // will take first light lul
-	glUniformMatrix4fv(lightSpaceMatrixLocation, 1, GL_TRUE, (GLfloat*)lightSpaceMatrix.data);
-	glUniform1i(shadowMapLocation, 1);
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, shadowMap);
+	glUniform1i(shadowMapLocation, 7);
+	glActiveTexture(GL_TEXTURE7);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubeMap);
 	graphicsMeshRender(shader, entity->mesh);
 	glUseProgram(0);
 }
@@ -749,4 +893,105 @@ extern Mesh graphicsMeshCreateFromObjWithTexture(const s8* objPath, NormalMappin
 	array_release(vertices);
 	array_release(indexes);
 	return m;
+}
+
+static u32 createSkyboxVAO()
+{
+	r32 skyboxVertices[] = {
+		// positions          
+		-1.0f,  1.0f, -1.0f,
+		-1.0f, -1.0f, -1.0f,
+		1.0f, -1.0f, -1.0f,
+		1.0f, -1.0f, -1.0f,
+		1.0f,  1.0f, -1.0f,
+		-1.0f,  1.0f, -1.0f,
+
+		-1.0f, -1.0f,  1.0f,
+		-1.0f, -1.0f, -1.0f,
+		-1.0f,  1.0f, -1.0f,
+		-1.0f,  1.0f, -1.0f,
+		-1.0f,  1.0f,  1.0f,
+		-1.0f, -1.0f,  1.0f,
+
+		1.0f, -1.0f, -1.0f,
+		1.0f, -1.0f,  1.0f,
+		1.0f,  1.0f,  1.0f,
+		1.0f,  1.0f,  1.0f,
+		1.0f,  1.0f, -1.0f,
+		1.0f, -1.0f, -1.0f,
+
+		-1.0f, -1.0f,  1.0f,
+		-1.0f,  1.0f,  1.0f,
+		1.0f,  1.0f,  1.0f,
+		1.0f,  1.0f,  1.0f,
+		1.0f, -1.0f,  1.0f,
+		-1.0f, -1.0f,  1.0f,
+
+		-1.0f,  1.0f, -1.0f,
+		1.0f,  1.0f, -1.0f,
+		1.0f,  1.0f,  1.0f,
+		1.0f,  1.0f,  1.0f,
+		-1.0f,  1.0f,  1.0f,
+		-1.0f,  1.0f, -1.0f,
+
+		-1.0f, -1.0f, -1.0f,
+		-1.0f, -1.0f,  1.0f,
+		1.0f, -1.0f, -1.0f,
+		1.0f, -1.0f, -1.0f,
+		-1.0f, -1.0f,  1.0f,
+		1.0f, -1.0f,  1.0f
+	};
+
+	u32 VAO, VBO;
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+
+	glBindVertexArray(VAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(skyboxVertices), skyboxVertices);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(0);
+
+	glBindVertexArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	return VAO;
+}
+
+static u32 skyboxVAO;
+static boolean skyboxVAOInitialized = false;
+
+extern void graphicsSkyboxRender(Shader shader, u32 texture, const PerspectiveCamera* camera)
+{
+	if (!skyboxVAOInitialized) {
+		skyboxVAO = createSkyboxVAO();
+		skyboxVAOInitialized = true;
+	}
+	glUseProgram(shader);
+	GLint skyboxTexLocation = glGetUniformLocation(shader, "cubeTexture");
+	glUniform1i(skyboxTexLocation, 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, texture);
+	GLint viewMatrixLocation = glGetUniformLocation(shader, "viewMatrix");
+	GLint projectionMatrixLocation = glGetUniformLocation(shader, "projectionMatrix");
+	Mat4 viewMatrix = camera->viewMatrix;
+	viewMatrix.data[0][3] = 0.0f;
+	viewMatrix.data[1][3] = 0.0f;
+	viewMatrix.data[2][3] = 0.0f;
+	viewMatrix.data[3][3] = 1.0f;
+	viewMatrix.data[3][2] = 0.0f;
+	viewMatrix.data[3][1] = 0.0f;
+	viewMatrix.data[3][0] = 0.0f;
+	glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, (GLfloat*)viewMatrix.data);
+	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->projectionMatrix.data);
+	glBindVertexArray(skyboxVAO);
+	glDepthMask(GL_FALSE);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+	glDepthMask(GL_TRUE);
+	glUseProgram(0);
+	glBindVertexArray(0);
 }

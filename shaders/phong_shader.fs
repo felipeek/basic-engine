@@ -3,7 +3,6 @@
 in vec4 fragmentPosition;
 in vec4 fragmentNormal;
 in vec2 fragmentTextureCoords;
-in vec4 fragmentPosLightSpace;
 
 #define POINT_LIGHT 0
 #define DIRECTIONAL_LIGHT 1
@@ -41,8 +40,10 @@ uniform NormalMappingInfo normalMappingInfo;
 uniform vec4 cameraPosition;
 uniform float objectShineness;
 uniform DiffuseInfo diffuseInfo;
-uniform sampler2D shadowMap;
+uniform samplerCube shadowCubeMap;
 // Specular map will not be used (<1,1,1,1> assumed)
+
+uniform float farPlane;
 
 out vec4 finalColor;
 
@@ -71,30 +72,24 @@ vec4 getCorrectNormal()
 	return normal;
 }
 
-float shadowCalculation(vec4 fragmentPosLightSpace, vec4 normal, vec4 lightDir) {
-	// perform perspective divide
-    vec3 projCoords = fragmentPosLightSpace.xyz / fragmentPosLightSpace.w;
-    // transform to [0,1] range
-    projCoords = projCoords * 0.5 + 0.5;
-	float currentDepth = projCoords.z;
-	if (currentDepth > 1.0) return 0.0;
+float shadowCalculation(vec4 fragmentPosition, vec4 normal, vec4 lightDir, vec4 lightPosition) {
+	vec4 fragToLight = fragmentPosition - lightPosition;
+	float closestDepth = texture(shadowCubeMap, fragToLight.xyz).r;
 
-	float shadow = 0.0;
-	vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-	for (int x = -2; x <= 2; ++x)
-	{
-		for (int y = -2; y <= 2; ++y)
-		{
-			// get closest depth value from light's perspective (using [0,1] range fragPosLight as coords)
-			float closestDepth = texture(shadowMap, projCoords.xy + vec2(x,y) * texelSize).r; 
-			// get depth of current fragment from light's perspective
-			// check whether current frag pos is in shadow
-			float bias = max(0.01 * (1.0 - dot(normal, lightDir)), 0.005);  
-			shadow += currentDepth - bias > closestDepth ? 1.0 : 0.0;
-		}
-	}
+	closestDepth *= farPlane;
+	float currentDepth = length(fragToLight.xyz);
 
-    return shadow / (5 * 5);
+	float bias = max(0.1 * (1.0 - dot(normal, lightDir)), 0.005);  
+	float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+
+    return shadow;
+}
+
+vec3 getDepthVector(vec4 fragmentPosition, vec4 normal, vec4 lightDir, vec4 lightPosition) {
+	vec4 fragToLight = fragmentPosition - lightPosition;
+	float closestDepth = texture(shadowCubeMap, fragToLight.xyz).r;
+
+    return vec3(closestDepth);
 }
 
 vec3 getPointColorOfLight(Light light)
@@ -126,34 +121,15 @@ vec3 getPointColorOfLight(Light light)
 	pointDiffuseColor *= pointAttenuation;
 	pointSpecularColor *= pointAttenuation;
 
-	//float shadow = shadowCalculation(fragmentPosLightSpace, normal, fragmentToPointLightVec);
-	vec4 pointColor = pointAmbientColor + pointDiffuseColor;// + pointSpecularColor;
+	float shadow = shadowCalculation(fragmentPosition, normal, fragmentToPointLightVec, light.positionOrDirection);
+	vec4 pointColor = pointAmbientColor + (1.0 - shadow) * pointDiffuseColor;// + pointSpecularColor;
 	return pointColor.xyz;
+	//return getDepthVector(fragmentPosition, normal, fragmentToPointLightVec, light.positionOrDirection);
 }
 
 vec3 getDirectionalColorOfLight(Light light)
 {
-	vec4 normal = getCorrectNormal();
-	vec4 realDiffuseColor = diffuseInfo.useDiffuseMap ? texture(diffuseInfo.diffuseMap, fragmentTextureCoords) :
-		diffuseInfo.diffuseColor;
-
-	vec4 fragmentToPointLightVec = - normalize(light.positionOrDirection);
-
-	// Ambient Color
-	vec4 pointAmbientColor = light.ambientColor * realDiffuseColor;
-
-	// Diffuse Color
-	float pointDiffuseContribution = max(0, dot(fragmentToPointLightVec, normal));
-	vec4 pointDiffuseColor = pointDiffuseContribution * light.diffuseColor * realDiffuseColor;
-	
-	// Specular Color
-	vec4 fragmentToCameraVec = normalize(cameraPosition - fragmentPosition);
-	float pointSpecularContribution = pow(max(dot(fragmentToCameraVec, reflect(-fragmentToPointLightVec, normal)), 0.0), objectShineness);
-	vec4 pointSpecularColor = pointSpecularContribution * light.specularColor * vec4(1.0, 1.0, 1.0, 1.0);
-
-	float shadow = shadowCalculation(fragmentPosLightSpace, normal, fragmentToPointLightVec);
-	vec4 pointColor = pointAmbientColor + (1.0 - shadow) * pointDiffuseColor;// + pointSpecularColor;
-	return pointColor.xyz;
+	return vec3(0.0f, 0.0f, 0.0f);
 }
 
 void main()

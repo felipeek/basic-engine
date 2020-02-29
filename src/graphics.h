@@ -91,6 +91,7 @@ extern void graphicsFloatImageFree(FloatImageData* imageData);
 extern void graphicsImageSave(const s8* imagePath, const ImageData* imageData);
 extern void graphicsFloatImageSave(const s8* imagePath, const FloatImageData* imageData);
 extern Shader graphicsShaderCreate(const s8* vertexShaderPath, const s8* fragmentShaderPath);
+extern Shader graphicsShaderCreateWithGeometry(const s8* vertexShaderPath, const s8* geometryShaderPath, const s8* fragmentShaderPath);
 extern Mesh graphicsQuadCreateWithTexture(u32 texture);
 extern Mesh graphicsQuadCreateWithColor(Vec4 color);
 extern Mesh graphicsMeshCreateWithColor(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo, Vec4 diffuseColor);
@@ -98,6 +99,7 @@ extern Mesh graphicsMeshCreateWithTexture(Vertex* vertices, s32 verticesSize, u3
 extern Mesh graphicsMeshCreateFromObjWithColor(const s8* objPath, NormalMappingInfo* normalInfo, Vec4 diffuseColor);
 extern Mesh graphicsMeshCreateFromObjWithTexture(const s8* objPath, NormalMappingInfo* normalInfo, u32 diffuseMap);
 extern void graphicsMeshRender(Shader shader, Mesh mesh);
+extern void graphicsSkyboxRender(Shader shader, u32 texture, const PerspectiveCamera* camera);
 // If mesh already has a diffuse map, the older diffuse map will be deleted if deleteDiffuseMap is true.
 // If mesh has a color instead of a diffuse map, the mesh will lose the color and be set to use the diffuse map.
 extern void graphicsMeshChangeDiffuseMap(Mesh* mesh, u32 diffuseMap, boolean deleteDiffuseMap);
@@ -113,6 +115,8 @@ extern void graphicsEntitySetScale(Entity* entity, Vec3 worldScale);
 extern void graphicsEntityRenderBasicShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity);
 extern void graphicsEntityRenderQuadShader(Shader shader, const PerspectiveCamera* camera, const u32 texture);
 extern void graphicsEntityRenderDepthShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* light);
+extern void graphicsEntityRenderDepthPointShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* light,
+	s32 shadowTexWidth, s32 shadowTexHeight);
 extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* lights, u32 shadowMap);
 extern void graphicsPointLightCreate(Light* light, Vec4 position, Vec4 ambientColor, Vec4 diffuseColor, Vec4 specularColor);
 extern void graphicsDirectionalLightCreate(Light* light, Vec4 position, Vec4 ambientColor, Vec4 diffuseColor, Vec4 specularColor);
