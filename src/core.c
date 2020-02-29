@@ -22,8 +22,8 @@
 #define SKYBOX_FRAGMENT_SHADER_PATH "./shaders/skybox_shader.fs"
 #define GIM_ENTITY_COLOR (Vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
-const u32 SHADOW_WIDTH = 256;
-const u32 SHADOW_HEIGHT = 256;
+const u32 SHADOW_WIDTH = 1024;
+const u32 SHADOW_HEIGHT = 1024;
 
 extern s32 windowWidth;
 extern s32 windowHeight;

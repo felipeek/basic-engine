@@ -72,6 +72,35 @@ vec4 getCorrectNormal()
 	return normal;
 }
 
+vec3 sampleOffsetDirections[20] = vec3[]
+(
+   vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1), 
+   vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
+   vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
+   vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
+   vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
+);
+
+float PCFshadowCalculation(vec4 fragmentPosition, vec4 normal, vec4 lightDir, vec4 lightPosition) {
+	vec4 fragToLight = fragmentPosition - lightPosition;
+	float currentDepth = length(fragToLight.xyz);
+
+	float shadow = 0.0;
+	float bias   = 0.15;
+	int samples  = 20;
+	float viewDistance = length(cameraPosition - fragmentPosition);
+	float diskRadius = (0.05 + (viewDistance / farPlane)) / 25.0;  
+	for(int i = 0; i < samples; ++i)
+	{
+		float closestDepth = texture(shadowCubeMap, fragToLight.xyz + sampleOffsetDirections[i] * diskRadius).r;
+		closestDepth *= farPlane;   // Undo mapping [0;1]
+		if(currentDepth - bias > closestDepth)
+			shadow += 1.0;
+	}
+	shadow /= float(samples);  
+	return shadow;
+}
+
 float shadowCalculation(vec4 fragmentPosition, vec4 normal, vec4 lightDir, vec4 lightPosition) {
 	vec4 fragToLight = fragmentPosition - lightPosition;
 	float closestDepth = texture(shadowCubeMap, fragToLight.xyz).r;
@@ -121,7 +150,7 @@ vec3 getPointColorOfLight(Light light)
 	pointDiffuseColor *= pointAttenuation;
 	pointSpecularColor *= pointAttenuation;
 
-	float shadow = shadowCalculation(fragmentPosition, normal, fragmentToPointLightVec, light.positionOrDirection);
+	float shadow = PCFshadowCalculation(fragmentPosition, normal, fragmentToPointLightVec, light.positionOrDirection);
 	vec4 pointColor = pointAmbientColor + (1.0 - shadow) * pointDiffuseColor;// + pointSpecularColor;
 	return pointColor.xyz;
 	//return getDepthVector(fragmentPosition, normal, fragmentToPointLightVec, light.positionOrDirection);
