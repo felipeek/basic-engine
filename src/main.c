@@ -83,7 +83,7 @@ static GLFWwindow* initGlfw()
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	GLFWwindow* window = glfwCreateWindow(windowWidth, windowHeight, WINDOW_TITLE, 0, 0);
+	GLFWwindow* window = glfwCreateWindow(windowWidth, windowHeight, WINDOW_TITLE, glfwGetPrimaryMonitor(), 0);
 	glfwSetWindowPos(window, 50, 50);
 	glfwMakeContextCurrent(window);
 	glfwSetKeyCallback(window, glfwKeyCallback);
@@ -118,22 +118,27 @@ extern s32 main(s32 argc, s8** argv)
 	r64 lastFrame = glfwGetTime();
 	s32 frameNumber = (s32)lastFrame;
 	u32 fps = 0;
+	glfwSwapInterval(0);
 
 	while (!glfwWindowShouldClose(mainWindow))
 	{
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glClearColor(0.2074f, 0.3168f, 0.3615f, 1.0f);
+		r64 r = rand() / (r64)INT_MAX;
+		r64 g = rand() / (r64)INT_MAX;
+		r64 b = rand() / (r64)INT_MAX;
 
-		coreUpdate(deltaTime);
-		coreRender();
-		coreInputProcess(keyState, deltaTime);
+		glClearColor(r, g, b, 1.0f);
+
+		//coreUpdate(deltaTime);
+		//coreRender();
+		//coreInputProcess(keyState, deltaTime);
 		glfwPollEvents();
 		glfwSwapBuffers(mainWindow);
 
 		r64 currentFrame = glfwGetTime();
 		if ((s32)currentFrame > frameNumber)
 		{
-			//printf("FPS: %u\n", fps);
+			printf("FPS: %u\n", fps);
 			fps = 0;
 			frameNumber++;
 		}
