@@ -1,35 +1,33 @@
 #ifndef BASIC_ENGINE_CAMERA_H
 #define BASIC_ENGINE_CAMERA_H
-#include "graphics_math.h"
+#include "gm.h"
 
-typedef struct PerspectiveCameraStruct PerspectiveCamera;
-
-struct PerspectiveCameraStruct
+typedef struct
 {
-	Vec4 position;
-	Vec4 up;
-	Vec4 view;
-	r32 nearPlane;
-	r32 farPlane;
+	vec4 position;
+	vec4 up;
+	vec4 view;
+	r32 near_plane;
+	r32 far_plane;
 	r32 pitch;
 	r32 yaw;
 	r32 fov;
-	Mat4 viewMatrix;
-	Mat4 projectionMatrix;
-	Vec4 xAxis;
-	Vec4 yAxis;
-	Vec4 zAxis;
-};
+	mat4 view_matrix;
+	mat4 projection_matrix;
+	vec4 x_axis;
+	vec4 y_axis;
+	vec4 z_axis;
+} Perspective_Camera;
 
-extern void cameraInit(PerspectiveCamera* camera, Vec4 position, Vec4 up, Vec4 view, r32 nearPlane, r32 farPlane, r32 fov);
-extern void cameraSetPosition(PerspectiveCamera* camera, Vec4 position);
-extern void cameraSetUp(PerspectiveCamera* camera, Vec4 up);
-extern void cameraSetView(PerspectiveCamera* camera, Vec4 view);
-extern void cameraSetNearPlane(PerspectiveCamera* camera, r32 nearPlane);
-extern void cameraSetFarPlane(PerspectiveCamera* camera, r32 farPlane);
-extern void cameraIncPitch(PerspectiveCamera* camera, r32 angle);
-extern void cameraIncYaw(PerspectiveCamera* camera, r32 angle);
-extern void cameraSetFov(PerspectiveCamera* camera, r32 fov);
-extern void cameraForceMatrixRecalculation(PerspectiveCamera* camera);
+extern void camera_init(Perspective_Camera* camera, vec4 position, vec4 up, vec4 view, r32 near_plane, r32 far_plane, r32 fov);
+extern void camera_set_position(Perspective_Camera* camera, vec4 position);
+extern void camera_set_up(Perspective_Camera* camera, vec4 up);
+extern void camera_set_view(Perspective_Camera* camera, vec4 view);
+extern void camera_set_near_plane(Perspective_Camera* camera, r32 near_plane);
+extern void camera_set_far_plane(Perspective_Camera* camera, r32 far_plane);
+extern void camera_inc_pitch(Perspective_Camera* camera, r32 angle);
+extern void camera_inc_yaw(Perspective_Camera* camera, r32 angle);
+extern void camera_set_fov(Perspective_Camera* camera, r32 fov);
+extern void camera_force_matrix_recalculation(Perspective_Camera* camera);
 
 #endif

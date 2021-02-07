@@ -1,113 +1,105 @@
 #ifndef BASIC_ENGINE_GRAPHICS_H
 #define BASIC_ENGINE_GRAPHICS_H
-#include "graphics_math.h"
+#include "gm.h"
 #include "camera.h"
 
 typedef u32 Shader;
-typedef struct VertexStruct Vertex;
-typedef struct NormalMappingInfoStruct NormalMappingInfo;
-typedef struct MeshStruct Mesh;
-typedef struct EntityStruct Entity;
-typedef struct LightStruct Light;
-typedef struct ImageDataStruct ImageData;
-typedef struct FloatImageDataStruct FloatImageData;
-typedef struct DiffuseInfoStruct DiffuseInfo;
 
 #pragma pack(push, 1)
-struct VertexStruct
+typedef struct
 {
-	Vec4 position;
-	Vec4 normal;
-	Vec2 textureCoordinates;
-};
+	vec4 position;
+	vec4 normal;
+	vec2 texture_coordinates;
+} Vertex;
 #pragma pack(pop)
 
-struct NormalMappingInfoStruct
+typedef struct
 {
-	boolean useNormalMap;
-	boolean tangentSpace;		// @TODO: Not implemented yet.
-	u32 normalMapTexture;
-};
+	boolean use_normal_map;
+	boolean tangent_space;		// @TODO: Not implemented yet.
+	u32 normal_map_texture;
+} Normal_Mapping_Info;
 
-struct DiffuseInfoStruct
+typedef struct
 {
-	boolean useDiffuseMap;
-	u32 diffuseMap;
-	Vec4 diffuseColor;
-};
+	boolean use_diffuse_map;
+	u32 diffuse_map;
+	vec4 diffuse_color;
+} Diffuse_Info;
 
-struct MeshStruct
+typedef struct
 {
 	u32 VAO, VBO, EBO;
-	s32 indexesSize;
-	NormalMappingInfo normalInfo;
-	DiffuseInfo diffuseInfo;
-};
+	s32 indexes_size;
+	Normal_Mapping_Info normal_info;
+	Diffuse_Info diffuse_info;
+} Mesh;
 
-struct EntityStruct
+typedef struct
 {
 	Mesh mesh;
-	Vec4 worldPosition;
-	Vec3 worldRotation;
-	Vec3 worldScale;
-	Mat4 modelMatrix;
-};
+	vec4 world_position;
+	vec3 world_rotation;
+	vec3 world_scale;
+	mat4 model_matrix;
+} Entity;
 
-struct LightStruct
+typedef struct
 {
-	Vec4 position;
-	Vec4 ambientColor;
-	Vec4 diffuseColor;
-	Vec4 specularColor;
-};
+	vec4 position;
+	vec4 ambient_color;
+	vec4 diffuse_color;
+	vec4 specular_color;
+} Light;
 
-struct ImageDataStruct
+typedef struct
 {
 	u8* data;
 	s32 width, height, channels;
-};
+} Image_Data;
 
-struct FloatImageDataStruct
+typedef struct
 {
 	r32* data;
 	s32 width, height, channels;
-};
+} Float_Image_Data;
 
-extern ImageData graphicsImageLoad(const s8* imagePath);
-extern FloatImageData graphicsFloatImageLoad(const s8* imagePath);
-extern FloatImageData graphicsFloatImageCopy(const FloatImageData* imageData);
-extern void graphicsImageFree(ImageData* imageData);
-extern void graphicsFloatImageFree(FloatImageData* imageData);
-extern void graphicsImageSave(const s8* imagePath, const ImageData* imageData);
-extern void graphicsFloatImageSave(const s8* imagePath, const FloatImageData* imageData);
-extern Shader graphicsShaderCreate(const s8* vertexShaderPath, const s8* fragmentShaderPath);
-extern Mesh graphicsQuadCreateWithTexture(u32 texture);
-extern Mesh graphicsQuadCreateWithColor(Vec4 color);
-extern Mesh graphicsMeshCreateWithColor(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo, Vec4 diffuseColor);
-extern Mesh graphicsMeshCreateWithTexture(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo, u32 diffuseMap);
-extern Mesh graphicsMeshCreateFromObjWithColor(const s8* objPath, NormalMappingInfo* normalInfo, Vec4 diffuseColor);
-extern Mesh graphicsMeshCreateFromObjWithTexture(const s8* objPath, NormalMappingInfo* normalInfo, u32 diffuseMap);
-extern void graphicsMeshRender(Shader shader, Mesh mesh);
-// If mesh already has a diffuse map, the older diffuse map will be deleted if deleteDiffuseMap is true.
+extern Image_Data graphics_image_load(const s8* image_path);
+extern Float_Image_Data graphics_float_image_load(const s8* image_path);
+extern Float_Image_Data graphics_float_image_copy(const Float_Image_Data* image_data);
+extern void graphics_image_free(Image_Data* image_data);
+extern void graphics_float_image_Free(Float_Image_Data* image_data);
+extern void graphics_image_save(const s8* image_path, const Image_Data* image_data);
+extern void graphics_float_image_save(const s8* image_path, const Float_Image_Data* image_data);
+extern Shader graphics_shader_create(const s8* vertex_shader_path, const s8* fragment_shader_path);
+extern Mesh graphics_quad_create_with_texture(u32 texture);
+extern Mesh graphics_quad_create_with_color(vec4 color);
+extern Mesh graphics_mesh_create_with_texture(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info, u32 diffuse_map);
+extern Mesh graphics_mesh_create_with_color(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info, vec4 diffuse_color);
+extern Mesh graphics_mesh_create_from_obj_with_color(const s8* obj_path, Normal_Mapping_Info* normal_info, vec4 diffuse_color);
+extern Mesh graphics_mesh_create_from_obj_with_texture(const s8* obj_path, Normal_Mapping_Info* normal_info, u32 diffuse_map);
+extern void graphics_mesh_render(Shader shader, Mesh mesh);
+// If mesh already has a diffuse map, the older diffuse map will be deleted if delete_diffuse_map is true.
 // If mesh has a color instead of a diffuse map, the mesh will lose the color and be set to use the diffuse map.
-extern void graphicsMeshChangeDiffuseMap(Mesh* mesh, u32 diffuseMap, boolean deleteDiffuseMap);
+extern void graphics_mesh_change_diffuse_map(Mesh* mesh, u32 diffuse_map, boolean delete_diffuse_map);
 // If the mesh already has a color, the older color will be deleted.
-// If mesh has a diffuse map instead of a color, the diffuse map will be deleted if deleteDiffuseMap is true
+// If mesh has a diffuse map instead of a color, the diffuse map will be deleted if delete_diffuse_map is true
 // The mesh will be set to use the color.
-extern void graphicsMeshChangeColor(Mesh* mesh, Vec4 color, boolean deleteDiffuseMap);
-extern void graphicsEntityCreate(Entity* entity, Mesh mesh, Vec4 worldPosition, Vec3 worldRotation, Vec3 worldScale);
-extern void graphicsEntityMeshReplace(Entity* entity, Mesh mesh, boolean deleteNormalMap, boolean deleteDiffuseMap);
-extern void graphicsEntitySetPosition(Entity* entity, Vec4 worldPosition);
-extern void graphicsEntitySetRotation(Entity* entity, Vec3 worldRotation);
-extern void graphicsEntitySetScale(Entity* entity, Vec3 worldScale);
-extern void graphicsEntityRenderBasicShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity);
-extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* lights);
-extern void graphicsLightCreate(Light* light, Vec4 position, Vec4 ambientColor, Vec4 diffuseColor, Vec4 specularColor);
-extern u32 graphicsTextureCreate(const s8* texturePath);
-extern u32 graphicsTextureCreateFromData(const ImageData* imageData);
-extern u32 graphicsTextureCreateFromFloatData(const FloatImageData* imageData);
-extern void graphicsTextureDelete(u32 textureId);
-extern FloatImageData graphicsImageDataToFloatImageData(ImageData* imageData, r32* memory);
-extern ImageData graphicsFloatImageDataToImageData(const FloatImageData* floatImageData, u8* memory);
+extern void graphics_mesh_change_color(Mesh* mesh, vec4 color, boolean delete_diffuse_map);
+extern void graphics_entity_create(Entity* entity, Mesh mesh, vec4 world_position, vec3 world_rotation, vec3 world_scale);
+extern void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_normal_map, boolean delete_diffuse_map);
+extern void graphics_entity_set_position(Entity* entity, vec4 world_position);
+extern void graphics_entity_set_rotation(Entity* entity, vec3 world_rotation);
+extern void graphics_entity_set_scale(Entity* entity, vec3 world_scale);
+extern void graphics_entity_render_basic_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity);
+extern void graphics_entity_render_phong_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity, const Light* lights);
+extern void graphics_light_create(Light* light, vec4 position, vec4 ambient_color, vec4 diffuse_color, vec4 specular_color);
+extern u32 graphics_texture_create(const s8* texture_path);
+extern u32 graphics_texture_create_from_data(const Image_Data* image_data);
+extern u32 graphics_texture_create_from_float_data(const Float_Image_Data* image_data);
+extern void graphics_texture_delete(u32 texture_id);
+extern Float_Image_Data graphics_image_data_to_float_image_data(Image_Data* image_data, r32* memory);
+extern Image_Data graphics_float_image_data_to_image_data(const Float_Image_Data* float_image_Data, u8* memory);
 
 #endif

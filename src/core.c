@@ -8,135 +8,135 @@
 
 #define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
 #define PHONG_FRAGMENT_SHADER_PATH "./shaders/phong_shader.fs"
-#define GIM_ENTITY_COLOR (Vec4) {1.0f, 1.0f, 1.0f, 1.0f}
+#define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
-static Shader phongShader;
-static PerspectiveCamera camera;
+static Shader phong_shader;
+static Perspective_Camera camera;
 static Light* lights;
 static Entity e;
 
-static PerspectiveCamera createCamera()
+static Perspective_Camera create_camera()
 {
-	PerspectiveCamera camera;
-	Vec4 cameraPosition = (Vec4) {0.0f, 0.0f, 1.0f, 1.0f};
-	Vec4 cameraUp = (Vec4) {0.0f, 1.0f, 0.0f, 1.0f};
-	Vec4 cameraView = (Vec4) {0.0f, 0.0f, -1.0f, 0.0f};
-	r32 cameraNearPlane = -0.01f;
-	r32 cameraFarPlane = -1000.0f;
-	r32 cameraFov = 45.0f;
-	cameraInit(&camera, cameraPosition, cameraUp, cameraView, cameraNearPlane, cameraFarPlane, cameraFov);
+	Perspective_Camera camera;
+	vec4 camera_position =(vec4) {0.0f, 0.0f, 1.0f, 1.0f};
+	vec4 camera_up = (vec4) {0.0f, 1.0f, 0.0f, 1.0f};
+	vec4 camera_view = (vec4) {0.0f, 0.0f, -1.0f, 0.0f};
+	r32 camera_near_plane = -0.01f;
+	r32 camera_far_plane = -1000.0f;
+	r32 camera_fov = 45.0f;
+	camera_init(&camera, camera_position, camera_up, camera_view, camera_near_plane, camera_far_plane, camera_fov);
 	return camera;
 }
 
-static Light* createLights()
+static Light* create_lights()
 {
 	Light light;
 	Light* lights = array_create(Light, 1);
 
-	Vec4 lightPosition = (Vec4) {0.0f, 0.0f, 1.0f, 1.0f};
-	Vec4 ambientColor = (Vec4) {0.1f, 0.1f, 0.1f, 1.0f};
-	Vec4 diffuseColor = (Vec4) {0.8, 0.8, 0.8, 1.0f};
-	Vec4 specularColor = (Vec4) {0.5f, 0.5f, 0.5f, 1.0f};
-	graphicsLightCreate(&light, lightPosition, ambientColor, diffuseColor, specularColor);
+	vec4 light_position = (vec4) {0.0f, 0.0f, 15.0f, 1.0f};
+	vec4 ambient_color = (vec4) {0.1f, 0.1f, 0.1f, 1.0f};
+	vec4 diffuse_color = (vec4) {0.8, 0.8, 0.8, 1.0f};
+	vec4 specular_color = (vec4) {0.5f, 0.5f, 0.5f, 1.0f};
+	graphics_light_create(&light, light_position, ambient_color, diffuse_color, specular_color);
 	array_push(lights, &light);
 
 	return lights;
 }
 
-extern int coreInit()
+int core_init()
 {
 	// Create shader
-	phongShader = graphicsShaderCreate(PHONG_VERTEX_SHADER_PATH, PHONG_FRAGMENT_SHADER_PATH);
+	phong_shader = graphics_shader_create(PHONG_VERTEX_SHADER_PATH, PHONG_FRAGMENT_SHADER_PATH);
 	// Create camera
-	camera = createCamera();
+	camera = create_camera();
 	// Create light
-	lights = createLights();
+	lights = create_lights();
 
-	Mesh m = graphicsMeshCreateFromObjWithColor("./res/horse.obj", 0, (Vec4){1.0f, 0.0f, 0.0f, 0.0f});
-	graphicsEntityCreate(&e, m, (Vec4){0.0f, 0.0f, 0.0f, 1.0f}, (Vec3){0.0f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f});
+	Mesh m = graphics_mesh_create_from_obj_with_color("./res/sphere.obj", 0, (vec4){1.0f, 0.0f, 0.0f, 0.0f});
+	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, (vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 1.0f, 1.0f});
 
 	return 0;
 }
 
-extern void coreDestroy()
+void core_destroy()
 {
 	array_release(lights);
 }
 
-extern void coreUpdate(r32 deltaTime)
+void core_update(r32 delta_time)
 {
 
 }
 
-extern void coreRender()
+void core_render()
 {
-	graphicsEntityRenderPhongShader(phongShader, &camera, &e, lights);
+	graphics_entity_render_phong_shader(phong_shader, &camera, &e, lights);
 }
 
-extern void coreInputProcess(boolean* keyState, r32 deltaTime)
+void core_input_process(boolean* key_state, r32 delta_time)
 {
-	r32 movementSpeed = 3.0f;
-	r32 rotationSpeed = 3.0f;
+	r32 movement_speed = 3.0f;
+	r32 rotation_speed = 3.0f;
 
-	if (keyState[GLFW_KEY_LEFT_SHIFT])
-		movementSpeed = 0.5f;
-	if (keyState[GLFW_KEY_RIGHT_SHIFT])
-		movementSpeed = 0.1f;
+	if (key_state[GLFW_KEY_LEFT_SHIFT])
+		movement_speed = 0.5f;
+	if (key_state[GLFW_KEY_RIGHT_SHIFT])
+		movement_speed = 0.1f;
 
-	if (keyState[GLFW_KEY_W])
-		cameraSetPosition(&camera, gmAddVec4(camera.position, gmScalarProductVec4(movementSpeed * deltaTime, gmNormalizeVec4(camera.view))));
-	if (keyState[GLFW_KEY_S])
-		cameraSetPosition(&camera, gmAddVec4(camera.position, gmScalarProductVec4(-movementSpeed * deltaTime, gmNormalizeVec4(camera.view))));
-	if (keyState[GLFW_KEY_A])
-		cameraSetPosition(&camera, gmAddVec4(camera.position, gmScalarProductVec4(-movementSpeed * deltaTime, gmNormalizeVec4(camera.xAxis))));
-	if (keyState[GLFW_KEY_D])
-		cameraSetPosition(&camera, gmAddVec4(camera.position, gmScalarProductVec4(movementSpeed * deltaTime, gmNormalizeVec4(camera.xAxis))));
-	if (keyState[GLFW_KEY_X])
+	if (key_state[GLFW_KEY_W])
+		camera_set_position(&camera, gm_vec4_add(camera.position, gm_vec4_scalar_product(movement_speed * delta_time, gm_vec4_normalize(camera.view))));
+	if (key_state[GLFW_KEY_S])
+		camera_set_position(&camera, gm_vec4_add(camera.position, gm_vec4_scalar_product(-movement_speed * delta_time, gm_vec4_normalize(camera.view))));
+	if (key_state[GLFW_KEY_A])
+		camera_set_position(&camera, gm_vec4_add(camera.position, gm_vec4_scalar_product(-movement_speed * delta_time, gm_vec4_normalize(camera.x_axis))));
+	if (key_state[GLFW_KEY_D])
+		camera_set_position(&camera, gm_vec4_add(camera.position, gm_vec4_scalar_product(movement_speed * delta_time, gm_vec4_normalize(camera.x_axis))));
+	if (key_state[GLFW_KEY_X])
 	{
-		if (keyState[GLFW_KEY_LEFT_SHIFT] || keyState[GLFW_KEY_RIGHT_SHIFT])
+		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
 		{
-			Vec3 rotation = e.worldRotation;
-			rotation.x -= rotationSpeed * deltaTime;
-			graphicsEntitySetRotation(&e, rotation);
+			vec3 rotation = e.world_rotation;
+			rotation.x -= rotation_speed * delta_time;
+			graphics_entity_set_rotation(&e, rotation);
 		}
 		else
 		{
-			Vec3 rotation = e.worldRotation;
-			rotation.x += rotationSpeed * deltaTime;
-			graphicsEntitySetRotation(&e, rotation);
+			vec3 rotation = e.world_rotation;
+			rotation.x += rotation_speed * delta_time;
+			graphics_entity_set_rotation(&e, rotation);
 		}
 	}
-	if (keyState[GLFW_KEY_Y])
+	if (key_state[GLFW_KEY_Y])
 	{
-		if (keyState[GLFW_KEY_LEFT_SHIFT] || keyState[GLFW_KEY_RIGHT_SHIFT])
+		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
 		{
-			Vec3 rotation = e.worldRotation;
-			rotation.y += rotationSpeed * deltaTime;
-			graphicsEntitySetRotation(&e, rotation);
+			vec3 rotation = e.world_rotation;
+			rotation.y += rotation_speed * delta_time;
+			graphics_entity_set_rotation(&e, rotation);
 		}
 		else
 		{
-			Vec3 rotation = e.worldRotation;
-			rotation.y -= rotationSpeed * deltaTime;
-			graphicsEntitySetRotation(&e, rotation);
+			vec3 rotation = e.world_rotation;
+			rotation.y -= rotation_speed * delta_time;
+			graphics_entity_set_rotation(&e, rotation);
 		}
 	}
-	if (keyState[GLFW_KEY_Z])
+	if (key_state[GLFW_KEY_Z])
 	{
-		if (keyState[GLFW_KEY_LEFT_SHIFT] || keyState[GLFW_KEY_RIGHT_SHIFT])
+		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
 		{
-			Vec3 rotation = e.worldRotation;
-			rotation.z += rotationSpeed * deltaTime;
-			graphicsEntitySetRotation(&e, rotation);
+			vec3 rotation = e.world_rotation;
+			rotation.z += rotation_speed * delta_time;
+			graphics_entity_set_rotation(&e, rotation);
 		}
 		else
 		{
-			Vec3 rotation = e.worldRotation;
-			rotation.z -= rotationSpeed * deltaTime;
-			graphicsEntitySetRotation(&e, rotation);
+			vec3 rotation = e.world_rotation;
+			rotation.z -= rotation_speed * delta_time;
+			graphics_entity_set_rotation(&e, rotation);
 		}
 	}
-	if (keyState[GLFW_KEY_L])
+	if (key_state[GLFW_KEY_L])
 	{
 		static boolean wireframe = false;
 
@@ -146,44 +146,44 @@ extern void coreInputProcess(boolean* keyState, r32 deltaTime)
 			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 		wireframe = !wireframe;
-		keyState[GLFW_KEY_L] = false;
+		key_state[GLFW_KEY_L] = false;
 	}
 }
 
-extern void coreMouseChangeProcess(boolean reset, r64 xPos, r64 yPos)
+void core_mouse_change_process(boolean reset, r64 x_pos, r64 y_pos)
 {
-	static r64 xPosOld, yPosOld;
+	static r64 x_pos_old, y_pos_old;
 	// This constant is basically the mouse sensibility.
 	// @TODO: Allow mouse sensibility to be configurable.
-	static const r32 cameraMouseSpeed = 0.001f;
+	static const r32 camera_mouse_speed = 0.001f;
 
 	if (!reset)
 	{
-		r64 xDifference = xPos - xPosOld;
-		r64 yDifference = yPos - yPosOld;
+		r64 x_difference = x_pos - x_pos_old;
+		r64 y_difference = y_pos - y_pos_old;
 
-		r32 pitchAngle = -cameraMouseSpeed * (float)xDifference;
-		r32 yawAngle = cameraMouseSpeed * (float)yDifference;
+		r32 pitch_angle = -camera_mouse_speed * (float)x_difference;
+		r32 yaw_angle = camera_mouse_speed * (float)y_difference;
 
-		cameraIncPitch(&camera, pitchAngle);
-		cameraIncYaw(&camera, yawAngle);
+		camera_inc_pitch(&camera, pitch_angle);
+		camera_inc_yaw(&camera, yaw_angle);
 	}
 
-	xPosOld = xPos;
-	yPosOld = yPos;
+	x_pos_old = x_pos;
+	y_pos_old = y_pos;
 }
 
-extern void coreMouseClickProcess(s32 button, s32 action, r64 xPos, r64 yPos)
+void core_mouse_click_process(s32 button, s32 action, r64 x_pos, r64 y_pos)
 {
 
 }
 
-extern void coreScrollChangeProcess(r64 xOffset, r64 yOffset)
+void core_scroll_change_process(r64 x_offset, r64 y_offset)
 {
 
 }
 
-extern void coreWindowResizeProcess(s32 width, s32 height)
+void core_window_resize_process(s32 width, s32 height)
 {
 
 }

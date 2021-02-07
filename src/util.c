@@ -2,36 +2,36 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-extern r32 utilRandomFloat(r32 min, r32 max)
+extern r32 util_random_float(r32 min, r32 max)
 {
     r32 scale = rand() / (r32)RAND_MAX;
     return min + scale * (max - min);
 }
 
-extern s8* utilReadFile(const s8* path, s32* _fileLength)
+extern s8* util_read_file(const s8* path, s32* _file_length)
 {
 	FILE* file;
 	s8* buffer;
-	s32 fileLength;
+	s32 file_length;
 
 	file = fopen(path, "rb");
 	fseek(file, 0, SEEK_END);
-	fileLength = ftell(file);
+	file_length = ftell(file);
 	rewind(file);
 
-	buffer = (s8*)malloc((fileLength + 1) * sizeof(s8));
-	fread(buffer, fileLength, 1, file);
+	buffer = (s8*)malloc((file_length + 1) * sizeof(s8));
+	fread(buffer, file_length, 1, file);
 	fclose(file);
 
-	buffer[fileLength] = '\0';
+	buffer[file_length] = '\0';
 
-	if (_fileLength)
-		*_fileLength = fileLength;
+	if (_file_length)
+		*_file_length = file_length;
 
 	return buffer;
 }
 
-extern void utilFreeFile(s8* file)
+extern void util_free_file(s8* file)
 {
 	free(file);
 }

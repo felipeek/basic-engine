@@ -4,6 +4,6 @@
 #include "common.h"
 #include "graphics.h"
 
-extern int objParse(const char* objPath, Vertex** vertices, u32** indexes);
+extern int obj_parse(const char* obj_path, Vertex** vertices, u32** indexes);
 
 #endif

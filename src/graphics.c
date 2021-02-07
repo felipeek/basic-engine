@@ -7,134 +7,134 @@
 #include <dynamic_array.h>
 #include <math.h>
 
-extern ImageData graphicsImageLoad(const s8* imagePath)
+Image_Data graphics_image_load(const s8* image_path)
 {
-	ImageData imageData;
+	Image_Data image_data;
 
 	stbi_set_flip_vertically_on_load(1);
-	imageData.data = stbi_load(imagePath, &imageData.width, &imageData.height, &imageData.channels, 4);
+	image_data.data = stbi_load(image_path, &image_data.width, &image_data.height, &image_data.channels, 4);
 
-	imageData.channels = 4;	// @temporary
+	image_data.channels = 4;	// @temporary
 
-	return imageData;
+	return image_data;
 }
 
-extern FloatImageData graphicsFloatImageLoad(const s8* imagePath)
+Float_Image_Data graphics_float_image_load(const s8* image_path)
 {
-	ImageData imageData;
+	Image_Data image_data;
 
 	stbi_set_flip_vertically_on_load(1);
-	imageData.data = stbi_load(imagePath, &imageData.width, &imageData.height, &imageData.channels, 4);
+	image_data.data = stbi_load(image_path, &image_data.width, &image_data.height, &image_data.channels, 4);
 
-	imageData.channels = 4;	// @temporary
+	image_data.channels = 4;	// @temporary
 
-	FloatImageData fid = graphicsImageDataToFloatImageData(&imageData, 0);
+	Float_Image_Data fid = graphics_image_data_to_float_image_data(&image_data, 0);
 
-	graphicsImageFree(&imageData);
+	graphics_image_free(&image_data);
 
 	return fid;
 }
 
-extern FloatImageData graphicsFloatImageCopy(const FloatImageData* imageData)
+Float_Image_Data graphics_float_image_copy(const Float_Image_Data* image_data)
 {
-	FloatImageData fid;
+	Float_Image_Data fid;
 
-	fid = *imageData;
+	fid = *image_data;
 
 	fid.data = malloc(sizeof(r32) * fid.width * fid.height * fid.channels);
-	memcpy(fid.data, imageData->data, sizeof(r32) * fid.width * fid.height * fid.channels);
+	memcpy(fid.data, image_data->data, sizeof(r32) * fid.width * fid.height * fid.channels);
 	
 	return fid;
 }
 
-extern void graphicsImageFree(ImageData* imageData)
+void graphics_image_free(Image_Data* image_data)
 {
-	stbi_image_free(imageData->data);
+	stbi_image_free(image_data->data);
 }
 
-extern void graphicsFloatImageFree(FloatImageData* imageData)
+void graphics_float_image_free(Float_Image_Data* image_data)
 {
-	free(imageData->data);
+	free(image_data->data);
 }
 
-extern void graphicsImageSave(const s8* imagePath, const ImageData* imageData)
+void graphics_image_save(const s8* image_path, const Image_Data* image_data)
 {
 	stbi_flip_vertically_on_write(1);
-	stbi_write_bmp(imagePath, imageData->width, imageData->height, imageData->channels, imageData->data);
+	stbi_write_bmp(image_path, image_data->width, image_data->height, image_data->channels, image_data->data);
 }
 
-extern void graphicsFloatImageSave(const s8* imagePath, const FloatImageData* imageData)
+void graphics_float_image_save(const s8* image_path, const Float_Image_Data* image_data)
 {
-	ImageData id = graphicsFloatImageDataToImageData(imageData, 0);
-	graphicsImageSave(imagePath, &id);
-	graphicsImageFree(&id);
+	Image_Data id = graphics_float_image_data_to_image_data(image_data, 0);
+	graphics_image_save(image_path, &id);
+	graphics_image_free(&id);
 }
 
-extern Shader graphicsShaderCreate(const s8* vertexShaderPath, const s8* fragmentShaderPath)
+Shader graphics_shader_create(const s8* vertex_shader_path, const s8* fragment_shader_path)
 {
-	s8* vertexShaderCode = utilReadFile(vertexShaderPath, 0);
-	s8* fragmentShaderCode = utilReadFile(fragmentShaderPath, 0);
+	s8* vertex_shader_code = util_read_file(vertex_shader_path, 0);
+	s8* fragment_shader_code = util_read_file(fragment_shader_path, 0);
 
 	GLint success;
-	GLchar infoLogBuffer[1024];
-	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(vertexShader, 1, (const GLchar *const*)&vertexShaderCode, 0);
-	glShaderSource(fragmentShader, 1, (const GLchar *const*)&fragmentShaderCode, 0);
+	GLchar info_log_buffer[1024];
+	GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+	GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(vertex_shader, 1, (const GLchar *const*)&vertex_shader_code, 0);
+	glShaderSource(fragment_shader, 1, (const GLchar *const*)&fragment_shader_code, 0);
 
-	glCompileShader(vertexShader);
-	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+	glCompileShader(vertex_shader);
+	glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
 	if (!success)
 	{
-		glGetShaderInfoLog(vertexShader, 1024, 0, infoLogBuffer);
-		printf("Error compiling vertex shader: %s\n", infoLogBuffer);
+		glGetShaderInfoLog(vertex_shader, 1024, 0, info_log_buffer);
+		printf("Error compiling vertex shader: %s\n", info_log_buffer);
 	}
 
-	glCompileShader(fragmentShader);
-	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+	glCompileShader(fragment_shader);
+	glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
 	if (!success)
 	{
-		glGetShaderInfoLog(fragmentShader, 1024, 0, infoLogBuffer);
-		printf("Error compiling fragment shader: %s\n", infoLogBuffer);
+		glGetShaderInfoLog(fragment_shader, 1024, 0, info_log_buffer);
+		printf("Error compiling fragment shader: %s\n", info_log_buffer);
 	}
 
-	GLuint shaderProgram = glCreateProgram();
+	GLuint shader_program = glCreateProgram();
 
-	glAttachShader(shaderProgram, vertexShader);
-	glAttachShader(shaderProgram, fragmentShader);
-	glLinkProgram(shaderProgram);
+	glAttachShader(shader_program, vertex_shader);
+	glAttachShader(shader_program, fragment_shader);
+	glLinkProgram(shader_program);
 
-	glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+	glGetProgramiv(shader_program, GL_LINK_STATUS, &success);
 	if (!success)
 	{
-		glGetShaderInfoLog(shaderProgram, 1024, 0, infoLogBuffer);
-		printf("Error linking program: %s\n", infoLogBuffer);
+		glGetShaderInfoLog(shader_program, 1024, 0, info_log_buffer);
+		printf("Error linking program: %s\n", info_log_buffer);
 	}
 
-	free(vertexShaderCode);
-	free(fragmentShaderCode);
-	return shaderProgram;
+	free(vertex_shader_code);
+	free(fragment_shader_code);
+	return shader_program;
 }
 
 // Vertices must be Vertex[4]
 // Indexes must be u32[6]
-static void fillQuadVerticesAndIndexes(r32 size, Vertex* vertices, u32* indices)
+static void fill_quad_vertices_and_indexes(r32 size, Vertex* vertices, u32* indices)
 {
-	vertices[0].position = (Vec4) { 0.0f, 0.0f, 0.0f, 1.0f };
-	vertices[0].normal = (Vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
-	vertices[0].textureCoordinates = (Vec2) { 0.0f, 0.0f };
+	vertices[0].position = (vec4) { 0.0f, 0.0f, 0.0f, 1.0f };
+	vertices[0].normal = (vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
+	vertices[0].texture_coordinates = (vec2) { 0.0f, 0.0f };
 
-	vertices[1].position = (Vec4) { size, 0.0f, 0.0f, 1.0f };
-	vertices[1].normal = (Vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
-	vertices[1].textureCoordinates = (Vec2) { 1.0f, 0.0f };
+	vertices[1].position = (vec4) { size, 0.0f, 0.0f, 1.0f };
+	vertices[1].normal = (vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
+	vertices[1].texture_coordinates = (vec2) { 1.0f, 0.0f };
 
-	vertices[2].position = (Vec4) { 0.0f, size, 0.0f, 1.0f };
-	vertices[2].normal = (Vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
-	vertices[2].textureCoordinates = (Vec2) { 0.0f, 1.0f };
+	vertices[2].position = (vec4) { 0.0f, size, 0.0f, 1.0f };
+	vertices[2].normal = (vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
+	vertices[2].texture_coordinates = (vec2) { 0.0f, 1.0f };
 
-	vertices[3].position = (Vec4) { size, size, 0.0f, 1.0f };
-	vertices[3].normal = (Vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
-	vertices[3].textureCoordinates = (Vec2) { 1.0f, 1.0f };
+	vertices[3].position = (vec4) { size, size, 0.0f, 1.0f };
+	vertices[3].normal = (vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
+	vertices[3].texture_coordinates = (vec2) { 1.0f, 1.0f };
 
 	indices[0] = 0;
 	indices[1] = 1;
@@ -144,31 +144,31 @@ static void fillQuadVerticesAndIndexes(r32 size, Vertex* vertices, u32* indices)
 	indices[5] = 2;
 }
 
-extern Mesh graphicsQuadCreateWithTexture(u32 texture)
+Mesh graphics_quad_create_with_texture(u32 texture)
 {
 	r32 size = 1.0f;
 	Vertex vertices[4];
 	u32 indices[6];
 
-	fillQuadVerticesAndIndexes(size, vertices, indices);
+	fill_quad_vertices_and_indexes(size, vertices, indices);
 
-	return graphicsMeshCreateWithTexture(vertices, sizeof(vertices) / sizeof(Vertex), indices,
+	return graphics_mesh_create_with_texture(vertices, sizeof(vertices) / sizeof(Vertex), indices,
 		sizeof(indices) / sizeof(u32), 0, texture);
 }
 
-extern Mesh graphicsQuadCreateWithColor(Vec4 color)
+Mesh graphics_quad_create_with_color(vec4 color)
 {
 	r32 size = 1.0f;
 	Vertex vertices[4];
 	u32 indices[6];
 
-	fillQuadVerticesAndIndexes(size, vertices, indices);
+	fill_quad_vertices_and_indexes(size, vertices, indices);
 
-	return graphicsMeshCreateWithColor(vertices, sizeof(vertices) / sizeof(Vertex), indices,
+	return graphics_mesh_create_with_color(vertices, sizeof(vertices) / sizeof(Vertex), indices,
 		sizeof(indices) / sizeof(u32), 0, color);
 }
 
-static Mesh createSimpleMesh(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo)
+static Mesh create_simple_mesh(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info)
 {
 	Mesh mesh;
 	GLuint VBO, EBO, VAO;
@@ -179,8 +179,8 @@ static Mesh createSimpleMesh(Vertex* vertices, s32 verticesSize, u32* indices, s
 	glBindVertexArray(VAO);
 
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, verticesSize * sizeof(Vertex), 0, GL_STATIC_DRAW);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, verticesSize * sizeof(Vertex), vertices);
+	glBufferData(GL_ARRAY_BUFFER, vertices_size * sizeof(Vertex), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, vertices_size * sizeof(Vertex), vertices);
 
 	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 10 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
 	glEnableVertexAttribArray(0);
@@ -192,8 +192,8 @@ static Mesh createSimpleMesh(Vertex* vertices, s32 verticesSize, u32* indices, s
 	glEnableVertexAttribArray(2);
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesSize * sizeof(u32), 0, GL_STATIC_DRAW);
-	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, indicesSize * sizeof(u32), indices);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_size * sizeof(u32), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, indices_size * sizeof(u32), indices);
 
 	glBindVertexArray(0);
 
@@ -203,264 +203,261 @@ static Mesh createSimpleMesh(Vertex* vertices, s32 verticesSize, u32* indices, s
 	mesh.VAO = VAO;
 	mesh.VBO = VBO;
 	mesh.EBO = EBO;
-	mesh.indexesSize = indicesSize;
+	mesh.indexes_size = indices_size;
 
-	if (!normalInfo)
+	if (!normal_info)
 	{
-		mesh.normalInfo.tangentSpace = false;
-		mesh.normalInfo.useNormalMap = false;
-		mesh.normalInfo.normalMapTexture = 0;
+		mesh.normal_info.tangent_space = false;
+		mesh.normal_info.use_normal_map = false;
+		mesh.normal_info.normal_map_texture = 0;
 	}
 	else
-		mesh.normalInfo = *normalInfo;
+		mesh.normal_info = *normal_info;
 
 	return mesh;
 }
 
-extern Mesh graphicsMeshCreateWithColor(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo, Vec4 diffuseColor)
+Mesh graphics_mesh_create_with_color(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info, vec4 diffuse_color)
 {
-	Mesh mesh = createSimpleMesh(vertices, verticesSize, indices, indicesSize, normalInfo);
-	mesh.diffuseInfo.useDiffuseMap = false;
-	mesh.diffuseInfo.diffuseColor = diffuseColor;
+	Mesh mesh = create_simple_mesh(vertices, vertices_size, indices, indices_size, normal_info);
+	mesh.diffuse_info.use_diffuse_map = false;
+	mesh.diffuse_info.diffuse_color = diffuse_color;
 	return mesh;
 }
 
-extern Mesh graphicsMeshCreateWithTexture(Vertex* vertices, s32 verticesSize, u32* indices, s32 indicesSize, NormalMappingInfo* normalInfo, u32 diffuseMap)
+Mesh graphics_mesh_create_with_texture(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info, u32 diffuse_map)
 {
-	Mesh mesh = createSimpleMesh(vertices, verticesSize, indices, indicesSize, normalInfo);
-	mesh.diffuseInfo.useDiffuseMap = true;
-	mesh.diffuseInfo.diffuseMap = diffuseMap;
+	Mesh mesh = create_simple_mesh(vertices, vertices_size, indices, indices_size, normal_info);
+	mesh.diffuse_info.use_diffuse_map = true;
+	mesh.diffuse_info.diffuse_map = diffuse_map;
 	return mesh;
 }
 
-static s8* buildLightUniformName(s8* buffer, s32 index, const s8* property)
+static s8* build_light_uniform_name(s8* buffer, s32 index, const s8* property)
 {
 	sprintf(buffer, "lights[%d].%s", index, property);
 	return buffer;
 }
 
-static void lightUpdateUniforms(const Light* lights, Shader shader)
+static void light_update_uniforms(const Light* lights, Shader shader)
 {
-	s32 numberOfLights = array_get_length(lights);
+	s32 number_of_lights = array_get_length(lights);
 	s8 buffer[64];
 	glUseProgram(shader);
 
-	for (s32 i = 0; i < numberOfLights; ++i)
+	for (s32 i = 0; i < number_of_lights; ++i)
 	{
 		Light light = lights[i];
-		GLint lightPositionLocation = glGetUniformLocation(shader, buildLightUniformName(buffer, i, "position"));
-		GLint ambientColorLocation = glGetUniformLocation(shader, buildLightUniformName(buffer, i, "ambientColor"));
-		GLint diffuseColorLocation = glGetUniformLocation(shader, buildLightUniformName(buffer, i, "diffuseColor"));
-		GLint specularColorLocation = glGetUniformLocation(shader, buildLightUniformName(buffer, i, "specularColor"));
-		glUniform4f(lightPositionLocation, light.position.x, light.position.y, light.position.z, light.position.w);
-		glUniform4f(ambientColorLocation, light.ambientColor.x, light.ambientColor.y, light.ambientColor.z, light.ambientColor.w);
-		glUniform4f(diffuseColorLocation, light.diffuseColor.x, light.diffuseColor.y, light.diffuseColor.z, light.diffuseColor.w);
-		glUniform4f(specularColorLocation, light.specularColor.x, light.specularColor.y, light.specularColor.z, light.specularColor.w);
+		GLint light_position_location = glGetUniformLocation(shader, build_light_uniform_name(buffer, i, "position"));
+		GLint ambient_color_location = glGetUniformLocation(shader, build_light_uniform_name(buffer, i, "ambient_color"));
+		GLint diffuse_color_location = glGetUniformLocation(shader, build_light_uniform_name(buffer, i, "diffuse_color"));
+		GLint specular_color_location = glGetUniformLocation(shader, build_light_uniform_name(buffer, i, "specular_color"));
+		glUniform4f(light_position_location, light.position.x, light.position.y, light.position.z, light.position.w);
+		glUniform4f(ambient_color_location, light.ambient_color.x, light.ambient_color.y, light.ambient_color.z, light.ambient_color.w);
+		glUniform4f(diffuse_color_location, light.diffuse_color.x, light.diffuse_color.y, light.diffuse_color.z, light.diffuse_color.w);
+		glUniform4f(specular_color_location, light.specular_color.x, light.specular_color.y, light.specular_color.z, light.specular_color.w);
 	}
 
-	GLint lightQuantityLocation = glGetUniformLocation(shader, "lightQuantity");
-	glUniform1i(lightQuantityLocation, numberOfLights);
+	GLint light_quantity_location = glGetUniformLocation(shader, "light_quantity");
+	glUniform1i(light_quantity_location, number_of_lights);
 }
 
-static void diffuseUpdateUniforms(const DiffuseInfo* diffuseInfo, Shader shader)
+static void diffuse_update_uniforms(const Diffuse_Info* diffuse_info, Shader shader)
 {
 	glUseProgram(shader);
-	GLint useDiffuseMapLocation = glGetUniformLocation(shader, "diffuseInfo.useDiffuseMap");
-	GLint diffuseMapLocation = glGetUniformLocation(shader, "diffuseInfo.diffuseMap");
-	GLint diffuseColorLocation = glGetUniformLocation(shader, "diffuseInfo.diffuseColor");
-	glUniform1i(useDiffuseMapLocation, diffuseInfo->useDiffuseMap);
-	if (diffuseInfo->useDiffuseMap)
+	GLint use_diffuse_map_location = glGetUniformLocation(shader, "diffuse_info.use_diffuse_map");
+	GLint diffuse_map_location = glGetUniformLocation(shader, "diffuse_info.diffuse_map");
+	GLint diffuse_color_location = glGetUniformLocation(shader, "diffuse_info.diffuse_color");
+	glUniform1i(use_diffuse_map_location, diffuse_info->use_diffuse_map);
+	if (diffuse_info->use_diffuse_map)
 	{
-		glUniform1i(diffuseMapLocation, 0);
+		glUniform1i(diffuse_map_location, 0);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, diffuseInfo->diffuseMap);
+		glBindTexture(GL_TEXTURE_2D, diffuse_info->diffuse_map);
 	}
 	else
-		glUniform4f(diffuseColorLocation, diffuseInfo->diffuseColor.x, diffuseInfo->diffuseColor.y,
-			diffuseInfo->diffuseColor.z, diffuseInfo->diffuseColor.w);
+		glUniform4f(diffuse_color_location, diffuse_info->diffuse_color.x, diffuse_info->diffuse_color.y,
+			diffuse_info->diffuse_color.z, diffuse_info->diffuse_color.w);
 }
 
-static void normalsUpdateUniforms(const NormalMappingInfo* normalInfo, Shader shader)
+static void normals_update_uniforms(const Normal_Mapping_Info* normal_info, Shader shader)
 {
 	glUseProgram(shader);
-	GLint useNormalMapLocation = glGetUniformLocation(shader, "normalMappingInfo.useNormalMap");
-	GLint normalMapTextureLocation = glGetUniformLocation(shader, "normalMappingInfo.normalMapTexture");
-	GLint tangentSpaceLocation = glGetUniformLocation(shader, "normalMappingInfo.tangentSpace");
-	glUniform1i(useNormalMapLocation, normalInfo->useNormalMap);
-	if (normalInfo->useNormalMap)
+	GLint use_normal_map_location = glGetUniformLocation(shader, "normal_mapping_info.use_normal_map");
+	GLint normal_map_texture_location = glGetUniformLocation(shader, "normal_mapping_info.normal_map_texture");
+	GLint tangent_space_location = glGetUniformLocation(shader, "normal_mapping_info.tangent_space");
+	glUniform1i(use_normal_map_location, normal_info->use_normal_map);
+	if (normal_info->use_normal_map)
 	{
-		glUniform1i(normalMapTextureLocation, 2);
-		glUniform1i(tangentSpaceLocation, normalInfo->tangentSpace);
+		glUniform1i(normal_map_texture_location, 2);
+		glUniform1i(tangent_space_location, normal_info->tangent_space);
 		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, normalInfo->normalMapTexture);
+		glBindTexture(GL_TEXTURE_2D, normal_info->normal_map_texture);
 	}
 }
 
-// This function must be re-done.
-// This implementation is just temporary, but it's not bug-free and will work only for a limited set of objs.
-extern void graphicsMeshRender(Shader shader, Mesh mesh)
+void graphics_mesh_render(Shader shader, Mesh mesh)
 {
 	glBindVertexArray(mesh.VAO);
 	glUseProgram(shader);
-	diffuseUpdateUniforms(&mesh.diffuseInfo, shader);
-	normalsUpdateUniforms(&mesh.normalInfo, shader);
-	glDrawElements(GL_TRIANGLES, mesh.indexesSize, GL_UNSIGNED_INT, 0);
+	diffuse_update_uniforms(&mesh.diffuse_info, shader);
+	normals_update_uniforms(&mesh.normal_info, shader);
+	glDrawElements(GL_TRIANGLES, mesh.indexes_size, GL_UNSIGNED_INT, 0);
 	glUseProgram(0);
 	glBindVertexArray(0);
 }
 
-extern void graphicsMeshChangeDiffuseMap(Mesh* mesh, u32 diffuseMap, boolean deleteDiffuseMap)
+void graphics_mesh_change_diffuse_map(Mesh* mesh, u32 diffuse_map, boolean delete_diffuse_map)
 {
-	if (deleteDiffuseMap && mesh->diffuseInfo.useDiffuseMap)
-		glDeleteTextures(1, &mesh->diffuseInfo.diffuseMap);
+	if (delete_diffuse_map && mesh->diffuse_info.use_diffuse_map)
+		glDeleteTextures(1, &mesh->diffuse_info.diffuse_map);
 
-	mesh->diffuseInfo.diffuseMap = diffuseMap;
-	mesh->diffuseInfo.useDiffuseMap = true;
+	mesh->diffuse_info.diffuse_map = diffuse_map;
+	mesh->diffuse_info.use_diffuse_map = true;
 }
 
-extern void graphicsMeshChangeColor(Mesh* mesh, Vec4 color, boolean deleteDiffuseMap)
+void graphics_mesh_change_color(Mesh* mesh, vec4 color, boolean delete_diffuse_map)
 {
-	if (deleteDiffuseMap && mesh->diffuseInfo.useDiffuseMap)
-		glDeleteTextures(1, &mesh->diffuseInfo.diffuseMap);
+	if (delete_diffuse_map && mesh->diffuse_info.use_diffuse_map)
+		glDeleteTextures(1, &mesh->diffuse_info.diffuse_map);
 
-	mesh->diffuseInfo.useDiffuseMap = false;
-	mesh->diffuseInfo.diffuseColor = color;
+	mesh->diffuse_info.use_diffuse_map = false;
+	mesh->diffuse_info.diffuse_color = color;
 }
 
-static void recalculateModelMatrix(Entity* entity)
+static void recalculate_model_matrix(Entity* entity)
 {
 	r32 s, c;
 
-	Mat4 scaleMatrix = (Mat4) {
-		entity->worldScale.x, 0.0f, 0.0f, 0.0f,
-			0.0f, entity->worldScale.y, 0.0f, 0.0f,
-			0.0f, 0.0f, entity->worldScale.z, 0.0f,
+	mat4 scale_matrix = (mat4) {
+		entity->world_scale.x, 0.0f, 0.0f, 0.0f,
+			0.0f, entity->world_scale.y, 0.0f, 0.0f,
+			0.0f, 0.0f, entity->world_scale.z, 0.0f,
 			0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	s = sinf(entity->worldRotation.x);
-	c = cosf(entity->worldRotation.x);
-	Mat4 rotXMatrix = (Mat4) {
+	s = sinf(entity->world_rotation.x);
+	c = cosf(entity->world_rotation.x);
+	mat4 rot_x_matrix = (mat4) {
 		1.0f, 0.0f, 0.0f, 0.0f,
 			0.0f, c, -s, 0.0f,
 			0.0f, s, c, 0.0f,
 			0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	s = sinf(entity->worldRotation.y);
-	c = cosf(entity->worldRotation.y);
-	Mat4 rotYMatrix = (Mat4) {
-		c, 0.0f, s, 0.0f,
+	s = sinf(entity->world_rotation.y);
+	c = cosf(entity->world_rotation.y);
+	mat4 rot_y_matrix = (mat4) {
+      c, 0.0f, s, 0.0f,
 			0.0f, 1.0f, 0.0f, 0.0f,
 			-s, 0.0f, c, 0.0f,
 			0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	s = sinf(entity->worldRotation.z);
-	c = cosf(entity->worldRotation.z);
-	Mat4 rotZMatrix = (Mat4) {
+	s = sinf(entity->world_rotation.z);
+	c = cosf(entity->world_rotation.z);
+	mat4 rot_z_matrix = (mat4) {
 		c, -s, 0.0f, 0.0f,
 			s, c, 0.0f, 0.0f,
 			0.0f, 0.0f, 1.0f, 0.0f,
 			0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	Mat4 rotationMatrix = gmMultiplyMat4(&rotYMatrix, &rotXMatrix);
-	rotationMatrix = gmMultiplyMat4(&rotZMatrix, &rotationMatrix);
+	mat4 rotation_matrix = gm_mat4_multiply(&rot_y_matrix, &rot_x_matrix);
+	rotation_matrix = gm_mat4_multiply(&rot_z_matrix, &rotation_matrix);
 
-	Mat4 translationMatrix = (Mat4) {
-		1.0f, 0.0f, 0.0f, entity->worldPosition.x,
-			0.0f, 1.0f, 0.0f, entity->worldPosition.y,
-			0.0f, 0.0f, 1.0f, entity->worldPosition.z,
+	mat4 translation_matrix = (mat4) {
+		1.0f, 0.0f, 0.0f, entity->world_position.x,
+			0.0f, 1.0f, 0.0f, entity->world_position.y,
+			0.0f, 0.0f, 1.0f, entity->world_position.z,
 			0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	entity->modelMatrix = gmMultiplyMat4(&rotationMatrix, &scaleMatrix);
-	entity->modelMatrix = gmMultiplyMat4(&translationMatrix, &entity->modelMatrix);
+	entity->model_matrix = gm_mat4_multiply(&rotation_matrix, &scale_matrix);
+	entity->model_matrix = gm_mat4_multiply(&translation_matrix, &entity->model_matrix);
 }
 
-extern void graphicsEntityCreate(Entity* entity, Mesh mesh, Vec4 worldPosition, Vec3 worldRotation, Vec3 worldScale)
+void graphics_entity_create(Entity* entity, Mesh mesh, vec4 world_position, vec3 world_rotation, vec3 world_scale)
 {
 	entity->mesh = mesh;
-	entity->worldPosition = worldPosition;
-	entity->worldRotation = worldRotation;
-	entity->worldScale = worldScale;
-	recalculateModelMatrix(entity);
+	entity->world_position = world_position;
+	entity->world_rotation = world_rotation;
+	entity->world_scale = world_scale;
+	recalculate_model_matrix(entity);
 }
 
-extern void graphicsEntityMeshReplace(Entity* entity, Mesh mesh,
-	boolean deleteNormalMap , boolean deleteDiffuseMap)
+void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_normal_map, boolean delete_diffuse_map)
 {
 	glDeleteBuffers(1, &entity->mesh.VBO);
 	glDeleteBuffers(1, &entity->mesh.EBO);
 	glDeleteVertexArrays(1, &entity->mesh.VAO);
-	if (deleteNormalMap && entity->mesh.normalInfo.useNormalMap)
-		glDeleteTextures(1, &entity->mesh.normalInfo.normalMapTexture);
-	if (deleteDiffuseMap && entity->mesh.diffuseInfo.useDiffuseMap)
-		glDeleteTextures(1, &entity->mesh.diffuseInfo.diffuseMap);
+	if (delete_normal_map && entity->mesh.normal_info.use_normal_map)
+		glDeleteTextures(1, &entity->mesh.normal_info.normal_map_texture);
+	if (delete_diffuse_map && entity->mesh.diffuse_info.use_diffuse_map)
+		glDeleteTextures(1, &entity->mesh.diffuse_info.diffuse_map);
 
 	entity->mesh = mesh;
 }
 
-extern void graphicsEntitySetPosition(Entity* entity, Vec4 worldPosition)
+void graphics_entity_set_position(Entity* entity, vec4 world_position)
 {
-	entity->worldPosition = worldPosition;
-	recalculateModelMatrix(entity);
+	entity->world_position = world_position;
+	recalculate_model_matrix(entity);
 }
 
-extern void graphicsEntitySetRotation(Entity* entity, Vec3 worldRotation)
+void graphics_entity_set_rotation(Entity* entity, vec3 world_rotation)
 {
-	entity->worldRotation = worldRotation;
-	recalculateModelMatrix(entity);
+	entity->world_rotation = world_rotation;
+	recalculate_model_matrix(entity);
 }
 
-extern void graphicsEntitySetScale(Entity* entity, Vec3 worldScale)
+void graphics_entity_set_scale(Entity* entity, vec3 world_scale)
 {
-	entity->worldScale = worldScale;
-	recalculateModelMatrix(entity);
+	entity->world_scale = world_scale;
+	recalculate_model_matrix(entity);
 }
 
-extern void graphicsEntityRenderBasicShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity)
+void graphics_entity_render_basic_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity)
 {
 	glUseProgram(shader);
-	GLint modelMatrixLocation = glGetUniformLocation(shader, "modelMatrix");
-	GLint viewMatrixLocation = glGetUniformLocation(shader, "viewMatrix");
-	GLint projectionMatrixLocation = glGetUniformLocation(shader, "projectionMatrix");
-	glUniformMatrix4fv(modelMatrixLocation, 1, GL_TRUE, (GLfloat*)entity->modelMatrix.data);
-	glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->viewMatrix.data);
-	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->projectionMatrix.data);
-	graphicsMeshRender(shader, entity->mesh);
+	GLint model_matrix_location = glGetUniformLocation(shader, "model_matrix");
+	GLint view_matrix_location = glGetUniformLocation(shader, "view_matrix");
+	GLint projection_matrix_location = glGetUniformLocation(shader, "projection_matrix");
+	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)entity->model_matrix.data);
+	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)camera->view_matrix.data);
+	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)camera->projection_matrix.data);
+	graphics_mesh_render(shader, entity->mesh);
 	glUseProgram(0);
 }
 
-extern void graphicsEntityRenderPhongShader(Shader shader, const PerspectiveCamera* camera, const Entity* entity, const Light* lights)
+void graphics_entity_render_phong_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity, const Light* lights)
 {
 	glUseProgram(shader);
-	lightUpdateUniforms(lights, shader);
-	GLint cameraPositionLocation = glGetUniformLocation(shader, "cameraPosition");
-	GLint shinenessLocation = glGetUniformLocation(shader, "objectShineness");
-	GLint modelMatrixLocation = glGetUniformLocation(shader, "modelMatrix");
-	GLint viewMatrixLocation = glGetUniformLocation(shader, "viewMatrix");
-	GLint projectionMatrixLocation = glGetUniformLocation(shader, "projectionMatrix");
-	glUniform4f(cameraPositionLocation, camera->position.x, camera->position.y, camera->position.z, camera->position.w);
-	glUniform1f(shinenessLocation, 128.0f);
-	glUniformMatrix4fv(modelMatrixLocation, 1, GL_TRUE, (GLfloat*)entity->modelMatrix.data);
-	glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->viewMatrix.data);
-	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_TRUE, (GLfloat*)camera->projectionMatrix.data);
-	graphicsMeshRender(shader, entity->mesh);
+	light_update_uniforms(lights, shader);
+	GLint camera_position_location = glGetUniformLocation(shader, "camera_position");
+	GLint shineness_location = glGetUniformLocation(shader, "object_shineness");
+	GLint model_matrix_location = glGetUniformLocation(shader, "model_matrix");
+	GLint view_matrix_location = glGetUniformLocation(shader, "view_matrix");
+	GLint projection_matrix_location = glGetUniformLocation(shader, "projection_matrix");
+	glUniform4f(camera_position_location, camera->position.x, camera->position.y, camera->position.z, camera->position.w);
+	glUniform1f(shineness_location, 128.0f);
+	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)entity->model_matrix.data);
+	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)camera->view_matrix.data);
+	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)camera->projection_matrix.data);
+	graphics_mesh_render(shader, entity->mesh);
 	glUseProgram(0);
 }
 
-extern u32 graphicsTextureCreateFromData(const ImageData* imageData)
+u32 graphics_texture_create_from_data(const Image_Data* image_data)
 {
-	u32 textureId;
+	u32 texture_id;
 
-	glGenTextures(1, &textureId);
-	glBindTexture(GL_TEXTURE_2D, textureId);
-	if (imageData->channels == 4)
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, imageData->width, imageData->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageData->data);
+	glGenTextures(1, &texture_id);
+	glBindTexture(GL_TEXTURE_2D, texture_id);
+	if (image_data->channels == 4)
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image_data->width, image_data->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data->data);
 	else
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, imageData->width, imageData->height, 0, GL_RGB, GL_UNSIGNED_BYTE, imageData->data);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, image_data->width, image_data->height, 0, GL_RGB, GL_UNSIGNED_BYTE, image_data->data);
 
 	glGenerateMipmap(GL_TEXTURE_2D);
 
@@ -477,19 +474,19 @@ extern u32 graphicsTextureCreateFromData(const ImageData* imageData)
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	return textureId;
+	return texture_id;
 }
 
-extern u32 graphicsTextureCreateFromFloatData(const FloatImageData* imageData)
+u32 graphics_texture_create_from_float_data(const Float_Image_Data* image_data)
 {
-	u32 textureId;
+	u32 texture_id;
 
-	glGenTextures(1, &textureId);
-	glBindTexture(GL_TEXTURE_2D, textureId);
-	if (imageData->channels == 4)
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, imageData->width, imageData->height, 0, GL_RGBA, GL_FLOAT, imageData->data);
+	glGenTextures(1, &texture_id);
+	glBindTexture(GL_TEXTURE_2D, texture_id);
+	if (image_data->channels == 4)
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, image_data->width, image_data->height, 0, GL_RGBA, GL_FLOAT, image_data->data);
 	else
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, imageData->width, imageData->height, 0, GL_RGB, GL_FLOAT, imageData->data);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, image_data->width, image_data->height, 0, GL_RGB, GL_FLOAT, image_data->data);
 	glGenerateMipmap(GL_TEXTURE_2D);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -505,111 +502,109 @@ extern u32 graphicsTextureCreateFromFloatData(const FloatImageData* imageData)
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	return textureId;
+	return texture_id;
 }
 
-extern u32 graphicsTextureCreate(const s8* texturePath)
+u32 graphics_texture_create(const s8* texture_path)
 {
-	ImageData imageData = graphicsImageLoad(texturePath);
-	if (imageData.data == NULL) return -1;
-	u32 textureId = graphicsTextureCreateFromData(&imageData);
-	graphicsImageFree(&imageData);
+	Image_Data image_data = graphics_image_load(texture_path);
+	if (image_data.data == NULL) return -1;
+	u32 texture_id = graphics_texture_create_from_data(&image_data);
+	graphics_image_free(&image_data);
 
-	return textureId;
+	return texture_id;
 }
 
-extern void graphicsTextureDelete(u32 textureId)
+void graphics_texture_delete(u32 texture_id)
 {
-	glDeleteTextures(1, &textureId);
+	glDeleteTextures(1, &texture_id);
 }
 
-extern void graphicsLightCreate(Light* light, Vec4 position, Vec4 ambientColor, Vec4 diffuseColor, Vec4 specularColor)
+void graphics_light_create(Light* light, vec4 position, vec4 ambient_color, vec4 diffuse_color, vec4 specular_color)
 {
 	light->position = position;
-	light->ambientColor = ambientColor;
-	light->diffuseColor = diffuseColor;
-	light->specularColor = specularColor;
+	light->ambient_color = ambient_color;
+	light->diffuse_color = diffuse_color;
+	light->specular_color = specular_color;
 }
 
 // If memory is null, new memory will be allocated
-extern FloatImageData graphicsImageDataToFloatImageData(ImageData* imageData, r32* memory)
+Float_Image_Data graphics_image_data_to_float_image_data(Image_Data* image_data, r32* memory)
 {
 	// @TODO: check WHY this is happening
-	s32 imageChannels = imageData->channels;
+	s32 image_channels = image_data->channels;
 
 	if (!memory)
-		memory = (r32*)malloc(sizeof(r32) * imageData->height * imageData->width * imageChannels);
+		memory = (r32*)malloc(sizeof(r32) * image_data->height * image_data->width * image_channels);
 
-	for (s32 i = 0; i < imageData->height; ++i)
+	for (s32 i = 0; i < image_data->height; ++i)
 	{
-		for (s32 j = 0; j < imageData->width; ++j)
+		for (s32 j = 0; j < image_data->width; ++j)
 		{
-			memory[i * imageData->width * imageChannels + j * imageChannels] =
-				imageData->data[i * imageData->width * imageData->channels + j * imageData->channels] / 255.0f;
-			memory[i * imageData->width * imageChannels + j * imageChannels + 1] =
-				imageData->data[i * imageData->width * imageData->channels + j * imageData->channels + 1] / 255.0f;
-			memory[i * imageData->width * imageChannels + j * imageChannels + 2] =
-				imageData->data[i * imageData->width * imageData->channels + j * imageData->channels + 2] / 255.0f;
-			memory[i * imageData->width * imageChannels + j * imageChannels + 3] = 1.0f;
+			memory[i * image_data->width * image_channels + j * image_channels] =
+				image_data->data[i * image_data->width * image_data->channels + j * image_data->channels] / 255.0f;
+			memory[i * image_data->width * image_channels + j * image_channels + 1] =
+				image_data->data[i * image_data->width * image_data->channels + j * image_data->channels + 1] / 255.0f;
+			memory[i * image_data->width * image_channels + j * image_channels + 2] =
+				image_data->data[i * image_data->width * image_data->channels + j * image_data->channels + 2] / 255.0f;
+			memory[i * image_data->width * image_channels + j * image_channels + 3] = 1.0f;
 		}
 	}
 
-	FloatImageData fid;
-	fid.width = imageData->width;
-	fid.height = imageData->height;
-	fid.channels = imageData->channels;
+	Float_Image_Data fid;
+	fid.width = image_data->width;
+	fid.height = image_data->height;
+	fid.channels = image_data->channels;
 	fid.data = memory;
 
 	return fid;
 }
 
-extern ImageData graphicsFloatImageDataToImageData(const FloatImageData* floatImageData, u8* memory)
+Image_Data graphics_float_image_data_to_image_data(const Float_Image_Data* float_image_data, u8* memory)
 {
 	// @TODO: check WHY this is happening
-	s32 imageChannels = floatImageData->channels;
+	s32 image_channels = float_image_data->channels;
 
 	if (!memory)
-		memory = (u8*)malloc(sizeof(u8) * floatImageData->height * floatImageData->width * imageChannels);
+		memory = (u8*)malloc(sizeof(u8) * float_image_data->height * float_image_data->width * image_channels);
 
-	for (s32 i = 0; i < floatImageData->height; ++i)
+	for (s32 i = 0; i < float_image_data->height; ++i)
 	{
-		for (s32 j = 0; j < floatImageData->width; ++j)
+		for (s32 j = 0; j < float_image_data->width; ++j)
 		{
-			memory[i * floatImageData->width * imageChannels + j * imageChannels] = (u8)round(255.0f * floatImageData->data[i * floatImageData->width * imageChannels + j * imageChannels]);
-			memory[i * floatImageData->width * imageChannels + j * imageChannels + 1] = (u8)round(255.0f * floatImageData->data[i * floatImageData->width * imageChannels + j * imageChannels + 1]);
-			memory[i * floatImageData->width * imageChannels + j * imageChannels + 2] = (u8)round(255.0f * floatImageData->data[i * floatImageData->width * imageChannels + j * imageChannels + 2]);
-			if (floatImageData->channels > 3) memory[i * floatImageData->width * imageChannels + j * imageChannels + 3] = 255;
+			memory[i * float_image_data->width * image_channels + j * image_channels] = (u8)round(255.0f * float_image_data->data[i * float_image_data->width * image_channels + j * image_channels]);
+			memory[i * float_image_data->width * image_channels + j * image_channels + 1] = (u8)round(255.0f * float_image_data->data[i * float_image_data->width * image_channels + j * image_channels + 1]);
+			memory[i * float_image_data->width * image_channels + j * image_channels + 2] = (u8)round(255.0f * float_image_data->data[i * float_image_data->width * image_channels + j * image_channels + 2]);
+			if (float_image_data->channels > 3) memory[i * float_image_data->width * image_channels + j * image_channels + 3] = 255;
 		}
 	}
 
-	ImageData id;
-	id.width = floatImageData->width;
-	id.height = floatImageData->height;
-	id.channels = floatImageData->channels;
+	Image_Data id;
+	id.width = float_image_data->width;
+	id.height = float_image_data->height;
+	id.channels = float_image_data->channels;
 	id.data = memory;
 
 	return id;
 }
 
-extern Mesh graphicsMeshCreateFromObjWithColor(const s8* objPath, NormalMappingInfo* normalInfo, Vec4 diffuseColor)
+Mesh graphics_mesh_create_from_obj_with_color(const s8* obj_path, Normal_Mapping_Info* normal_info, vec4 diffuse_color)
 {
 	Vertex* vertices;
 	u32* indexes;
-	objParse(objPath, &vertices, &indexes);
-	Mesh m = graphicsMeshCreateWithColor(vertices, array_get_length(vertices), indexes,
-		array_get_length(indexes), normalInfo, diffuseColor);
+	obj_parse(obj_path, &vertices, &indexes);
+	Mesh m = graphics_mesh_create_with_color(vertices, array_get_length(vertices), indexes, array_get_length(indexes), normal_info, diffuse_color);
 	array_release(vertices);
 	array_release(indexes);
 	return m;
 }
 
-extern Mesh graphicsMeshCreateFromObjWithTexture(const s8* objPath, NormalMappingInfo* normalInfo, u32 diffuseMap)
+Mesh graphics_mesh_create_from_obj_with_texture(const s8* obj_path, Normal_Mapping_Info* normal_info, u32 diffuse_map)
 {
 	Vertex* vertices;
 	u32* indexes;
-	objParse(objPath, &vertices, &indexes);
-	Mesh m = graphicsMeshCreateWithTexture(vertices, array_get_length(vertices), indexes,
-		array_get_length(indexes), normalInfo, diffuseMap);
+	obj_parse(obj_path, &vertices, &indexes);
+	Mesh m = graphics_mesh_create_with_texture(vertices, array_get_length(vertices), indexes, array_get_length(indexes), normal_info, diffuse_map);
 	array_release(vertices);
 	array_release(indexes);
 	return m;

@@ -4,14 +4,14 @@
 #include "graphics.h"
 #include <dynamic_array.h>
 
-extern "C" int objParse(const char* objPath, Vertex** vertices, u32** indexes)
+extern "C" int obj_parse(const char* obj_path, Vertex** vertices, u32** indexes)
 {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::string warn;
 	std::string err;
 
-	bool ret = tinyobj::LoadObj(&attrib, &shapes, 0, &warn, &err, objPath, 0, true);
+	bool ret = tinyobj::LoadObj(&attrib, &shapes, 0, &warn, &err, obj_path, 0, true);
 
 	if (!warn.empty()) {
 		std::cout << warn << std::endl;
@@ -43,8 +43,8 @@ extern "C" int objParse(const char* objPath, Vertex** vertices, u32** indexes)
 		v.position.y = attrib.vertices[f + 1];
 		v.position.z = attrib.vertices[f + 2];
 		v.position.w = 1.0f;
-		v.normal = (Vec4){0.0f, 0.0f, 0.0f, 0.0f};
-		v.textureCoordinates = (Vec2) {0.0f, 0.0f};
+		v.normal = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
+		v.texture_coordinates = (vec2) {0.0f, 0.0f};
 		array_push(*vertices, &v);
 	}
 
@@ -59,43 +59,43 @@ extern "C" int objParse(const char* objPath, Vertex** vertices, u32** indexes)
 
 	if (attrib.normals.empty()) {
 		// Calculate normals
-		size_t indexesLength = array_get_length(*indexes);
+		size_t indexes_length = array_get_length(*indexes);
 
-		for (size_t i = 0; i < indexesLength; i += 3)
+		for (size_t i = 0; i < indexes_length; i += 3)
 		{
-			Vertex* vertexA, *vertexB, *vertexC;
+			Vertex* vertex_a, *vertex_b, *vertex_c;
 			unsigned int i1 = (*indexes)[i + 0];
 			unsigned int i2 = (*indexes)[i + 1];
 			unsigned int i3 = (*indexes)[i + 2];
 
 			// Find vertices
-			vertexA = *vertices + i1;
-			vertexB = *vertices + i2;
-			vertexC = *vertices + i3;
+			vertex_a = *vertices + i1;
+			vertex_b = *vertices + i2;
+			vertex_c = *vertices + i3;
 
 			// Manually calculate triangle's normal
-			Vec3 A = (Vec3) {vertexA->position.x, vertexA->position.y, vertexA->position.z};
-			Vec3 B = (Vec3) {vertexB->position.x, vertexB->position.y, vertexB->position.z};
-			Vec3 C = (Vec3) {vertexC->position.x, vertexC->position.y, vertexC->position.z};
-			Vec3 firstEdge = (Vec3){B.x - A.x, B.y - A.y, B.z - A.z};
-			Vec3 secondEdge = (Vec3){C.x - A.x, C.y - A.y, C.z - A.z};
-			Vec4 normal;
-			normal.x = firstEdge.y * secondEdge.z - firstEdge.z * secondEdge.y;
-			normal.y = firstEdge.z * secondEdge.x - firstEdge.x * secondEdge.z;
-			normal.z = firstEdge.x * secondEdge.y - firstEdge.y * secondEdge.x;
+			vec3 A = (vec3) {vertex_a->position.x, vertex_a->position.y, vertex_a->position.z};
+			vec3 B = (vec3) {vertex_b->position.x, vertex_b->position.y, vertex_b->position.z};
+			vec3 C = (vec3) {vertex_c->position.x, vertex_c->position.y, vertex_c->position.z};
+			vec3 first_edge = (vec3){B.x - A.x, B.y - A.y, B.z - A.z};
+			vec3 second_edge = (vec3){C.x - A.x, C.y - A.y, C.z - A.z};
+			vec4 normal;
+			normal.x = first_edge.y * second_edge.z - first_edge.z * second_edge.y;
+			normal.y = first_edge.z * second_edge.x - first_edge.x * second_edge.z;
+			normal.z = first_edge.x * second_edge.y - first_edge.y * second_edge.x;
 
 			// Assign normals
-			vertexA->normal = (Vec4){vertexA->normal.x + normal.x, vertexA->normal.y + normal.y, vertexA->normal.z + normal.z};
-			vertexB->normal = (Vec4){vertexB->normal.x + normal.x, vertexB->normal.y + normal.y, vertexB->normal.z + normal.z};
-			vertexC->normal = (Vec4){vertexC->normal.x + normal.x, vertexC->normal.y + normal.y, vertexC->normal.z + normal.z};
+			vertex_a->normal = (vec4){vertex_a->normal.x + normal.x, vertex_a->normal.y + normal.y, vertex_a->normal.z + normal.z};
+			vertex_b->normal = (vec4){vertex_b->normal.x + normal.x, vertex_b->normal.y + normal.y, vertex_b->normal.z + normal.z};
+			vertex_c->normal = (vec4){vertex_c->normal.x + normal.x, vertex_c->normal.y + normal.y, vertex_c->normal.z + normal.z};
 		}
 	}
 
-	// If texCoords were provided... fill them
+	// If tex_coords were provided... fill them
 	for (size_t f = 0; f < attrib.texcoords.size(); f += 2) {
 		Vertex* v = &(*vertices)[f / 2];
-		v->textureCoordinates.x = attrib.texcoords[f];
-		v->textureCoordinates.y = attrib.texcoords[f + 1];
+		v->texture_coordinates.x = attrib.texcoords[f];
+		v->texture_coordinates.y = attrib.texcoords[f + 1];
 	}
 
 	return 0;
