@@ -1,10 +1,11 @@
 #include <GLFW/glfw3.h>
 #include <dynamic_array.h>
+#include <stdio.h>
+#include <math.h>
 #include "core.h"
 #include "graphics.h"
-#include <math.h>
 #include "obj.h"
-#include <stdio.h>
+#include "menu.h"
 
 #define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
 #define PHONG_FRAGMENT_SHADER_PATH "./shaders/phong_shader.fs"
@@ -41,6 +42,11 @@ static Light* create_lights()
 	return lights;
 }
 
+static void menu_dummy_callback()
+{
+	printf("dummy callback called!\n");
+}
+
 int core_init()
 {
 	// Create shader
@@ -52,6 +58,8 @@ int core_init()
 
 	Mesh m = graphics_mesh_create_from_obj_with_color("./res/cow.obj", 0, (vec4){1.0f, 0.0f, 0.0f, 0.0f});
 	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){1.0f, 1.0f, 1.0f});
+
+	menu_register_dummy_callback(menu_dummy_callback);
 
 	return 0;
 }

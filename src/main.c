@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include "core.h"
 #include "gm.h"
+#include "menu.h"
 
 #define WINDOW_TITLE "basic-engine"
 
@@ -19,7 +20,7 @@ s32 window_height = 768;
 GLFWwindow* main_window;
 
 static boolean key_state[1024];	// @TODO: Check range.
-static boolean is_cursor_hidden = false;
+static boolean is_menu_visible = false;
 
 static void glfw_key_callback(GLFWwindow* window, s32 key, s32 scanCode, s32 action, s32 mods)
 {
@@ -29,12 +30,12 @@ static void glfw_key_callback(GLFWwindow* window, s32 key, s32 scanCode, s32 act
 		key_state[key] = false;
 	if (key_state[GLFW_KEY_ESCAPE])
 	{
-		if (is_cursor_hidden)
+		if (is_menu_visible)
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 		else
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
-		is_cursor_hidden = !is_cursor_hidden;
+		is_menu_visible = !is_menu_visible;
 		key_state[GLFW_KEY_ESCAPE] = !key_state[GLFW_KEY_ESCAPE];
 	}
 }
@@ -43,7 +44,7 @@ static void glfw_cursor_callback(GLFWwindow* window, r64 x_pos, r64 y_pos)
 {
 	static boolean reset_core_mouse_movement = true;
 
-	if (!is_cursor_hidden)
+	if (!is_menu_visible)
 	{
 		core_mouse_change_process(reset_core_mouse_movement, x_pos, y_pos);
 		reset_core_mouse_movement = false;
@@ -57,12 +58,18 @@ static void glfw_mouse_button_callback(GLFWwindow* window, s32 button, s32 actio
 	r64 x_pos, y_pos;
 	glfwGetCursorPos(window, &x_pos, &y_pos);
 	y_pos = window_height - y_pos;
-	core_mouse_click_process(button, action, x_pos, y_pos);
+	if (is_menu_visible)
+		menu_mouse_click_process(window, button, action, mods);
+	else
+		core_mouse_click_process(button, action, x_pos, y_pos);
 }
 
-static void glfw_scroll_callback(GLFWwindow* window, r64 xOffset, r64 yOffset)
+static void glfw_scroll_callback(GLFWwindow* window, r64 x_offset, r64 y_offset)
 {
-	core_scroll_change_process(xOffset, yOffset);
+	if (is_menu_visible)
+		menu_scroll_change_process(window, x_offset, y_offset);
+	else
+		core_scroll_change_process(x_offset, y_offset);
 }
 
 static void glfw_resize_callback(GLFWwindow* window, s32 width, s32 height)
@@ -75,6 +82,8 @@ static void glfw_resize_callback(GLFWwindow* window, s32 width, s32 height)
 
 static void glfw_char_callback(GLFWwindow* window, u32 c)
 {
+	if (is_menu_visible)
+		menu_char_click_process(window, c);
 }
 
 static GLFWwindow* init_glfw()
@@ -107,7 +116,7 @@ static void init_glew()
 
 s32 main(s32 argc, s8** argv)
 {
-  r32 delta_time = 0.0f;
+	r32 delta_time = 0.0f;
 	main_window = init_glfw();
 	init_glew();
 
@@ -121,6 +130,8 @@ s32 main(s32 argc, s8** argv)
 	s32 frame_number = (s32)last_frame;
 	u32 fps = 0;
 
+	menu_init(main_window);
+
 	while (!glfwWindowShouldClose(main_window))
 	{
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -128,7 +139,11 @@ s32 main(s32 argc, s8** argv)
 
 		core_update(delta_time);
 		core_render();
-		core_input_process(key_state, delta_time);
+		if (!is_menu_visible)
+			core_input_process(key_state, delta_time);
+		else
+			menu_render();
+
 		glfwPollEvents();
 		glfwSwapBuffers(main_window);
 
@@ -147,6 +162,7 @@ s32 main(s32 argc, s8** argv)
 		last_frame = current_frame;
 	}
 
+	menu_destroy();
 	core_destroy();
 	glfwTerminate();
 }
