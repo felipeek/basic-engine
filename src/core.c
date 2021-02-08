@@ -6,6 +6,7 @@
 #include "graphics.h"
 #include "obj.h"
 #include "menu.h"
+#include "animation.h"
 
 #define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
 #define PHONG_FRAGMENT_SHADER_PATH "./shaders/phong_shader.fs"
@@ -17,6 +18,10 @@ static Light* lights;
 static Entity e;
 static vec3* bezier_points;
 static Render_Primitives_Context rpc;
+
+// Animation
+static boolean is_animating = false;
+static r32 t_animation = 0.0f;
 
 static Perspective_Camera create_camera()
 {
@@ -53,6 +58,14 @@ static void menu_bezier_points_callback(u32 number_of_points, vec3* points)
 	}
 }
 
+static void menu_animate_callback(boolean ensure_constant_speed, boolean use_frenet_frames)
+{
+	char buffer[64];
+
+	is_animating = true;
+	t_animation = 0;
+}
+
 int core_init()
 {
 	// Create shader
@@ -66,6 +79,7 @@ int core_init()
 	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){1.0f, 1.0f, 1.0f});
 
 	menu_register_bezier_points_callback(menu_bezier_points_callback);
+	menu_register_animate_callback(menu_animate_callback);
 
 	bezier_points = array_create(vec3, 1);
 	graphics_renderer_primitives_init(&rpc);
@@ -80,7 +94,16 @@ void core_destroy()
 
 void core_update(r32 delta_time)
 {
+	static r32 ANIMATION_SPEED_FACTOR = 1.0f;
 
+	if (is_animating)
+	{
+		vec3 point_in_curve = animation_get_point_in_bezier_curve(array_get_length(bezier_points), bezier_points, t_animation);
+		graphics_entity_set_position(&e, (vec4){ point_in_curve.x, point_in_curve.y, point_in_curve.z, 1.0f });
+		t_animation += ANIMATION_SPEED_FACTOR * delta_time;
+		if (t_animation >= 1.0f)
+			is_animating = false;
+	}
 }
 
 void core_render()
@@ -90,6 +113,7 @@ void core_render()
 	for (s32 i = 0; i < array_get_length(bezier_points); ++i)
 	{
 		graphics_renderer_debug_points(&rpc, &bezier_points[i], 1, (vec4){0.0f, 1.0f, 0.0f, 1.0f});
+
 		if (i > 0)
 		{
 			graphics_renderer_debug_vector(&rpc, bezier_points[i - 1], bezier_points[i], (vec4){0.0f, 0.8f, 0.8f, 1.0f});

@@ -20,12 +20,19 @@ typedef struct {
 } vec3;
 
 typedef void (*Bezier_Points_Callback)(u32, vec3*);
+typedef void (*Animate_Callback)(boolean, boolean);
 
 static Bezier_Points_Callback bezier_points_callback;
+static Animate_Callback animate_callback;
 
 extern "C" void menu_register_bezier_points_callback(Bezier_Points_Callback f)
 {
 	bezier_points_callback = f;
+}
+
+extern "C" void menu_register_animate_callback(Animate_Callback f)
+{
+	animate_callback = f;
 }
 
 extern "C" void menu_char_click_process(GLFWwindow* window, u32 c)
@@ -98,6 +105,15 @@ static void draw_main_window()
 				bezier_points_callback(number_of_points, point_locations);
 			}
 		}
+	}
+
+	static bool ensure_constant_speed, use_frenet_frames;
+	ImGui::Checkbox("Ensure Constant Speed", &ensure_constant_speed);
+	ImGui::Checkbox("Use Frenet Frames", &use_frenet_frames);
+
+	if (ImGui::Button("Animate"))
+	{
+		animate_callback(ensure_constant_speed, use_frenet_frames);
 	}
 
 	ImGui::End();
