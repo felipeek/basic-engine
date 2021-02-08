@@ -40,7 +40,7 @@ typedef struct
 {
 	Mesh mesh;
 	vec4 world_position;
-	vec3 world_rotation;
+	Quaternion world_rotation;
 	vec3 world_scale;
 	mat4 model_matrix;
 } Entity;
@@ -87,10 +87,10 @@ extern void graphics_mesh_change_diffuse_map(Mesh* mesh, u32 diffuse_map, boolea
 // If mesh has a diffuse map instead of a color, the diffuse map will be deleted if delete_diffuse_map is true
 // The mesh will be set to use the color.
 extern void graphics_mesh_change_color(Mesh* mesh, vec4 color, boolean delete_diffuse_map);
-extern void graphics_entity_create(Entity* entity, Mesh mesh, vec4 world_position, vec3 world_rotation, vec3 world_scale);
+extern void graphics_entity_create(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale);
 extern void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_normal_map, boolean delete_diffuse_map);
 extern void graphics_entity_set_position(Entity* entity, vec4 world_position);
-extern void graphics_entity_set_rotation(Entity* entity, vec3 world_rotation);
+extern void graphics_entity_set_rotation(Entity* entity, Quaternion world_rotation);
 extern void graphics_entity_set_scale(Entity* entity, vec3 world_scale);
 extern void graphics_entity_render_basic_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity);
 extern void graphics_entity_render_phong_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity, const Light* lights);

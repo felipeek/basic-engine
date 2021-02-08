@@ -336,35 +336,7 @@ static void recalculate_model_matrix(Entity* entity)
 			0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	s = sinf(entity->world_rotation.x);
-	c = cosf(entity->world_rotation.x);
-	mat4 rot_x_matrix = (mat4) {
-		1.0f, 0.0f, 0.0f, 0.0f,
-			0.0f, c, -s, 0.0f,
-			0.0f, s, c, 0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f
-	};
-
-	s = sinf(entity->world_rotation.y);
-	c = cosf(entity->world_rotation.y);
-	mat4 rot_y_matrix = (mat4) {
-      c, 0.0f, s, 0.0f,
-			0.0f, 1.0f, 0.0f, 0.0f,
-			-s, 0.0f, c, 0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f
-	};
-
-	s = sinf(entity->world_rotation.z);
-	c = cosf(entity->world_rotation.z);
-	mat4 rot_z_matrix = (mat4) {
-		c, -s, 0.0f, 0.0f,
-			s, c, 0.0f, 0.0f,
-			0.0f, 0.0f, 1.0f, 0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f
-	};
-
-	mat4 rotation_matrix = gm_mat4_multiply(&rot_y_matrix, &rot_x_matrix);
-	rotation_matrix = gm_mat4_multiply(&rot_z_matrix, &rotation_matrix);
+	mat4 rotation_matrix = quaternion_get_matrix(&entity->world_rotation);
 
 	mat4 translation_matrix = (mat4) {
 		1.0f, 0.0f, 0.0f, entity->world_position.x,
@@ -377,7 +349,7 @@ static void recalculate_model_matrix(Entity* entity)
 	entity->model_matrix = gm_mat4_multiply(&translation_matrix, &entity->model_matrix);
 }
 
-void graphics_entity_create(Entity* entity, Mesh mesh, vec4 world_position, vec3 world_rotation, vec3 world_scale)
+void graphics_entity_create(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale)
 {
 	entity->mesh = mesh;
 	entity->world_position = world_position;
@@ -405,7 +377,7 @@ void graphics_entity_set_position(Entity* entity, vec4 world_position)
 	recalculate_model_matrix(entity);
 }
 
-void graphics_entity_set_rotation(Entity* entity, vec3 world_rotation)
+void graphics_entity_set_rotation(Entity* entity, Quaternion world_rotation)
 {
 	entity->world_rotation = world_rotation;
 	recalculate_model_matrix(entity);

@@ -19,12 +19,10 @@ static Perspective_Camera create_camera()
 {
 	Perspective_Camera camera;
 	vec4 camera_position =(vec4) {0.0f, 0.0f, 1.0f, 1.0f};
-	vec4 camera_up = (vec4) {0.0f, 1.0f, 0.0f, 1.0f};
-	vec4 camera_view = (vec4) {0.0f, 0.0f, -1.0f, 0.0f};
 	r32 camera_near_plane = -0.01f;
 	r32 camera_far_plane = -1000.0f;
 	r32 camera_fov = 45.0f;
-	camera_init(&camera, camera_position, camera_up, camera_view, camera_near_plane, camera_far_plane, camera_fov);
+	camera_init(&camera, camera_position, camera_near_plane, camera_far_plane, camera_fov);
 	return camera;
 }
 
@@ -52,8 +50,8 @@ int core_init()
 	// Create light
 	lights = create_lights();
 
-	Mesh m = graphics_mesh_create_from_obj_with_color("./res/sphere.obj", 0, (vec4){1.0f, 0.0f, 0.0f, 0.0f});
-	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, (vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 1.0f, 1.0f});
+	Mesh m = graphics_mesh_create_from_obj_with_color("./res/cow.obj", 0, (vec4){1.0f, 0.0f, 0.0f, 0.0f});
+	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){1.0f, 1.0f, 1.0f});
 
 	return 0;
 }
@@ -76,7 +74,7 @@ void core_render()
 void core_input_process(boolean* key_state, r32 delta_time)
 {
 	r32 movement_speed = 3.0f;
-	r32 rotation_speed = 3.0f;
+	r32 rotation_speed = 300.0f;
 
 	if (key_state[GLFW_KEY_LEFT_SHIFT])
 		movement_speed = 0.5f;
@@ -84,56 +82,50 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		movement_speed = 0.1f;
 
 	if (key_state[GLFW_KEY_W])
-		camera_set_position(&camera, gm_vec4_add(camera.position, gm_vec4_scalar_product(movement_speed * delta_time, gm_vec4_normalize(camera.view))));
+		camera_move_forward(&camera, movement_speed * delta_time);
 	if (key_state[GLFW_KEY_S])
-		camera_set_position(&camera, gm_vec4_add(camera.position, gm_vec4_scalar_product(-movement_speed * delta_time, gm_vec4_normalize(camera.view))));
+		camera_move_forward(&camera, -movement_speed * delta_time);
 	if (key_state[GLFW_KEY_A])
-		camera_set_position(&camera, gm_vec4_add(camera.position, gm_vec4_scalar_product(-movement_speed * delta_time, gm_vec4_normalize(camera.x_axis))));
+		camera_move_right(&camera, -movement_speed * delta_time);
 	if (key_state[GLFW_KEY_D])
-		camera_set_position(&camera, gm_vec4_add(camera.position, gm_vec4_scalar_product(movement_speed * delta_time, gm_vec4_normalize(camera.x_axis))));
+		camera_move_right(&camera, movement_speed * delta_time);
 	if (key_state[GLFW_KEY_X])
 	{
 		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
 		{
-			vec3 rotation = e.world_rotation;
-			rotation.x -= rotation_speed * delta_time;
-			graphics_entity_set_rotation(&e, rotation);
+			Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, rotation_speed * delta_time);
+			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
 		}
 		else
 		{
-			vec3 rotation = e.world_rotation;
-			rotation.x += rotation_speed * delta_time;
-			graphics_entity_set_rotation(&e, rotation);
+			Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, -rotation_speed * delta_time);
+			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
 		}
 	}
 	if (key_state[GLFW_KEY_Y])
 	{
 		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
 		{
-			vec3 rotation = e.world_rotation;
-			rotation.y += rotation_speed * delta_time;
-			graphics_entity_set_rotation(&e, rotation);
+			Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, rotation_speed * delta_time);
+			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
 		}
 		else
 		{
-			vec3 rotation = e.world_rotation;
-			rotation.y -= rotation_speed * delta_time;
-			graphics_entity_set_rotation(&e, rotation);
+			Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, -rotation_speed * delta_time);
+			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
 		}
 	}
 	if (key_state[GLFW_KEY_Z])
 	{
 		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
 		{
-			vec3 rotation = e.world_rotation;
-			rotation.z += rotation_speed * delta_time;
-			graphics_entity_set_rotation(&e, rotation);
+			Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, rotation_speed * delta_time);
+			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
 		}
 		else
 		{
-			vec3 rotation = e.world_rotation;
-			rotation.z -= rotation_speed * delta_time;
-			graphics_entity_set_rotation(&e, rotation);
+			Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, -rotation_speed * delta_time);
+			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
 		}
 	}
 	if (key_state[GLFW_KEY_L])
@@ -155,18 +147,15 @@ void core_mouse_change_process(boolean reset, r64 x_pos, r64 y_pos)
 	static r64 x_pos_old, y_pos_old;
 	// This constant is basically the mouse sensibility.
 	// @TODO: Allow mouse sensibility to be configurable.
-	static const r32 camera_mouse_speed = 0.001f;
+	static const r32 camera_mouse_speed = 0.1f;
 
 	if (!reset)
 	{
 		r64 x_difference = x_pos - x_pos_old;
 		r64 y_difference = y_pos - y_pos_old;
 
-		r32 pitch_angle = -camera_mouse_speed * (float)x_difference;
-		r32 yaw_angle = camera_mouse_speed * (float)y_difference;
-
-		camera_inc_pitch(&camera, pitch_angle);
-		camera_inc_yaw(&camera, yaw_angle);
+		camera_rotate_x(&camera, camera_mouse_speed * (r32)x_difference);
+		camera_rotate_y(&camera, camera_mouse_speed * (r32)y_difference);
 	}
 
 	x_pos_old = x_pos;

@@ -4,51 +4,20 @@
 extern s32 window_width;
 extern s32 window_height;
 
-static void truncate_angles(Perspective_Camera* camera)
-{
-	const float yaw_truncate_threshold = 0.1f;
-	const float yaw_bottom_limit = PI_F - yaw_truncate_threshold;
-	const float yaw_top_limit = yaw_truncate_threshold;
-
-	if (camera->yaw > yaw_bottom_limit)
-		camera->yaw = yaw_bottom_limit;
-	else if (camera->yaw < yaw_top_limit)
-		camera->yaw = yaw_top_limit;
-}
-
-static void recalculate_angles(Perspective_Camera* camera)
-{
-	camera->pitch = atan2f(camera->view.x, camera->view.z);
-	camera->yaw = atan2f(sqrtf(camera->view.x * camera->view.x + camera->view.z * camera->view.z), camera->view.y);
-	truncate_angles(camera);
-}
-
 static void recalculate_view_matrix(Perspective_Camera* camera)
 {
-	vec3 up_vec3 = (vec3) { camera->up.x, camera->up.y, camera->up.z };
-	vec4 w = gm_vec4_scalar_product(-1, gm_vec4_normalize(camera->view));
-	vec3 w_vec3 = (vec3) { w.x, w.y, w.z };
-	vec3 up_w_cross = gm_vec3_cross(up_vec3, w_vec3);
-	vec4 u = gm_vec4_normalize((vec4) { up_w_cross.x, up_w_cross.y, up_w_cross.z, 0.0f });
-	vec3 u_vec3 = (vec3) { u.x, u.y, u.z };
-	vec3 v_vec3 = gm_vec3_cross(w_vec3, u_vec3);
-	vec4 v = (vec4) { v_vec3.x, v_vec3.y, v_vec3.z, 0.0f };
-	// Useless, but conceptually correct.
-	vec4 world_to_camera_vec = gm_vec4_subtract(camera->position, (vec4) { 0.0f, 0.0f, 0.0f, 1.0f });
+	mat4 trans = (mat4) {
+    1.0f, 0.0f, 0.0f, -camera->position.x,
+    0.0f, 1.0f, 0.0f, -camera->position.y,
+    0.0f, 0.0f, 1.0f, -camera->position.z,
+    0.0f, 0.0f, 0.0f, 1.0f
+  };
 
-	camera->x_axis = u;
-	camera->y_axis = v;
-	camera->z_axis = w;
+  Quaternion f = quaternion_product(&camera->rotation, &camera->yrotation);
 
-	// Need to transpose when sending to shader
-	camera->view_matrix = (mat4) {
-		u.x, u.y, u.z, -gm_vec4_dot(u, world_to_camera_vec),
-			v.x, v.y, v.z, -gm_vec4_dot(v, world_to_camera_vec),
-			w.x, w.y, w.z, -gm_vec4_dot(w, world_to_camera_vec),
-			0.0f, 0.0f, 0.0f, 1.0f
-	};
+  mat4 rotation = quaternion_get_matrix(&f);
+  camera->view_matrix = gm_mat4_multiply(&rotation, &trans);
 }
-
 
 static void recalculate_projection_matrix(Perspective_Camera* camera)
 {
@@ -78,23 +47,14 @@ static void recalculate_projection_matrix(Perspective_Camera* camera)
 	camera->projection_matrix = gm_mat4_scalar_product(-1, &mp);
 }
 
-static void recalculate_view(Perspective_Camera* camera)
-{
-	camera->view.x = sinf(camera->pitch) * sinf(camera->yaw);
-	camera->view.y = cosf(camera->yaw);
-	camera->view.z = cosf(camera->pitch) * sinf(camera->yaw);
-	camera->view.w = 0.0f;
-}
-
-void camera_init(Perspective_Camera* camera, vec4 position, vec4 up, vec4 view, r32 near_plane, r32 far_plane, r32 fov)
+void camera_init(Perspective_Camera* camera, vec4 position, r32 near_plane, r32 far_plane, r32 fov)
 {
 	camera->position = position;
-	camera->up = up;
-	camera->view = view;
 	camera->near_plane = near_plane;
 	camera->far_plane = far_plane;
 	camera->fov = fov;
-	recalculate_angles(camera);
+	camera->rotation = (Quaternion) {0.0f, 0.0f, 0.0f, 1.0f};
+  camera->yrotation = (Quaternion) {0.0f, 0.0f, 0.0f, 1.0f};
 	recalculate_view_matrix(camera);
 	recalculate_projection_matrix(camera);
 }
@@ -102,19 +62,6 @@ void camera_init(Perspective_Camera* camera, vec4 position, vec4 up, vec4 view, 
 void camera_set_position(Perspective_Camera* camera, vec4 position)
 {
 	camera->position = position;
-	recalculate_view_matrix(camera);
-}
-
-void camera_set_up(Perspective_Camera* camera, vec4 up)
-{
-	camera->up = up;
-	recalculate_view_matrix(camera);
-}
-
-void camera_set_view(Perspective_Camera* camera, vec4 view)
-{
-	camera->view = view;
-	recalculate_angles(camera);
 	recalculate_view_matrix(camera);
 }
 
@@ -130,20 +77,68 @@ void camera_set_far_plane(Perspective_Camera* camera, r32 far_plane)
 	recalculate_projection_matrix(camera);
 }
 
-void camera_inc_pitch(Perspective_Camera* camera, r32 angle)
+void camera_rotate_x(Perspective_Camera* camera, r32 x_difference)
 {
-	camera->pitch += angle;
-	truncate_angles(camera);
-	recalculate_view(camera);
-	recalculate_view_matrix(camera);
+  Quaternion y_axis = quaternion_new((vec3) { 0.0f, 1.0f, 0.0f }, x_difference);
+  camera->yrotation = quaternion_product(&y_axis, &camera->yrotation);
+  quaternion_normalize(&camera->yrotation);
+  recalculate_view_matrix(camera);
 }
 
-void camera_inc_yaw(Perspective_Camera* camera, r32 angle)
+void camera_rotate_y(Perspective_Camera* camera, r32 y_difference)
 {
-	camera->yaw += angle;
-	truncate_angles(camera);
-	recalculate_view(camera);
-	recalculate_view_matrix(camera);
+  vec3 right = quaternion_get_right_inverted(&camera->rotation);
+  right = gm_vec3_normalize(right);
+  Quaternion x_axis = quaternion_new(right, y_difference);
+  camera->rotation = quaternion_product(&camera->rotation, &x_axis);
+  quaternion_normalize(&camera->rotation);
+  recalculate_view_matrix(camera);
+}
+
+void camera_move_forward(Perspective_Camera* camera, r32 amount)
+{
+  Quaternion f = quaternion_product(&camera->rotation, &camera->yrotation);
+
+  vec3 forward = quaternion_get_forward_inverted(&f);
+  forward = gm_vec3_scalar_product(amount, gm_vec3_normalize(forward));
+  camera->position = gm_vec4_add((vec4) {-forward.x, -forward.y, -forward.z, 0.0}, camera->position);
+
+  recalculate_view_matrix(camera);
+}
+
+void camera_move_right(Perspective_Camera* camera, r32 amount)
+{
+  Quaternion f = quaternion_product(&camera->rotation, &camera->yrotation);
+
+  vec3 right = quaternion_get_right_inverted(&f);
+  right = gm_vec3_scalar_product(amount, gm_vec3_normalize(right));
+  camera->position = gm_vec4_add((vec4) {right.x, right.y, right.z, 0.0}, camera->position);
+
+  recalculate_view_matrix(camera);
+}
+
+vec3 camera_get_x_axis(const Perspective_Camera* camera)
+{
+  Quaternion q = quaternion_product(&camera->rotation, &camera->yrotation);
+  vec3 right = quaternion_get_right_inverted(&q);
+  right = gm_vec3_normalize(right);
+  return (vec3) {right.x, right.y, right.z};
+}
+
+vec3 camera_get_y_axis(const Perspective_Camera* camera)
+{
+  Quaternion q = quaternion_product(&camera->rotation, &camera->yrotation);
+  vec3 up = quaternion_get_up_inverted(&q);
+  up = gm_vec3_normalize(up);
+  return (vec3) {up.x, up.y, up.z};
+}
+
+vec3 camera_get_z_axis(const Perspective_Camera* camera)
+{
+  Quaternion q = quaternion_product(&camera->rotation, &camera->yrotation);
+  vec3 forward = quaternion_get_forward_inverted(&q);
+  forward = gm_vec3_normalize(forward);
+  return (vec3) {forward.x, forward.y, forward.z};
 }
 
 void camera_set_fov(Perspective_Camera* camera, r32 fov)

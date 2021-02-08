@@ -1,4 +1,5 @@
 #ifndef BASIC_ENGINE_QUATERNION_H
+#define BASIC_ENGINE_QUATERNION_H
 #include "common.h"
 #include "gm.h"
 
