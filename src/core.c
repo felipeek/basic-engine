@@ -16,12 +16,14 @@ static Shader phong_shader;
 static Perspective_Camera camera;
 static Light* lights;
 static Entity e;
-static vec3* bezier_points;
 static Render_Primitives_Context rpc;
 
 // Animation
-static boolean is_animating = false;
+static vec3* bezier_points;
+static Bezier_Curve bezier_curve;
+static boolean is_animating = false, ensure_constant_speed = false, use_frenet_frames = false;
 static r32 t_animation = 0.0f;
+static r32 animation_speed;
 
 static Perspective_Camera create_camera()
 {
@@ -58,12 +60,24 @@ static void menu_bezier_points_callback(u32 number_of_points, vec3* points)
 	}
 }
 
-static void menu_animate_callback(boolean ensure_constant_speed, boolean use_frenet_frames)
+static void menu_animate_callback(r32 speed, boolean _ensure_constant_speed, boolean _use_frenet_frames)
 {
 	char buffer[64];
 
-	is_animating = true;
-	t_animation = 0;
+	if (array_get_length(bezier_points) > 1)
+	{
+		if (is_animating)
+		{
+			animation_destroy_bezier_curve(&bezier_curve);
+		}
+
+		is_animating = true;
+		t_animation = 0;
+		animation_speed = speed;
+		ensure_constant_speed = _ensure_constant_speed;
+		use_frenet_frames = _use_frenet_frames;
+		animation_create_bezier_curve(&bezier_curve, bezier_points);
+	}
 }
 
 int core_init()
@@ -76,7 +90,7 @@ int core_init()
 	lights = create_lights();
 
 	Mesh m = graphics_mesh_create_from_obj_with_color("./res/cow.obj", 0, (vec4){1.0f, 0.0f, 0.0f, 0.0f});
-	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){1.0f, 1.0f, 1.0f});
+	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){0.1f, 0.1f, 0.1f});
 
 	menu_register_bezier_points_callback(menu_bezier_points_callback);
 	menu_register_animate_callback(menu_animate_callback);
@@ -94,15 +108,19 @@ void core_destroy()
 
 void core_update(r32 delta_time)
 {
-	static r32 ANIMATION_SPEED_FACTOR = 1.0f;
-
 	if (is_animating)
 	{
-		vec3 point_in_curve = animation_get_point_in_bezier_curve(array_get_length(bezier_points), bezier_points, t_animation);
+		t_animation += animation_speed * delta_time * (1.0f / bezier_curve.total_arc_length), 1.0f;
+		if (t_animation > 1.0f) t_animation = 1.0f;
+
+		r32 t = ensure_constant_speed ? animation_get_curve_parameter_from_desired_distance(&bezier_curve, t_animation) : t_animation;
+		vec3 point_in_curve = animation_get_point_in_bezier_curve(&bezier_curve, t);
 		graphics_entity_set_position(&e, (vec4){ point_in_curve.x, point_in_curve.y, point_in_curve.z, 1.0f });
-		t_animation += ANIMATION_SPEED_FACTOR * delta_time;
 		if (t_animation >= 1.0f)
+		{
 			is_animating = false;
+			animation_destroy_bezier_curve(&bezier_curve);
+		}
 	}
 }
 

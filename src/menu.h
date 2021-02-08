@@ -5,7 +5,7 @@
 #include "graphics.h"
 
 typedef void (*Bezier_Points_Callback)(u32, vec3*);
-typedef void (*Animate_Callback)(boolean, boolean);
+typedef void (*Animate_Callback)(r32, boolean, boolean);
 
 void menu_register_bezier_points_callback(Bezier_Points_Callback f);
 void menu_register_animate_callback(Animate_Callback f);

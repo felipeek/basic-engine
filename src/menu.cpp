@@ -20,7 +20,7 @@ typedef struct {
 } vec3;
 
 typedef void (*Bezier_Points_Callback)(u32, vec3*);
-typedef void (*Animate_Callback)(boolean, boolean);
+typedef void (*Animate_Callback)(r32, boolean, boolean);
 
 static Bezier_Points_Callback bezier_points_callback;
 static Animate_Callback animate_callback;
@@ -100,7 +100,7 @@ static void draw_main_window()
 
 		for (u32 i = 0; i < number_of_points; ++i) {
 			sprintf(buffer, "Point %u", i);
-			if (ImGui::DragFloat3(buffer, (r32*)&point_locations[i], 0.1f, -FLT_MAX, FLT_MAX, "%.3f", 1.0f))
+			if (ImGui::DragFloat3(buffer, (r32*)&point_locations[i], 0.1f, -FLT_MAX, FLT_MAX, "%.3f"))
 			{
 				bezier_points_callback(number_of_points, point_locations);
 			}
@@ -108,12 +108,14 @@ static void draw_main_window()
 	}
 
 	static bool ensure_constant_speed, use_frenet_frames;
+	static r32 speed = 1.0f;
+	ImGui::DragFloat("Speed", &speed, 0.01f, 0.0f, FLT_MAX, "%.3f");
 	ImGui::Checkbox("Ensure Constant Speed", &ensure_constant_speed);
 	ImGui::Checkbox("Use Frenet Frames", &use_frenet_frames);
 
 	if (ImGui::Button("Animate"))
 	{
-		animate_callback(ensure_constant_speed, use_frenet_frames);
+		animate_callback(speed, ensure_constant_speed, use_frenet_frames);
 	}
 
 	ImGui::End();
