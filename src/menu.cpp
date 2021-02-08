@@ -13,14 +13,19 @@
 
 #define GLSL_VERSION "#version 330"
 #define MENU_TITLE "Basic Engine"
+#define MAX_NUM_BEZIER_POINTS 64
 
-typedef void (*Dummy_Callback)();
+typedef struct {
+	float x, y, z;
+} vec3;
 
-static Dummy_Callback dummy_callback;
+typedef void (*Bezier_Points_Callback)(u32, vec3*);
 
-extern "C" void menu_register_dummy_callback(Dummy_Callback f)
+static Bezier_Points_Callback bezier_points_callback;
+
+extern "C" void menu_register_bezier_points_callback(Bezier_Points_Callback f)
 {
-	dummy_callback = f;
+	bezier_points_callback = f;
 }
 
 extern "C" void menu_char_click_process(GLFWwindow* window, u32 c)
@@ -67,11 +72,31 @@ static void draw_main_window()
 		return;
 	}
 
-	if (ImGui::Button("Dummy"))
+	if (ImGui::CollapsingHeader("Bezier Points", 0))
 	{
-		if (dummy_callback)
+		static u32 number_of_points = 1;
+		static vec3 point_locations[MAX_NUM_BEZIER_POINTS];
+		char buffer[64];
+
+		if (ImGui::Button("+"))
 		{
-			dummy_callback();
+			if (number_of_points < MAX_NUM_BEZIER_POINTS)
+				++number_of_points;
+		}
+
+		ImGui::SameLine(0.0f, -1.0f);
+		if (ImGui::Button("-"))
+		{
+			if (number_of_points > 1)
+				--number_of_points;
+		}
+
+		for (u32 i = 0; i < number_of_points; ++i) {
+			sprintf(buffer, "Point %u", i);
+			if (ImGui::DragFloat3(buffer, (r32*)&point_locations[i], 0.1f, -FLT_MAX, FLT_MAX, "%.3f", 1.0f))
+			{
+				bezier_points_callback(number_of_points, point_locations);
+			}
 		}
 	}
 

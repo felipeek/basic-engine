@@ -15,11 +15,13 @@ static Shader phong_shader;
 static Perspective_Camera camera;
 static Light* lights;
 static Entity e;
+static vec3* bezier_points;
+static Render_Primitives_Context rpc;
 
 static Perspective_Camera create_camera()
 {
 	Perspective_Camera camera;
-	vec4 camera_position =(vec4) {0.0f, 0.0f, 1.0f, 1.0f};
+	vec4 camera_position =(vec4) {0.0f, 0.0f, 10.0f, 1.0f};
 	r32 camera_near_plane = -0.01f;
 	r32 camera_far_plane = -1000.0f;
 	r32 camera_fov = 45.0f;
@@ -42,9 +44,13 @@ static Light* create_lights()
 	return lights;
 }
 
-static void menu_dummy_callback()
+static void menu_bezier_points_callback(u32 number_of_points, vec3* points)
 {
-	printf("dummy callback called!\n");
+	array_clear(bezier_points);
+	for (u32 i = 0; i < number_of_points; ++i)
+	{
+		array_push(bezier_points, &points[i]);
+	}
 }
 
 int core_init()
@@ -59,7 +65,10 @@ int core_init()
 	Mesh m = graphics_mesh_create_from_obj_with_color("./res/cow.obj", 0, (vec4){1.0f, 0.0f, 0.0f, 0.0f});
 	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){1.0f, 1.0f, 1.0f});
 
-	menu_register_dummy_callback(menu_dummy_callback);
+	menu_register_bezier_points_callback(menu_bezier_points_callback);
+
+	bezier_points = array_create(vec3, 1);
+	graphics_renderer_primitives_init(&rpc);
 
 	return 0;
 }
@@ -77,6 +86,17 @@ void core_update(r32 delta_time)
 void core_render()
 {
 	graphics_entity_render_phong_shader(phong_shader, &camera, &e, lights);
+
+	for (s32 i = 0; i < array_get_length(bezier_points); ++i)
+	{
+		graphics_renderer_debug_points(&rpc, &bezier_points[i], 1, (vec4){0.0f, 1.0f, 0.0f, 1.0f});
+		if (i > 0)
+		{
+			graphics_renderer_debug_vector(&rpc, bezier_points[i - 1], bezier_points[i], (vec4){0.0f, 0.8f, 0.8f, 1.0f});
+		}
+	}
+
+	graphics_renderer_primitives_flush(&rpc, &camera);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)

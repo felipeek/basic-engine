@@ -1,11 +1,12 @@
-#ifndef GIMMESH_MENU_H
-#define GIMMESH_MENU_H
+#ifndef BASIC_ENGINE_MENU_H
+#define BASIC_ENGINE_MENU_H
 #include <GLFW/glfw3.h>
 #include "common.h"
+#include "graphics.h"
 
-typedef void (*Dummy_Callback)();
+typedef void (*Bezier_Points_Callback)(u32, vec3*);
 
-void menu_register_dummy_callback(Dummy_Callback f);
+void menu_register_bezier_points_callback(Bezier_Points_Callback f);
 void menu_char_click_process(GLFWwindow* window, u32 c);
 void menu_key_click_process(GLFWwindow* window, s32 key, s32 scan_code, s32 action, s32 mods);
 void menu_mouse_click_process(GLFWwindow* window, s32 button, s32 action, s32 mods);
