@@ -28,6 +28,13 @@ extern "C" int obj_parse(const char* obj_path, Vertex** vertices, u32** indexes)
 	*vertices = array_create(Vertex, 1);
 	*indexes = array_create(u32, 1);
 
+	bool generate_normals = attrib.normals.size() == 0;
+
+	if (generate_normals)
+		printf("normals not found in model.. will be generated\n");
+	else
+		printf("normals are present in model\n");
+
 	// For now, we are not re-using vertices, i.e., our indices are 0 1 2 3 4 5 6 7...
 	// This is because tinyobj loads the object in such a way that the position, tex coords and normals are completely independent
 	// vectors (just like in the obj file)
@@ -76,7 +83,8 @@ extern "C" int obj_parse(const char* obj_path, Vertex** vertices, u32** indexes)
 			v[2].position.z = attrib.vertices[3 * f2 + 2];
 			v[2].position.w = 1.0f;
 
-			if (attrib.normals.size() > 0) {
+			if (!generate_normals)
+			{
 				int nf0 = idx0.normal_index;
 				int nf1 = idx1.normal_index;
 				int nf2 = idx2.normal_index;
@@ -94,9 +102,51 @@ extern "C" int obj_parse(const char* obj_path, Vertex** vertices, u32** indexes)
 				v[2].normal.z = attrib.normals[3 * nf2 + 2];
 				v[2].normal.w = 0.0f;
 			}
+			else
+			{
+				v[0].normal = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
+				v[1].normal = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
+				v[2].normal = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
+			}
+
 			array_push(*vertices, &v[0]);
 			array_push(*vertices, &v[1]);
 			array_push(*vertices, &v[2]);
+		}
+	}
+
+	if (generate_normals)
+	{
+		// Calculate normals
+		size_t indexes_length = array_get_length(*indexes);
+
+		for (size_t i = 0; i < indexes_length; i += 3)
+		{
+			Vertex* vertex_a, *vertex_b, *vertex_c;
+			unsigned int i1 = (*indexes)[i + 0];
+			unsigned int i2 = (*indexes)[i + 1];
+			unsigned int i3 = (*indexes)[i + 2];
+
+			// Find vertices
+			vertex_a = *vertices + i1;
+			vertex_b = *vertices + i2;
+			vertex_c = *vertices + i3;
+
+			// Manually calculate triangle's normal
+			vec3 A = (vec3) {vertex_a->position.x, vertex_a->position.y, vertex_a->position.z};
+			vec3 B = (vec3) {vertex_b->position.x, vertex_b->position.y, vertex_b->position.z};
+			vec3 C = (vec3) {vertex_c->position.x, vertex_c->position.y, vertex_c->position.z};
+			vec3 first_edge = (vec3){B.x - A.x, B.y - A.y, B.z - A.z};
+			vec3 second_edge = (vec3){C.x - A.x, C.y - A.y, C.z - A.z};
+			vec4 normal;
+			normal.x = first_edge.y * second_edge.z - first_edge.z * second_edge.y;
+			normal.y = first_edge.z * second_edge.x - first_edge.x * second_edge.z;
+			normal.z = first_edge.x * second_edge.y - first_edge.y * second_edge.x;
+
+			// Assign normals
+			vertex_a->normal = (vec4){vertex_a->normal.x + normal.x, vertex_a->normal.y + normal.y, vertex_a->normal.z + normal.z};
+			vertex_b->normal = (vec4){vertex_b->normal.x + normal.x, vertex_b->normal.y + normal.y, vertex_b->normal.z + normal.z};
+			vertex_c->normal = (vec4){vertex_c->normal.x + normal.x, vertex_c->normal.y + normal.y, vertex_c->normal.z + normal.z};
 		}
 	}
 
