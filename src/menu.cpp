@@ -20,7 +20,7 @@ typedef struct {
 } vec3;
 
 typedef void (*Bezier_Points_Callback)(u32, vec3*);
-typedef void (*Animate_Callback)(r32, boolean, boolean);
+typedef void (*Animate_Callback)(r32, boolean, boolean, boolean, s32);
 
 static Bezier_Points_Callback bezier_points_callback;
 static Animate_Callback animate_callback;
@@ -107,15 +107,25 @@ static void draw_main_window()
 		}
 	}
 
-	static bool ensure_constant_speed, use_frenet_frames;
+	static bool ensure_constant_speed, use_frenet_frames, manually_define_adaptive_subdivision_iterations = 0;
 	static r32 speed = 1.0f;
+	static s32 adaptive_subdivision_iterations = 5;
 	ImGui::DragFloat("Speed", &speed, 0.01f, 0.0f, FLT_MAX, "%.3f");
 	ImGui::Checkbox("Ensure Constant Speed", &ensure_constant_speed);
+	if (ensure_constant_speed)
+	{
+		ImGui::Checkbox("Manually define adaptive subdivision iterations", &manually_define_adaptive_subdivision_iterations);
+		if (manually_define_adaptive_subdivision_iterations)
+		{
+			ImGui::DragInt("Number of Iterations", &adaptive_subdivision_iterations, 0.1f, 1, 15);
+		}
+	}
 	ImGui::Checkbox("Use Frenet Frames", &use_frenet_frames);
 
 	if (ImGui::Button("Animate"))
 	{
-		animate_callback(speed, ensure_constant_speed, use_frenet_frames);
+		animate_callback(speed, ensure_constant_speed, use_frenet_frames,
+			manually_define_adaptive_subdivision_iterations, adaptive_subdivision_iterations);
 	}
 
 	ImGui::End();

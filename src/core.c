@@ -60,11 +60,12 @@ static void menu_bezier_points_callback(u32 number_of_points, vec3* points)
 	}
 }
 
-static void menu_animate_callback(r32 speed, boolean _ensure_constant_speed, boolean _use_frenet_frames)
+static void menu_animate_callback(r32 speed, boolean _ensure_constant_speed, boolean _use_frenet_frames,
+	boolean manually_define_adaptive_subdivision_iterations, s32 adaptive_subdivision_iterations)
 {
 	char buffer[64];
 
-	if (array_get_length(bezier_points) > 1)
+	if (array_get_length(bezier_points) > 2)
 	{
 		if (is_animating)
 		{
@@ -78,7 +79,8 @@ static void menu_animate_callback(r32 speed, boolean _ensure_constant_speed, boo
 		animation_speed = speed;
 		ensure_constant_speed = _ensure_constant_speed;
 		use_frenet_frames = _use_frenet_frames;
-		animation_create_bezier_curve(&bezier_curve, bezier_points);
+		animation_create_bezier_curve(&bezier_curve, bezier_points,
+			manually_define_adaptive_subdivision_iterations, adaptive_subdivision_iterations);
 		first_derivate = animation_derivate_bezier_curve(&bezier_curve);
 		second_derivate = animation_derivate_bezier_curve(&first_derivate);
 	}

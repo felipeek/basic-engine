@@ -6,7 +6,8 @@
 #define MAX_NUMBER_OF_POINTS 64
 
 // Calculate the arc lengths of several fragments of the curve
-static r32* calculate_arc_lengths(Bezier_Curve* bezier_curve)
+static r32* calculate_arc_lengths(Bezier_Curve* bezier_curve, boolean manually_define_adaptive_subdivision_iterations,
+	s32 adaptive_subdivision_iterations)
 {
 	const r32 ERROR_THRESHOLD = 0.0001f;
 	r32* arc_lengths = array_create(r32, bezier_curve->number_of_points);
@@ -58,8 +59,16 @@ static r32* calculate_arc_lengths(Bezier_Curve* bezier_curve)
 				need_to_subdivide_more = true;
 		}
 
-		if (!need_to_subdivide_more)
-			break;
+		if (manually_define_adaptive_subdivision_iterations)
+		{
+			if (--adaptive_subdivision_iterations == 0)
+				break;
+		}
+		else
+		{
+			if (!need_to_subdivide_more)
+				break;
+		}
 
 		// Need to subdivide again
 		num_samples *= 2;
@@ -88,16 +97,18 @@ Bezier_Curve animation_derivate_bezier_curve(const Bezier_Curve* bezier_curve)
 	}
 
 	Bezier_Curve derivated_curve;
-	animation_create_bezier_curve(&derivated_curve, points);
+	animation_create_bezier_curve(&derivated_curve, points, 1, 1);
 	return derivated_curve;
 }
 
 
-void animation_create_bezier_curve(Bezier_Curve* bezier_curve, vec3* points)
+void animation_create_bezier_curve(Bezier_Curve* bezier_curve, vec3* points,
+	boolean manually_define_adaptive_subdivision_iterations, s32 adaptive_subdivision_iterations)
 {
 	bezier_curve->number_of_points = array_get_length(points);
 	bezier_curve->points = points;
-	bezier_curve->arc_lengths = calculate_arc_lengths(bezier_curve);
+	bezier_curve->arc_lengths = calculate_arc_lengths(bezier_curve,
+		manually_define_adaptive_subdivision_iterations, adaptive_subdivision_iterations);
 
 	bezier_curve->total_arc_length = 0.0f;
 	for (u32 i = 0; i < array_get_length(bezier_curve->arc_lengths); ++i)
