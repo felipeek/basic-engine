@@ -140,11 +140,11 @@ void core_render()
 
 	for (s32 i = 0; i < array_get_length(bezier_points); ++i)
 	{
-		graphics_renderer_debug_points(&rpc, &bezier_points[i], 1, (vec4){0.0f, 1.0f, 0.0f, 1.0f});
+		graphics_renderer_debug_points(&rpc, &bezier_points[i], 1, (vec4){0.0f, 0.0f, 0.0f, 1.0f});
 
 		if (i > 0)
 		{
-			graphics_renderer_debug_vector(&rpc, bezier_points[i - 1], bezier_points[i], (vec4){0.0f, 0.8f, 0.8f, 1.0f});
+			graphics_renderer_debug_vector(&rpc, bezier_points[i - 1], bezier_points[i], (vec4){0.0f, 0.0f, 0.0f, 1.0f});
 		}
 	}
 

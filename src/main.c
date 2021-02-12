@@ -135,7 +135,7 @@ s32 main(s32 argc, s8** argv)
 	while (!glfwWindowShouldClose(main_window))
 	{
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glClearColor(0.2074f, 0.3168f, 0.3615f, 1.0f);
+		glClearColor(0.0f / 255.0f, 186.0f / 255.0f, 255.0f / 255.0f, 1.0f);
 
 		core_update(delta_time);
 		core_render();
