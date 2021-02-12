@@ -41,6 +41,7 @@ typedef struct
 	Mesh mesh;
 	vec4 world_position;
 	Quaternion world_rotation;
+	mat4 world_rotation_tmp;
 	vec3 world_scale;
 	mat4 model_matrix;
 } Entity;

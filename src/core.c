@@ -20,7 +20,7 @@ static Render_Primitives_Context rpc;
 
 // Animation
 static vec3* bezier_points;
-static Bezier_Curve bezier_curve;
+static Bezier_Curve bezier_curve, first_derivate, second_derivate;
 static boolean is_animating = false, ensure_constant_speed = false, use_frenet_frames = false;
 static r32 t_animation = 0.0f;
 static r32 animation_speed;
@@ -69,6 +69,8 @@ static void menu_animate_callback(r32 speed, boolean _ensure_constant_speed, boo
 		if (is_animating)
 		{
 			animation_destroy_bezier_curve(&bezier_curve);
+			animation_destroy_bezier_curve(&first_derivate);
+			animation_destroy_bezier_curve(&second_derivate);
 		}
 
 		is_animating = true;
@@ -77,6 +79,8 @@ static void menu_animate_callback(r32 speed, boolean _ensure_constant_speed, boo
 		ensure_constant_speed = _ensure_constant_speed;
 		use_frenet_frames = _use_frenet_frames;
 		animation_create_bezier_curve(&bezier_curve, bezier_points);
+		first_derivate = animation_derivate_bezier_curve(&bezier_curve);
+		second_derivate = animation_derivate_bezier_curve(&first_derivate);
 	}
 }
 
@@ -116,6 +120,9 @@ void core_update(r32 delta_time)
 		r32 t = ensure_constant_speed ? animation_get_curve_parameter_from_desired_distance(&bezier_curve, t_animation) : t_animation;
 		vec3 point_in_curve = animation_get_point_in_bezier_curve(&bezier_curve, t);
 		graphics_entity_set_position(&e, (vec4){ point_in_curve.x, point_in_curve.y, point_in_curve.z, 1.0f });
+		if (use_frenet_frames)
+			graphics_entity_set_rotation(&e, animation_get_orientation_for_path(&bezier_curve, t, &first_derivate, &second_derivate));
+
 		if (t_animation >= 1.0f)
 		{
 			is_animating = false;

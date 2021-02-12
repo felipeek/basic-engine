@@ -8,7 +8,7 @@
 // Calculate the arc lengths of several fragments of the curve
 static r32* calculate_arc_lengths(Bezier_Curve* bezier_curve)
 {
-	const r32 ERROR_THRESHOLD = 0.001f;
+	const r32 ERROR_THRESHOLD = 0.0001f;
 	r32* arc_lengths = array_create(r32, bezier_curve->number_of_points);
 	r32* arc_lengths_buffer = array_create(r32, bezier_curve->number_of_points);
 
@@ -75,6 +75,24 @@ static r32* calculate_arc_lengths(Bezier_Curve* bezier_curve)
 	return arc_lengths;
 }
 
+// generates a new curve, which is the first order derivate of the received curve
+Bezier_Curve animation_derivate_bezier_curve(const Bezier_Curve* bezier_curve)
+{
+	u32 number_of_points = bezier_curve->number_of_points - 1;
+	vec3* points = array_create(vec3, number_of_points);
+	for (u32 i = 0; i < number_of_points; ++i) {
+		// found reference in https://pages.mtu.edu/~shene/COURSES/cs3621/NOTES/spline/Bezier/bezier-der.html
+		vec3 p = gm_vec3_scalar_product(number_of_points,
+			gm_vec3_subtract(bezier_curve->points[i + 1], bezier_curve->points[i]));
+		array_push(points, &p);
+	}
+
+	Bezier_Curve derivated_curve;
+	animation_create_bezier_curve(&derivated_curve, points);
+	return derivated_curve;
+}
+
+
 void animation_create_bezier_curve(Bezier_Curve* bezier_curve, vec3* points)
 {
 	bezier_curve->number_of_points = array_get_length(points);
@@ -93,7 +111,7 @@ void animation_destroy_bezier_curve(Bezier_Curve* bezier_curve)
 	array_release(bezier_curve->arc_lengths);
 }
 
-vec3 animation_get_point_in_bezier_curve(Bezier_Curve* bezier_curve, r32 t)
+vec3 animation_get_point_in_bezier_curve(const Bezier_Curve* bezier_curve, r32 t)
 {
 	vec3 generated_points[MAX_NUMBER_OF_POINTS];
 
@@ -146,4 +164,30 @@ r32 animation_get_curve_parameter_from_desired_distance(Bezier_Curve* bezier_cur
 	}
 
 	assert(0);
+}
+
+// Use Frenet Frames to get the orientation to follow the path
+Quaternion animation_get_orientation_for_path(const Bezier_Curve* bezier_curve, r32 t, const Bezier_Curve* first_derivate,
+	const Bezier_Curve* second_derivate)
+{
+	vec3 first_derivate_point = animation_get_point_in_bezier_curve(first_derivate, t);
+	vec3 second_derivate_point = animation_get_point_in_bezier_curve(second_derivate, t);
+	vec3 tangent = gm_vec3_normalize(first_derivate_point);
+
+	// suggested in the class slide, but it doesnt seem to work because it is not orthogonal to the tangent vector
+	//vec3 normal = gm_vec3_normalize(second_derivate_point);	
+
+	vec3 normal = gm_vec3_normalize(gm_vec3_cross(first_derivate_point, gm_vec3_cross(second_derivate_point, first_derivate_point)));
+	//vec3 normal = gm_vec3_normalize(gm_vec3_cross(second_derivate_point, first_derivate_point));
+
+	vec3 binormal = gm_vec3_normalize(gm_vec3_cross(tangent, normal));
+
+	mat4 rotation_matrix = (mat4) {
+		tangent.x, normal.x, binormal.x, 0.0f,
+		tangent.y, normal.y, binormal.y, 0.0f,
+		tangent.z, normal.z, binormal.z, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	};
+
+	return quaternion_from_matrix(&rotation_matrix);
 }
