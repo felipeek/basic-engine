@@ -10,7 +10,6 @@
 
 #define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
 #define PHONG_FRAGMENT_SHADER_PATH "./shaders/phong_shader.fs"
-#define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
 static Shader phong_shader;
 static Perspective_Camera camera;
@@ -28,7 +27,7 @@ static r32 animation_speed;
 static Perspective_Camera create_camera()
 {
 	Perspective_Camera camera;
-	vec4 camera_position =(vec4) {0.0f, 0.0f, 10.0f, 1.0f};
+	vec4 camera_position =(vec4) {0.0f, 0.0f, 20.0f, 1.0f};
 	r32 camera_near_plane = -0.01f;
 	r32 camera_far_plane = -1000.0f;
 	r32 camera_fov = 45.0f;
@@ -95,8 +94,9 @@ int core_init()
 	// Create light
 	lights = create_lights();
 
-	Mesh m = graphics_mesh_create_from_obj_with_color("./res/cow.obj", 0, (vec4){1.0f, 0.0f, 0.0f, 0.0f});
-	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){0.1f, 0.1f, 0.1f});
+	u32 tex = graphics_texture_create("./res/plane_texture.png");
+	Mesh m = graphics_mesh_create_from_obj_with_texture("./res/plane.obj", 0, tex);
+	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){1.0f, 1.0f, 1.0f});
 
 	menu_register_bezier_points_callback(menu_bezier_points_callback);
 	menu_register_animate_callback(menu_animate_callback);
@@ -135,6 +135,7 @@ void core_update(r32 delta_time)
 
 void core_render()
 {
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	graphics_entity_render_phong_shader(phong_shader, &camera, &e, lights);
 
 	for (s32 i = 0; i < array_get_length(bezier_points); ++i)
@@ -152,7 +153,7 @@ void core_render()
 
 void core_input_process(boolean* key_state, r32 delta_time)
 {
-	r32 movement_speed = 3.0f;
+	r32 movement_speed = 15.0f;
 	r32 rotation_speed = 300.0f;
 
 	if (key_state[GLFW_KEY_LEFT_SHIFT])

@@ -433,8 +433,8 @@ u32 graphics_texture_create_from_data(const Image_Data* image_data)
 
 	glGenerateMipmap(GL_TEXTURE_2D);
 
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
 	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
@@ -565,6 +565,7 @@ Mesh graphics_mesh_create_from_obj_with_color(const s8* obj_path, Normal_Mapping
 	Vertex* vertices;
 	u32* indexes;
 	obj_parse(obj_path, &vertices, &indexes);
+
 	Mesh m = graphics_mesh_create_with_color(vertices, array_get_length(vertices), indexes, array_get_length(indexes), normal_info, diffuse_color);
 	array_release(vertices);
 	array_release(indexes);
