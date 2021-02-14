@@ -182,5 +182,5 @@ void core_scroll_change_process(r64 x_offset, r64 y_offset)
 
 void core_window_resize_process(s32 width, s32 height)
 {
-
+	camera_force_matrix_recalculation(&camera);
 }
