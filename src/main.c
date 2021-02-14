@@ -76,6 +76,7 @@ static void glfw_resize_callback(GLFWwindow* window, s32 width, s32 height)
 {
 	window_width = width;
 	window_height = height;
+	printf("width: %d, height: %d\n", width, height);
 	glViewport(0, 0, width, height);
 	core_window_resize_process(width, height);
 }
@@ -101,7 +102,7 @@ static GLFWwindow* init_glfw()
 	glfwSetCursorPosCallback(window, glfw_cursor_callback);
 	glfwSetMouseButtonCallback(window, glfw_mouse_button_callback);
 	glfwSetScrollCallback(window, glfw_scroll_callback);
-	glfwSetWindowSizeCallback(window, glfw_resize_callback);
+	glfwSetFramebufferSizeCallback(window, glfw_resize_callback);
 	glfwSetCharCallback(window, glfw_char_callback);
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 

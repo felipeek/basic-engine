@@ -13,10 +13,11 @@
 #define BASIC_FRAGMENT_SHADER_PATH "./shaders/basic_shader.fs"
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
-static Shader pbr_shader, basic_shader;
+static Shader pbr_shader, basic_shader, equirectangular_to_cube_shader;
 static Perspective_Camera camera;
 static Light* lights;
 static Entity e, light_entity;
+static u32 cube_map_tex;
 
 static Perspective_Camera create_camera()
 {
@@ -69,6 +70,9 @@ int core_init()
 	u32 normal = graphics_texture_create("./res/rustediron2_normal.png");
 	Mesh m = graphics_mesh_create_from_obj_with_texture("./res/sphere.obj", normal, albedo, metallic, roughness);
 	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){0.1f, 0.1f, 0.1f});
+
+	u32 equirectangular_map = graphics_texture_create("./res/newport_loft.hdr");
+	cube_map_tex = graphics_generate_cube_map_from_equirectangular_map(equirectangular_map);
 
 #if 0
 	/* NORMALS TEST */
@@ -137,6 +141,7 @@ void core_render()
 {
 	graphics_entity_render_pbr_shader(pbr_shader, &camera, &e, lights);
 	graphics_entity_render_basic_shader(basic_shader, &camera, &light_entity);
+	//graphics_render_skybox(cube_map_tex, &camera);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)

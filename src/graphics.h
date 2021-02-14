@@ -111,5 +111,7 @@ u32 graphics_texture_create_from_float_data(const Float_Image_Data* image_data);
 void graphics_texture_delete(u32 texture_id);
 Float_Image_Data graphics_image_data_to_float_image_data(Image_Data* image_data, r32* memory);
 Image_Data graphics_float_image_data_to_image_data(const Float_Image_Data* float_image_Data, u8* memory);
+u32 graphics_generate_cube_map_from_equirectangular_map(u32 equirectangular_map);
+void graphics_render_skybox(u32 skybox_texture, const Perspective_Camera* camera);
 
 #endif

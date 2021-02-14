@@ -21,16 +21,16 @@ Image_Data graphics_image_load(const s8* image_path)
 
 Float_Image_Data graphics_float_image_load(const s8* image_path)
 {
-	Image_Data image_data;
+	Float_Image_Data fid;
 
 	stbi_set_flip_vertically_on_load(1);
-	image_data.data = stbi_load(image_path, &image_data.width, &image_data.height, &image_data.channels, 4);
+	fid.data = stbi_loadf(image_path, &fid.width, &fid.height, &fid.channels, 0);
 
-	image_data.channels = 4;	// @temporary
+	//image_data.channels = 4;	// @temporary
 
-	Float_Image_Data fid = graphics_image_data_to_float_image_data(&image_data, 0);
+	//Float_Image_Data fid = graphics_image_data_to_float_image_data(&image_data, 0);
 
-	graphics_image_free(&image_data);
+	//graphics_image_free(&image_data);
 
 	return fid;
 }
@@ -461,6 +461,219 @@ void graphics_entity_render_pbr_shader(Shader shader, const Perspective_Camera* 
 	glUseProgram(0);
 }
 
+u32 graphics_texture_create_cube_map()
+{
+	unsigned int env_cube_map;
+	glGenTextures(1, &env_cube_map);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map);
+	for (unsigned int i = 0; i < 6; ++i)
+	{
+		// note that we store each face with 16 bit floating point values
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 
+					512, 512, 0, GL_RGB, GL_FLOAT, 0);
+	}
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	return env_cube_map;
+}
+
+static mat4 get_transforms_to_generate_cube_map(vec3 light_position, vec3 view_direction, vec3 up_vector,
+	r32 near_plane, r32 far_plane)
+{
+  /* PROJECTION MATRIX */
+
+  // We need to invert near plane and far plane because the matrix expect them negated.
+  near_plane = -near_plane;
+  far_plane = -far_plane;
+
+  // We pick a FOV of 90 degrees in order to create a perfect cube with 6 transforms.
+  r32 fov = 90.0f;
+
+  r32 top = (r32)fabsf(near_plane) * atanf(gm_radians(fov));
+  r32 bottom = -top;
+  r32 right = top;    // We assume shadow Texture is a square so we don't need to apply the ratio (width / height).
+  r32 left = -right;
+
+  mat4 P = (mat4) {
+    near_plane, 0.0f, 0.0f, 0.0f,
+    0.0f, near_plane, 0.0f, 0.0f,
+    0.0f, 0.0f, near_plane + far_plane, -near_plane * far_plane,
+    0.0f, 0.0f, 1.0f, 0.0f
+  };
+
+  mat4 M = (mat4) {
+    2.0f / (right - left), 0.0f, 0.0f, -(right + left) / (right - left),
+    0.0f, 2.0f / (top - bottom), 0.0f, -(top + bottom) / (top - bottom),
+    0.0f, 0.0f, 2.0f / (far_plane - near_plane), -(far_plane + near_plane) / (far_plane - near_plane),
+    0.0f, 0.0f, 0.0f, 1.0f
+  };
+
+  mat4 MP = gm_mat4_multiply(&M, &P);
+  mat4 projection_matrix = gm_mat4_scalar_product(-1, &MP);
+
+  /* VIEW MATRIX */
+
+  vec3 w = gm_vec3_scalar_product(-1, gm_vec3_normalize(view_direction));
+  vec3 u = gm_vec3_normalize(gm_vec3_cross(up_vector, w));
+  vec3 v = gm_vec3_cross(w, u);
+
+  mat4 view_matrix = (mat4) {
+    u.x, u.y, u.z, -gm_vec3_dot(u, light_position),
+    v.x, v.y, v.z, -gm_vec3_dot(v, light_position),
+    w.x, w.y, w.z, -gm_vec3_dot(w, light_position),
+    0.0f, 0.0f, 0.0f, 1.0f
+  };
+
+  return gm_mat4_multiply(&projection_matrix, &view_matrix);
+}
+
+typedef struct {
+  Shader shader;
+  boolean initialized;
+  GLuint vao;
+} Render_Cube_Context;
+
+Render_Cube_Context cube_render;
+
+static r32 cube_vertices[] = {
+  // positions          
+  -1.0f,  1.0f, -1.0f,
+  -1.0f, -1.0f, -1.0f,
+  1.0f, -1.0f, -1.0f,
+  1.0f, -1.0f, -1.0f,
+  1.0f,  1.0f, -1.0f,
+  -1.0f,  1.0f, -1.0f,
+
+  -1.0f, -1.0f,  1.0f,
+  -1.0f, -1.0f, -1.0f,
+  -1.0f,  1.0f, -1.0f,
+  -1.0f,  1.0f, -1.0f,
+  -1.0f,  1.0f,  1.0f,
+  -1.0f, -1.0f,  1.0f,
+
+  1.0f, -1.0f, -1.0f,
+  1.0f, -1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f, -1.0f,
+  1.0f, -1.0f, -1.0f,
+
+  -1.0f, -1.0f,  1.0f,
+  -1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f, -1.0f,  1.0f,
+  -1.0f, -1.0f,  1.0f,
+
+  -1.0f,  1.0f, -1.0f,
+  1.0f,  1.0f, -1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  -1.0f,  1.0f,  1.0f,
+  -1.0f,  1.0f, -1.0f,
+
+  -1.0f, -1.0f, -1.0f,
+  -1.0f, -1.0f,  1.0f,
+  1.0f, -1.0f, -1.0f,
+  1.0f, -1.0f, -1.0f,
+  -1.0f, -1.0f,  1.0f,
+  1.0f, -1.0f,  1.0f
+};
+
+#define EQUIRECTANGULAR_TO_CUBE_VERTEX_SHADER_PATH "./shaders/equirectangular_to_cube_shader.vs"
+#define EQUIRECTANGULAR_TO_CUBE_FRAGMENT_SHADER_PATH "./shaders/equirectangular_to_cube_shader.fs"
+
+static void renderer_cube_init()
+{
+  if (!cube_render.initialized)
+  {
+    cube_render.shader = graphics_shader_create(EQUIRECTANGULAR_TO_CUBE_VERTEX_SHADER_PATH, EQUIRECTANGULAR_TO_CUBE_FRAGMENT_SHADER_PATH);
+    cube_render.initialized = true;
+
+    u32 VBO;
+    glGenVertexArrays(1, &cube_render.vao);
+    glGenBuffers(1, &VBO);
+
+    glBindVertexArray(cube_render.vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cube_vertices), 0, GL_STATIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(cube_vertices), cube_vertices);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
+    glEnableVertexAttribArray(0);
+
+    glBindVertexArray(0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+  }
+}
+
+u32 graphics_generate_cube_map_from_equirectangular_map(u32 equirectangular_map)
+{
+	// Create framebuffer
+	unsigned int captureFBO, captureRBO;
+	glGenFramebuffers(1, &captureFBO);
+	glGenRenderbuffers(1, &captureRBO);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+	glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+
+	renderer_cube_init();
+	u32 cube_map = graphics_texture_create_cube_map();
+
+	mat4 cube_map_transforms[6];
+	cube_map_transforms[0] = get_transforms_to_generate_cube_map((vec3){0.0f, 0.0f, 0.0f},
+		(vec3){1.0f, 0.0f, 0.0f}, (vec3){0.0f, -1.0f, 0.0f}, 0.1f, 10.0f);
+	cube_map_transforms[1] = get_transforms_to_generate_cube_map((vec3){0.0f, 0.0f, 0.0f},
+		(vec3){-1.0f, 0.0f, 0.0f}, (vec3){0.0f, -1.0f, 0.0f}, 0.1f, 10.0f);
+	cube_map_transforms[2] = get_transforms_to_generate_cube_map((vec3){0.0f, 0.0f, 0.0f},
+		(vec3){0.0f, 1.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f}, 0.1f, 10.0f);
+	cube_map_transforms[3] = get_transforms_to_generate_cube_map((vec3){0.0f, 0.0f, 0.0f},
+		(vec3){0.0f, -1.0f, 0.0f}, (vec3){0.0f, 0.0f, -1.0f}, 0.1f, 10.0f);
+	cube_map_transforms[4] = get_transforms_to_generate_cube_map((vec3){0.0f, 0.0f, 0.0f},
+		(vec3){0.0f, 0.0f, 1.0f}, (vec3){0.0f, -1.0f, 0.0f}, 0.1f, 10.0f);
+	cube_map_transforms[5] = get_transforms_to_generate_cube_map((vec3){0.0f, 0.0f, 0.0f},
+		(vec3){0.0f, 0.0f, -1.0f}, (vec3){0.0f, -1.0f, 0.0f}, 0.1f, 10.0f);
+
+	glUseProgram(cube_render.shader);
+	GLint equirectangular_map_location = glGetUniformLocation(cube_render.shader, "equirectangular_map");
+	glUniform1i(equirectangular_map_location, 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, equirectangular_map);
+	GLint transform_location = glGetUniformLocation(cube_render.shader, "transform_matrix");
+
+	glDepthMask(GL_FALSE);
+	glDepthFunc(GL_LEQUAL);
+	glBindVertexArray(cube_render.vao);
+	GLint m_viewport[4];
+	glGetIntegerv(GL_VIEWPORT, m_viewport);
+	glViewport(0, 0, 512, 512);
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+
+	for (u32 i = 0; i < 6; ++i)
+	{
+		glUniformMatrix4fv(transform_location, 1, GL_TRUE, (GLfloat*)cube_map_transforms[i].data);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 
+						GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, cube_map, 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glDrawArrays(GL_TRIANGLES, 0, sizeof(cube_vertices) / (sizeof(r32) * 3));
+	}
+
+	glDepthFunc(GL_LESS);
+	glDepthMask(GL_TRUE);
+	glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glUseProgram(0);
+	glBindVertexArray(0);
+	return cube_map;
+}
+
 u32 graphics_texture_create_from_data(const Image_Data* image_data)
 {
 	u32 texture_id;
@@ -608,4 +821,130 @@ Mesh graphics_mesh_create_from_obj_with_texture(const s8* obj_path, u32 normal_m
 	array_release(vertices);
 	array_release(indexes);
 	return m;
+}
+
+
+
+
+/* **** SKYBOX ***** */
+
+#define SKYBOX_VERTEX_SHADER_PATH "./shaders/skybox.vs"
+#define SKYBOX_FRAGMENT_SHADER_PATH "./shaders/skybox.fs"
+
+/*
+  Sky Box
+*/
+
+typedef struct {
+  Shader shader;
+  boolean initialized;
+  GLuint vao;
+} Render_Skybox_Context;
+
+Render_Skybox_Context skybox_render;
+
+static r32 skybox_vertices[] = {
+  // positions          
+  -1.0f,  1.0f, -1.0f,
+  -1.0f, -1.0f, -1.0f,
+  1.0f, -1.0f, -1.0f,
+  1.0f, -1.0f, -1.0f,
+  1.0f,  1.0f, -1.0f,
+  -1.0f,  1.0f, -1.0f,
+
+  -1.0f, -1.0f,  1.0f,
+  -1.0f, -1.0f, -1.0f,
+  -1.0f,  1.0f, -1.0f,
+  -1.0f,  1.0f, -1.0f,
+  -1.0f,  1.0f,  1.0f,
+  -1.0f, -1.0f,  1.0f,
+
+  1.0f, -1.0f, -1.0f,
+  1.0f, -1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f, -1.0f,
+  1.0f, -1.0f, -1.0f,
+
+  -1.0f, -1.0f,  1.0f,
+  -1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f, -1.0f,  1.0f,
+  -1.0f, -1.0f,  1.0f,
+
+  -1.0f,  1.0f, -1.0f,
+  1.0f,  1.0f, -1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  -1.0f,  1.0f,  1.0f,
+  -1.0f,  1.0f, -1.0f,
+
+  -1.0f, -1.0f, -1.0f,
+  -1.0f, -1.0f,  1.0f,
+  1.0f, -1.0f, -1.0f,
+  1.0f, -1.0f, -1.0f,
+  -1.0f, -1.0f,  1.0f,
+  1.0f, -1.0f,  1.0f
+};
+
+static void
+renderer_skybox_init()
+{
+  if (!skybox_render.initialized)
+  {
+    skybox_render.shader = graphics_shader_create(SKYBOX_VERTEX_SHADER_PATH, SKYBOX_FRAGMENT_SHADER_PATH);
+    skybox_render.initialized = true;
+
+    u32 VBO;
+    glGenVertexArrays(1, &skybox_render.vao);
+    glGenBuffers(1, &VBO);
+
+    glBindVertexArray(skybox_render.vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(skybox_vertices), 0, GL_STATIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(skybox_vertices), skybox_vertices);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
+    glEnableVertexAttribArray(0);
+
+    glBindVertexArray(0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+  }
+}
+
+void graphics_render_skybox(u32 skybox_texture, const Perspective_Camera* camera)
+{
+  renderer_skybox_init();
+
+  glUseProgram(skybox_render.shader);
+  GLint skybox_texture_location = glGetUniformLocation(skybox_render.shader, "skybox_texture");
+  glUniform1i(skybox_texture_location, 0);
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_CUBE_MAP, skybox_texture);
+  GLint view_matrix_location = glGetUniformLocation(skybox_render.shader, "view_matrix");
+  GLint projection_matrix_location = glGetUniformLocation(skybox_render.shader, "projection_matrix");
+
+  // We remove the translation from the view matrix, to pretend the camera is in the center of the world.
+  mat4 view_matrix = camera->view_matrix;
+  view_matrix.data[0][3] = 0.0f;
+  view_matrix.data[1][3] = 0.0f;
+  view_matrix.data[2][3] = 0.0f;
+  view_matrix.data[3][3] = 1.0f;
+  view_matrix.data[3][2] = 0.0f;
+  view_matrix.data[3][1] = 0.0f;
+  view_matrix.data[3][0] = 0.0f;
+
+  glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)view_matrix.data);
+  glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)camera->projection_matrix.data);
+  glBindVertexArray(skybox_render.vao);
+  glDepthMask(GL_FALSE);
+  glDepthFunc(GL_LEQUAL);
+  glDrawArrays(GL_TRIANGLES, 0, sizeof(skybox_vertices) / (sizeof(r32) * 3));
+  glDepthFunc(GL_LESS);
+  glDepthMask(GL_TRUE);
+  glUseProgram(0);
+  glBindVertexArray(0);
 }
