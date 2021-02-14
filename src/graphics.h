@@ -11,29 +11,45 @@ typedef struct
 	vec4 position;
 	vec4 normal;
 	vec2 texture_coordinates;
+	vec4 tangent;
 } Vertex;
 #pragma pack(pop)
 
 typedef struct
 {
-	boolean use_normal_map;
-	boolean tangent_space;		// @TODO: Not implemented yet.
-	u32 normal_map_texture;
-} Normal_Mapping_Info;
+	boolean use;
+	u32 map;
+} Normal_Info;
 
 typedef struct
 {
-	boolean use_diffuse_map;
-	u32 diffuse_map;
-	vec4 diffuse_color;
-} Diffuse_Info;
+	boolean use;
+	u32 map;
+	vec3 albedo;
+} Albedo_Info;
+
+typedef struct
+{
+	boolean use;
+	u32 map;
+	r32 metallic;
+} Metallic_Info;
+
+typedef struct
+{
+	boolean use;
+	u32 map;
+	r32 roughness;
+} Roughness_Info;
 
 typedef struct
 {
 	u32 VAO, VBO, EBO;
 	s32 indexes_size;
-	Normal_Mapping_Info normal_info;
-	Diffuse_Info diffuse_info;
+	Normal_Info normal_info;
+	Albedo_Info albedo_info;
+	Metallic_Info metallic_info;
+	Roughness_Info roughness_info;
 } Mesh;
 
 typedef struct
@@ -47,10 +63,8 @@ typedef struct
 
 typedef struct
 {
-	vec4 position;
-	vec4 ambient_color;
-	vec4 diffuse_color;
-	vec4 specular_color;
+	vec3 position;
+	vec3 color;
 } Light;
 
 typedef struct
@@ -73,28 +87,24 @@ void graphics_float_image_Free(Float_Image_Data* image_data);
 void graphics_image_save(const s8* image_path, const Image_Data* image_data);
 void graphics_float_image_save(const s8* image_path, const Float_Image_Data* image_data);
 Shader graphics_shader_create(const s8* vertex_shader_path, const s8* fragment_shader_path);
-Mesh graphics_quad_create_with_texture(u32 texture);
-Mesh graphics_quad_create_with_color(vec4 color);
-Mesh graphics_mesh_create_with_texture(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info, u32 diffuse_map);
-Mesh graphics_mesh_create_with_color(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info, vec4 diffuse_color);
-Mesh graphics_mesh_create_from_obj_with_color(const s8* obj_path, Normal_Mapping_Info* normal_info, vec4 diffuse_color);
-Mesh graphics_mesh_create_from_obj_with_texture(const s8* obj_path, Normal_Mapping_Info* normal_info, u32 diffuse_map);
+Mesh graphics_mesh_create_with_texture(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, u32 normal_map,
+	u32 albedo_map, u32 metallic_map, u32 roughness_map);
+Mesh graphics_mesh_create_from_obj_with_texture(const s8* obj_path, u32 normal_map, u32 albedo_map, u32 metallic_map, u32 roughness_map);
 void graphics_mesh_render(Shader shader, Mesh mesh);
-// If mesh already has a diffuse map, the older diffuse map will be deleted if delete_diffuse_map is true.
-// If mesh has a color instead of a diffuse map, the mesh will lose the color and be set to use the diffuse map.
-void graphics_mesh_change_diffuse_map(Mesh* mesh, u32 diffuse_map, boolean delete_diffuse_map);
-// If the mesh already has a color, the older color will be deleted.
-// If mesh has a diffuse map instead of a color, the diffuse map will be deleted if delete_diffuse_map is true
-// The mesh will be set to use the color.
-void graphics_mesh_change_color(Mesh* mesh, vec4 color, boolean delete_diffuse_map);
+// If mesh already has an albedo/metallic/roughness map, the older diffuse map will be deleted if delete_*_map is true.
+void graphics_mesh_change_normal_map(Mesh* mesh, u32 normal_map, boolean delete_normal_map);
+void graphics_mesh_change_albedo_map(Mesh* mesh, u32 albedo_map, boolean delete_albedo_map);
+void graphics_mesh_change_metallic_map(Mesh* mesh, u32 metallic_map, boolean delete_metallic_map);
+void graphics_mesh_change_roughness_map(Mesh* mesh, u32 roughness_map, boolean delete_roughness_map);
 void graphics_entity_create(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale);
-void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_normal_map, boolean delete_diffuse_map);
+void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_normal_map, boolean delete_albedo_map,
+	boolean delete_metallic_map, boolean delete_roughness_map);
 void graphics_entity_set_position(Entity* entity, vec4 world_position);
 void graphics_entity_set_rotation(Entity* entity, Quaternion world_rotation);
 void graphics_entity_set_scale(Entity* entity, vec3 world_scale);
 void graphics_entity_render_basic_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity);
-void graphics_entity_render_phong_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity, const Light* lights);
-void graphics_light_create(Light* light, vec4 position, vec4 ambient_color, vec4 diffuse_color, vec4 specular_color);
+void graphics_entity_render_pbr_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity, const Light* lights);
+void graphics_light_create(Light* light, vec3 position, vec3 color);
 u32 graphics_texture_create(const s8* texture_path);
 u32 graphics_texture_create_from_data(const Image_Data* image_data);
 u32 graphics_texture_create_from_float_data(const Float_Image_Data* image_data);

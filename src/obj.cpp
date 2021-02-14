@@ -150,5 +150,49 @@ extern "C" int obj_parse(const char* obj_path, Vertex** vertices, u32** indexes)
 		}
 	}
 
+	// Generate Tangents
+	for (size_t i = 0; i < array_get_length(*indexes); i += 3)
+	{
+		u32 i1 = (*indexes)[i];
+		u32 i2 = (*indexes)[i + 1];
+		u32 i3 = (*indexes)[i + 2];
+		Vertex* v1 = &(*vertices)[i1];
+		Vertex* v2 = &(*vertices)[i2];
+		Vertex* v3 = &(*vertices)[i3];
+		vec4 edge1;
+		edge1.x = v2->position.x - v1->position.x;
+		edge1.y = v2->position.y - v1->position.y;
+		edge1.z = v2->position.z - v1->position.z;
+		edge1.w = v2->position.w - v1->position.w;
+		vec4 edge2;
+		edge2.x = v3->position.x - v1->position.x;
+		edge2.y = v3->position.y - v1->position.y;
+		edge2.z = v3->position.z - v1->position.z;
+		edge2.w = v3->position.w - v1->position.w;
+		vec2 delta_uv_1;
+		delta_uv_1.x = v2->texture_coordinates.x - v1->texture_coordinates.x;
+		delta_uv_1.y = v2->texture_coordinates.y - v1->texture_coordinates.y;
+		vec2 delta_uv_2;
+		delta_uv_2.x = v3->texture_coordinates.x - v1->texture_coordinates.x;
+		delta_uv_2.y = v3->texture_coordinates.y - v1->texture_coordinates.y;
+		r32 f = 1.0f / (delta_uv_1.x * delta_uv_2.y - delta_uv_2.x * delta_uv_1.y);
+		vec4 tangent;
+		tangent.x = f * (delta_uv_2.y * edge1.x - delta_uv_1.y * edge2.x);
+		tangent.y = f * (delta_uv_2.y * edge1.y - delta_uv_1.y * edge2.y);
+		tangent.z = f * (delta_uv_2.y * edge1.z - delta_uv_1.y * edge2.z);
+		tangent.w = 0.0f;
+		v1->tangent = tangent;
+		v2->tangent = tangent;
+		v3->tangent = tangent;
+	}
+
+	for (size_t i = 0; i < array_get_length(*vertices); ++i)
+	{
+		Vertex* v = &(*vertices)[i];
+		vec4 t = v->tangent;
+		r32 length = sqrtf(t.x * t.x + t.y * t.y + t.z * t.z + t.w * t.w);
+		v->tangent = (vec4){length * v->tangent.x, length * v->tangent.y, length * v->tangent.z, length * v->tangent.w};
+	}
+
 	return 0;
 }

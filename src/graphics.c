@@ -144,31 +144,7 @@ static void fill_quad_vertices_and_indexes(r32 size, Vertex* vertices, u32* indi
 	indices[5] = 2;
 }
 
-Mesh graphics_quad_create_with_texture(u32 texture)
-{
-	r32 size = 1.0f;
-	Vertex vertices[4];
-	u32 indices[6];
-
-	fill_quad_vertices_and_indexes(size, vertices, indices);
-
-	return graphics_mesh_create_with_texture(vertices, sizeof(vertices) / sizeof(Vertex), indices,
-		sizeof(indices) / sizeof(u32), 0, texture);
-}
-
-Mesh graphics_quad_create_with_color(vec4 color)
-{
-	r32 size = 1.0f;
-	Vertex vertices[4];
-	u32 indices[6];
-
-	fill_quad_vertices_and_indexes(size, vertices, indices);
-
-	return graphics_mesh_create_with_color(vertices, sizeof(vertices) / sizeof(Vertex), indices,
-		sizeof(indices) / sizeof(u32), 0, color);
-}
-
-static Mesh create_simple_mesh(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info)
+static Mesh create_simple_mesh(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size)
 {
 	Mesh mesh;
 	GLuint VBO, EBO, VAO;
@@ -182,14 +158,17 @@ static Mesh create_simple_mesh(Vertex* vertices, s32 vertices_size, u32* indices
 	glBufferData(GL_ARRAY_BUFFER, vertices_size * sizeof(Vertex), 0, GL_STATIC_DRAW);
 	glBufferSubData(GL_ARRAY_BUFFER, 0, vertices_size * sizeof(Vertex), vertices);
 
-	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 10 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 14 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
 	glEnableVertexAttribArray(0);
 
-	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 10 * sizeof(GLfloat), (void*)(4 * sizeof(GLfloat)));
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 14 * sizeof(GLfloat), (void*)(4 * sizeof(GLfloat)));
 	glEnableVertexAttribArray(1);
 
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 10 * sizeof(GLfloat), (void*)(8 * sizeof(GLfloat)));
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(GLfloat), (void*)(8 * sizeof(GLfloat)));
 	glEnableVertexAttribArray(2);
+
+	glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 14 * sizeof(GLfloat), (void*)(10 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(3);
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_size * sizeof(u32), 0, GL_STATIC_DRAW);
@@ -205,31 +184,40 @@ static Mesh create_simple_mesh(Vertex* vertices, s32 vertices_size, u32* indices
 	mesh.EBO = EBO;
 	mesh.indexes_size = indices_size;
 
-	if (!normal_info)
+	return mesh;
+}
+
+Mesh graphics_mesh_create_with_texture(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, u32 normal_map,
+	u32 albedo_map, u32 metallic_map, u32 roughness_map)
+{
+	Mesh mesh = create_simple_mesh(vertices, vertices_size, indices, indices_size);
+	mesh.normal_info.use = false;
+	mesh.albedo_info.use = false;
+	mesh.albedo_info.albedo = (vec3){1.0f, 0.0f, 0.0f};
+	mesh.metallic_info.use = false;
+	mesh.metallic_info.metallic = 0.0f;
+	mesh.roughness_info.use = false;
+	mesh.roughness_info.roughness = 1.0f;
+	if (normal_map != -1)
 	{
-		mesh.normal_info.tangent_space = false;
-		mesh.normal_info.use_normal_map = false;
-		mesh.normal_info.normal_map_texture = 0;
+		mesh.normal_info.use = true;
+		mesh.normal_info.map = normal_map;
 	}
-	else
-		mesh.normal_info = *normal_info;
-
-	return mesh;
-}
-
-Mesh graphics_mesh_create_with_color(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info, vec4 diffuse_color)
-{
-	Mesh mesh = create_simple_mesh(vertices, vertices_size, indices, indices_size, normal_info);
-	mesh.diffuse_info.use_diffuse_map = false;
-	mesh.diffuse_info.diffuse_color = diffuse_color;
-	return mesh;
-}
-
-Mesh graphics_mesh_create_with_texture(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info, u32 diffuse_map)
-{
-	Mesh mesh = create_simple_mesh(vertices, vertices_size, indices, indices_size, normal_info);
-	mesh.diffuse_info.use_diffuse_map = true;
-	mesh.diffuse_info.diffuse_map = diffuse_map;
+	if (albedo_map != -1)
+	{
+		mesh.albedo_info.use = true;
+		mesh.albedo_info.map = albedo_map;
+	}
+	if (metallic_map != -1)
+	{
+		mesh.metallic_info.use = true;
+		mesh.metallic_info.map = metallic_map;
+	}
+	if (roughness_map != -1)
+	{
+		mesh.roughness_info.use = true;
+		mesh.roughness_info.map = roughness_map;
+	}
 	return mesh;
 }
 
@@ -249,50 +237,78 @@ static void light_update_uniforms(const Light* lights, Shader shader)
 	{
 		Light light = lights[i];
 		GLint light_position_location = glGetUniformLocation(shader, build_light_uniform_name(buffer, i, "position"));
-		GLint ambient_color_location = glGetUniformLocation(shader, build_light_uniform_name(buffer, i, "ambient_color"));
-		GLint diffuse_color_location = glGetUniformLocation(shader, build_light_uniform_name(buffer, i, "diffuse_color"));
-		GLint specular_color_location = glGetUniformLocation(shader, build_light_uniform_name(buffer, i, "specular_color"));
-		glUniform4f(light_position_location, light.position.x, light.position.y, light.position.z, light.position.w);
-		glUniform4f(ambient_color_location, light.ambient_color.x, light.ambient_color.y, light.ambient_color.z, light.ambient_color.w);
-		glUniform4f(diffuse_color_location, light.diffuse_color.x, light.diffuse_color.y, light.diffuse_color.z, light.diffuse_color.w);
-		glUniform4f(specular_color_location, light.specular_color.x, light.specular_color.y, light.specular_color.z, light.specular_color.w);
+		GLint color_location = glGetUniformLocation(shader, build_light_uniform_name(buffer, i, "color"));
+		glUniform3f(light_position_location, light.position.x, light.position.y, light.position.z);
+		glUniform3f(color_location, light.color.x, light.color.y, light.color.z);
 	}
 
-	GLint light_quantity_location = glGetUniformLocation(shader, "light_quantity");
+	GLint light_quantity_location = glGetUniformLocation(shader, "light_num");
 	glUniform1i(light_quantity_location, number_of_lights);
 }
 
-static void diffuse_update_uniforms(const Diffuse_Info* diffuse_info, Shader shader)
+static void albedo_update_uniforms(const Albedo_Info* albedo_info, Shader shader)
 {
 	glUseProgram(shader);
-	GLint use_diffuse_map_location = glGetUniformLocation(shader, "diffuse_info.use_diffuse_map");
-	GLint diffuse_map_location = glGetUniformLocation(shader, "diffuse_info.diffuse_map");
-	GLint diffuse_color_location = glGetUniformLocation(shader, "diffuse_info.diffuse_color");
-	glUniform1i(use_diffuse_map_location, diffuse_info->use_diffuse_map);
-	if (diffuse_info->use_diffuse_map)
+	GLint use_location = glGetUniformLocation(shader, "albedo_info.use");
+	GLint albedo_map_location = glGetUniformLocation(shader, "albedo_info.map");
+	GLint albedo_location = glGetUniformLocation(shader, "albedo_info.albedo");
+	glUniform1i(use_location, albedo_info->use);
+	if (albedo_info->use)
 	{
-		glUniform1i(diffuse_map_location, 0);
+		glUniform1i(albedo_map_location, 0);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, diffuse_info->diffuse_map);
+		glBindTexture(GL_TEXTURE_2D, albedo_info->map);
 	}
 	else
-		glUniform4f(diffuse_color_location, diffuse_info->diffuse_color.x, diffuse_info->diffuse_color.y,
-			diffuse_info->diffuse_color.z, diffuse_info->diffuse_color.w);
+		glUniform3f(albedo_location, albedo_info->albedo.x, albedo_info->albedo.y,
+			albedo_info->albedo.z);
 }
 
-static void normals_update_uniforms(const Normal_Mapping_Info* normal_info, Shader shader)
+static void metallic_update_uniforms(const Metallic_Info* metallic_info, Shader shader)
 {
 	glUseProgram(shader);
-	GLint use_normal_map_location = glGetUniformLocation(shader, "normal_mapping_info.use_normal_map");
-	GLint normal_map_texture_location = glGetUniformLocation(shader, "normal_mapping_info.normal_map_texture");
-	GLint tangent_space_location = glGetUniformLocation(shader, "normal_mapping_info.tangent_space");
-	glUniform1i(use_normal_map_location, normal_info->use_normal_map);
-	if (normal_info->use_normal_map)
+	GLint use_location = glGetUniformLocation(shader, "metallic_info.use");
+	GLint metallic_map_location = glGetUniformLocation(shader, "metallic_info.map");
+	GLint metallic_location = glGetUniformLocation(shader, "metallic_info.metallic");
+	glUniform1i(use_location, metallic_info->use);
+	if (metallic_info->use)
 	{
-		glUniform1i(normal_map_texture_location, 2);
-		glUniform1i(tangent_space_location, normal_info->tangent_space);
+		glUniform1i(metallic_map_location, 1);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, metallic_info->map);
+	}
+	else
+		glUniform1f(metallic_location, metallic_info->metallic);
+}
+
+static void roughness_update_uniforms(const Roughness_Info* roughness_info, Shader shader)
+{
+	glUseProgram(shader);
+	GLint use_location = glGetUniformLocation(shader, "roughness_info.use");
+	GLint roughness_map_location = glGetUniformLocation(shader, "roughness_info.map");
+	GLint roughness_location = glGetUniformLocation(shader, "roughness_info.roughness");
+	glUniform1i(use_location, roughness_info->use);
+	if (roughness_info->use)
+	{
+		glUniform1i(roughness_map_location, 2);
 		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, normal_info->normal_map_texture);
+		glBindTexture(GL_TEXTURE_2D, roughness_info->map);
+	}
+	else
+		glUniform1f(roughness_location, roughness_info->roughness);
+}
+
+static void normals_update_uniforms(const Normal_Info* normal_info, Shader shader)
+{
+	glUseProgram(shader);
+	GLint use_normal_map_location = glGetUniformLocation(shader, "normal_info.use");
+	GLint normal_map_texture_location = glGetUniformLocation(shader, "normal_info.map");
+	glUniform1i(use_normal_map_location, normal_info->use);
+	if (normal_info->map)
+	{
+		glUniform1i(normal_map_texture_location, 3);
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_2D, normal_info->map);
 	}
 }
 
@@ -300,29 +316,49 @@ void graphics_mesh_render(Shader shader, Mesh mesh)
 {
 	glBindVertexArray(mesh.VAO);
 	glUseProgram(shader);
-	diffuse_update_uniforms(&mesh.diffuse_info, shader);
+	albedo_update_uniforms(&mesh.albedo_info, shader);
+	metallic_update_uniforms(&mesh.metallic_info, shader);
+	roughness_update_uniforms(&mesh.roughness_info, shader);
 	normals_update_uniforms(&mesh.normal_info, shader);
 	glDrawElements(GL_TRIANGLES, mesh.indexes_size, GL_UNSIGNED_INT, 0);
 	glUseProgram(0);
 	glBindVertexArray(0);
 }
 
-void graphics_mesh_change_diffuse_map(Mesh* mesh, u32 diffuse_map, boolean delete_diffuse_map)
+void graphics_mesh_change_normal_map(Mesh* mesh, u32 normal_map, boolean delete_normal_map)
 {
-	if (delete_diffuse_map && mesh->diffuse_info.use_diffuse_map)
-		glDeleteTextures(1, &mesh->diffuse_info.diffuse_map);
+	if (delete_normal_map && mesh->normal_info.use)
+		glDeleteTextures(1, &mesh->normal_info.map);
 
-	mesh->diffuse_info.diffuse_map = diffuse_map;
-	mesh->diffuse_info.use_diffuse_map = true;
+	mesh->normal_info.map = normal_map;
+	mesh->normal_info.use = true;
 }
 
-void graphics_mesh_change_color(Mesh* mesh, vec4 color, boolean delete_diffuse_map)
+void graphics_mesh_change_albedo_map(Mesh* mesh, u32 albedo_map, boolean delete_albedo_map)
 {
-	if (delete_diffuse_map && mesh->diffuse_info.use_diffuse_map)
-		glDeleteTextures(1, &mesh->diffuse_info.diffuse_map);
+	if (delete_albedo_map && mesh->albedo_info.use)
+		glDeleteTextures(1, &mesh->albedo_info.map);
 
-	mesh->diffuse_info.use_diffuse_map = false;
-	mesh->diffuse_info.diffuse_color = color;
+	mesh->albedo_info.map = albedo_map;
+	mesh->albedo_info.use = true;
+}
+
+void graphics_mesh_change_metallic_map(Mesh* mesh, u32 metallic_map, boolean delete_metallic_map)
+{
+	if (delete_metallic_map && mesh->metallic_info.use)
+		glDeleteTextures(1, &mesh->metallic_info.map);
+
+	mesh->metallic_info.map = metallic_map;
+	mesh->metallic_info.use = true;
+}
+
+void graphics_mesh_change_roughness_map(Mesh* mesh, u32 roughness_map, boolean delete_roughness_map)
+{
+	if (delete_roughness_map && mesh->roughness_info.use)
+		glDeleteTextures(1, &mesh->roughness_info.map);
+
+	mesh->roughness_info.map = roughness_map;
+	mesh->roughness_info.use = true;
 }
 
 static void recalculate_model_matrix(Entity* entity)
@@ -358,15 +394,20 @@ void graphics_entity_create(Entity* entity, Mesh mesh, vec4 world_position, Quat
 	recalculate_model_matrix(entity);
 }
 
-void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_normal_map, boolean delete_diffuse_map)
+void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_normal_map, boolean delete_albedo_map,
+	boolean delete_metallic_map, boolean delete_roughness_map)
 {
 	glDeleteBuffers(1, &entity->mesh.VBO);
 	glDeleteBuffers(1, &entity->mesh.EBO);
 	glDeleteVertexArrays(1, &entity->mesh.VAO);
-	if (delete_normal_map && entity->mesh.normal_info.use_normal_map)
-		glDeleteTextures(1, &entity->mesh.normal_info.normal_map_texture);
-	if (delete_diffuse_map && entity->mesh.diffuse_info.use_diffuse_map)
-		glDeleteTextures(1, &entity->mesh.diffuse_info.diffuse_map);
+	if (delete_normal_map && entity->mesh.normal_info.use)
+		glDeleteTextures(1, &entity->mesh.normal_info.map);
+	if (delete_albedo_map && entity->mesh.albedo_info.use)
+		glDeleteTextures(1, &entity->mesh.albedo_info.map);
+	if (delete_metallic_map && entity->mesh.metallic_info.use)
+		glDeleteTextures(1, &entity->mesh.metallic_info.map);
+	if (delete_roughness_map && entity->mesh.roughness_info.use)
+		glDeleteTextures(1, &entity->mesh.roughness_info.map);
 
 	entity->mesh = mesh;
 }
@@ -402,7 +443,7 @@ void graphics_entity_render_basic_shader(Shader shader, const Perspective_Camera
 	glUseProgram(0);
 }
 
-void graphics_entity_render_phong_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity, const Light* lights)
+void graphics_entity_render_pbr_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity, const Light* lights)
 {
 	glUseProgram(shader);
 	light_update_uniforms(lights, shader);
@@ -411,7 +452,7 @@ void graphics_entity_render_phong_shader(Shader shader, const Perspective_Camera
 	GLint model_matrix_location = glGetUniformLocation(shader, "model_matrix");
 	GLint view_matrix_location = glGetUniformLocation(shader, "view_matrix");
 	GLint projection_matrix_location = glGetUniformLocation(shader, "projection_matrix");
-	glUniform4f(camera_position_location, camera->position.x, camera->position.y, camera->position.z, camera->position.w);
+	glUniform3f(camera_position_location, camera->position.x, camera->position.y, camera->position.z);
 	glUniform1f(shineness_location, 128.0f);
 	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)entity->model_matrix.data);
 	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)camera->view_matrix.data);
@@ -492,12 +533,10 @@ void graphics_texture_delete(u32 texture_id)
 	glDeleteTextures(1, &texture_id);
 }
 
-void graphics_light_create(Light* light, vec4 position, vec4 ambient_color, vec4 diffuse_color, vec4 specular_color)
+void graphics_light_create(Light* light, vec3 position, vec3 color)
 {
 	light->position = position;
-	light->ambient_color = ambient_color;
-	light->diffuse_color = diffuse_color;
-	light->specular_color = specular_color;
+	light->color = color;
 }
 
 // If memory is null, new memory will be allocated
@@ -560,23 +599,12 @@ Image_Data graphics_float_image_data_to_image_data(const Float_Image_Data* float
 	return id;
 }
 
-Mesh graphics_mesh_create_from_obj_with_color(const s8* obj_path, Normal_Mapping_Info* normal_info, vec4 diffuse_color)
+Mesh graphics_mesh_create_from_obj_with_texture(const s8* obj_path, u32 normal_map, u32 albedo_map, u32 metallic_map, u32 roughness_map)
 {
 	Vertex* vertices;
 	u32* indexes;
 	obj_parse(obj_path, &vertices, &indexes);
-	Mesh m = graphics_mesh_create_with_color(vertices, array_get_length(vertices), indexes, array_get_length(indexes), normal_info, diffuse_color);
-	array_release(vertices);
-	array_release(indexes);
-	return m;
-}
-
-Mesh graphics_mesh_create_from_obj_with_texture(const s8* obj_path, Normal_Mapping_Info* normal_info, u32 diffuse_map)
-{
-	Vertex* vertices;
-	u32* indexes;
-	obj_parse(obj_path, &vertices, &indexes);
-	Mesh m = graphics_mesh_create_with_texture(vertices, array_get_length(vertices), indexes, array_get_length(indexes), normal_info, diffuse_map);
+	Mesh m = graphics_mesh_create_with_texture(vertices, array_get_length(vertices), indexes, array_get_length(indexes), normal_map, albedo_map, metallic_map, roughness_map);
 	array_release(vertices);
 	array_release(indexes);
 	return m;

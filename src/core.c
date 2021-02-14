@@ -7,14 +7,16 @@
 #include "obj.h"
 #include "menu.h"
 
-#define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
-#define PHONG_FRAGMENT_SHADER_PATH "./shaders/phong_shader.fs"
+#define PBR_VERTEX_SHADER_PATH "./shaders/pbr_shader.vs"
+#define PBR_FRAGMENT_SHADER_PATH "./shaders/pbr_shader.fs"
+#define BASIC_VERTEX_SHADER_PATH "./shaders/basic_shader.vs"
+#define BASIC_FRAGMENT_SHADER_PATH "./shaders/basic_shader.fs"
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
-static Shader phong_shader;
+static Shader pbr_shader, basic_shader;
 static Perspective_Camera camera;
 static Light* lights;
-static Entity e;
+static Entity e, light_entity;
 
 static Perspective_Camera create_camera()
 {
@@ -32,12 +34,16 @@ static Light* create_lights()
 	Light light;
 	Light* lights = array_create(Light, 1);
 
-	vec4 light_position = (vec4) {0.0f, 0.0f, 15.0f, 1.0f};
-	vec4 ambient_color = (vec4) {0.1f, 0.1f, 0.1f, 1.0f};
-	vec4 diffuse_color = (vec4) {0.8, 0.8, 0.8, 1.0f};
-	vec4 specular_color = (vec4) {0.5f, 0.5f, 0.5f, 1.0f};
-	graphics_light_create(&light, light_position, ambient_color, diffuse_color, specular_color);
+	vec3 light_position = (vec3) {0.7f, 0.0f, 0.5f};
+	const r32 strongness = 1.0f;
+	vec3 color = (vec3) {strongness, strongness, strongness};
+	graphics_light_create(&light, light_position, color);
 	array_push(lights, &light);
+
+	Mesh m = graphics_mesh_create_from_obj_with_texture("./res/sphere.obj", -1, -1, -1, -1);
+	graphics_entity_create(&light_entity, m,
+		(vec4){lights[0].position.x, lights[0].position.y, lights[0].position.z, 1.0f},
+		quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){0.1f, 0.1f, 0.1f});
 
 	return lights;
 }
@@ -50,14 +56,63 @@ static void menu_dummy_callback()
 int core_init()
 {
 	// Create shader
-	phong_shader = graphics_shader_create(PHONG_VERTEX_SHADER_PATH, PHONG_FRAGMENT_SHADER_PATH);
+	pbr_shader = graphics_shader_create(PBR_VERTEX_SHADER_PATH, PBR_FRAGMENT_SHADER_PATH);
+	basic_shader = graphics_shader_create(BASIC_VERTEX_SHADER_PATH, BASIC_FRAGMENT_SHADER_PATH);
 	// Create camera
 	camera = create_camera();
 	// Create light
 	lights = create_lights();
 
-	Mesh m = graphics_mesh_create_from_obj_with_color("./res/cow.obj", 0, (vec4){1.0f, 0.0f, 0.0f, 0.0f});
+	u32 albedo = graphics_texture_create("./res/rustediron2_basecolor.png");
+	u32 metallic = graphics_texture_create("./res/rustediron2_metallic.png");
+	u32 roughness = graphics_texture_create("./res/rustediron2_roughness.png");
+	u32 normal = graphics_texture_create("./res/rustediron2_normal.png");
+	Mesh m = graphics_mesh_create_from_obj_with_texture("./res/sphere.obj", normal, albedo, metallic, roughness);
+	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){0.1f, 0.1f, 0.1f});
+
+#if 0
+	/* NORMALS TEST */
+	// create plane
+	Vertex* vertices = array_create(Vertex, 4);
+	u32* indexes = array_create(u32, 6);
+	Vertex v1, v2, v3, v4;
+	v1.position = (vec4){-1.0f, -1.0f, 0.0f, 1.0f};
+	v2.position = (vec4){1.0f, -1.0f, 0.0f, 1.0f};
+	v3.position = (vec4){-1.0f, 1.0f, 0.0f, 1.0f};
+	v4.position = (vec4){1.0f, 1.0f, 0.0f, 1.0f};
+	v1.normal = (vec4){0.0f, 0.0f, 1.0f, 0.0f};
+	v2.normal = (vec4){0.0f, 0.0f, 1.0f, 0.0f};
+	v3.normal = (vec4){0.0f, 0.0f, 1.0f, 0.0f};
+	v4.normal = (vec4){0.0f, 0.0f, 1.0f, 0.0f};
+	v1.texture_coordinates = (vec2){0.0f, 0.0f};
+	v2.texture_coordinates = (vec2){1.0f, 0.0f};
+	v3.texture_coordinates = (vec2){0.0f, 1.0f};
+	v4.texture_coordinates = (vec2){1.0f, 1.0f};
+	v1.tangent = (vec4){1.0f, 0.0f, 0.0f, 0.0f};
+	v2.tangent = (vec4){1.0f, 0.0f, 0.0f, 0.0f};
+	v3.tangent = (vec4){1.0f, 0.0f, 0.0f, 0.0f};
+	v4.tangent = (vec4){1.0f, 0.0f, 0.0f, 0.0f};
+	array_push(vertices, &v1);
+	array_push(vertices, &v2);
+	array_push(vertices, &v3);
+	array_push(vertices, &v4);
+	u32 i1 = 0;
+	u32 i2 = 1;
+	u32 i3 = 2;
+	u32 i4 = 1;
+	u32 i5 = 3;
+	u32 i6 = 2;
+	array_push(indexes, &i1);
+	array_push(indexes, &i2);
+	array_push(indexes, &i3);
+	array_push(indexes, &i4);
+	array_push(indexes, &i5);
+	array_push(indexes, &i6);
+	u32 normal = graphics_texture_create("./res/brick_normals.png");
+	u32 albedo = graphics_texture_create("./res/brickwall.jpg");
+	Mesh m = graphics_mesh_create_with_texture(vertices, 4, indexes, 6, normal, albedo, -1, -1);
 	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){1.0f, 1.0f, 1.0f});
+#endif
 
 	menu_register_dummy_callback(menu_dummy_callback);
 
@@ -71,12 +126,17 @@ void core_destroy()
 
 void core_update(r32 delta_time)
 {
-
+	graphics_entity_set_position(&light_entity,
+		(vec4){lights[0].position.x, lights[0].position.y, lights[0].position.z, 1.0f});
+	lights[0].position.x = light_entity.world_position.x;
+	lights[0].position.y = light_entity.world_position.y;
+	lights[0].position.z = light_entity.world_position.z;
 }
 
 void core_render()
 {
-	graphics_entity_render_phong_shader(phong_shader, &camera, &e, lights);
+	graphics_entity_render_pbr_shader(pbr_shader, &camera, &e, lights);
+	graphics_entity_render_basic_shader(basic_shader, &camera, &light_entity);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
@@ -147,6 +207,19 @@ void core_input_process(boolean* key_state, r32 delta_time)
 
 		wireframe = !wireframe;
 		key_state[GLFW_KEY_L] = false;
+	}
+	if (key_state[GLFW_KEY_N])
+	{
+		printf("tweaking..\n");
+		static boolean normal = false;
+
+		if (normal)
+			e.mesh.normal_info.use = 0;
+		else
+			e.mesh.normal_info.use = 1;
+
+		normal = !normal;
+		key_state[GLFW_KEY_N] = false;
 	}
 }
 
