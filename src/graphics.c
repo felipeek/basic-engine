@@ -364,7 +364,16 @@ static void normals_update_uniforms(const Normal_Info* normal_info, Shader shade
 	}
 }
 
-void graphics_mesh_render(Shader shader, Mesh mesh)
+static void irradiance_map_update_uniforms(u32 irradiance_map, Shader shader)
+{
+	glUseProgram(shader);
+	GLint irradiance_map_location = glGetUniformLocation(shader, "irradiance_map");
+	glUniform1i(irradiance_map_location, 4);
+	glActiveTexture(GL_TEXTURE4);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, irradiance_map);
+}
+
+void graphics_mesh_render(Shader shader, Mesh mesh, u32 irradiance_map)
 {
 	glBindVertexArray(mesh.VAO);
 	glUseProgram(shader);
@@ -372,6 +381,7 @@ void graphics_mesh_render(Shader shader, Mesh mesh)
 	metallic_update_uniforms(&mesh.metallic_info, shader);
 	roughness_update_uniforms(&mesh.roughness_info, shader);
 	normals_update_uniforms(&mesh.normal_info, shader);
+	irradiance_map_update_uniforms(irradiance_map, shader);
 	glDrawElements(GL_TRIANGLES, mesh.indexes_size, GL_UNSIGNED_INT, 0);
 	glUseProgram(0);
 	glBindVertexArray(0);
@@ -491,25 +501,23 @@ void graphics_entity_render_basic_shader(Shader shader, const Perspective_Camera
 	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)entity->model_matrix.data);
 	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)camera->view_matrix.data);
 	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)camera->projection_matrix.data);
-	graphics_mesh_render(shader, entity->mesh);
+	graphics_mesh_render(shader, entity->mesh, 0);
 	glUseProgram(0);
 }
 
-void graphics_entity_render_pbr_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity, const Light* lights)
+void graphics_entity_render_pbr_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity, const Light* lights, u32 irradiance_map)
 {
 	glUseProgram(shader);
 	light_update_uniforms(lights, shader);
 	GLint camera_position_location = glGetUniformLocation(shader, "camera_position");
-	GLint shineness_location = glGetUniformLocation(shader, "object_shineness");
 	GLint model_matrix_location = glGetUniformLocation(shader, "model_matrix");
 	GLint view_matrix_location = glGetUniformLocation(shader, "view_matrix");
 	GLint projection_matrix_location = glGetUniformLocation(shader, "projection_matrix");
 	glUniform3f(camera_position_location, camera->position.x, camera->position.y, camera->position.z);
-	glUniform1f(shineness_location, 128.0f);
 	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)entity->model_matrix.data);
 	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)camera->view_matrix.data);
 	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)camera->projection_matrix.data);
-	graphics_mesh_render(shader, entity->mesh);
+	graphics_mesh_render(shader, entity->mesh, irradiance_map);
 	glUseProgram(0);
 }
 

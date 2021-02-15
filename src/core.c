@@ -19,6 +19,8 @@ static Light* lights;
 static Entity e, light_entity;
 static u32 cube_map_tex, irradiance_map, bound_tex;
 
+static Entity* test_entities;
+
 static Perspective_Camera create_camera()
 {
 	Perspective_Camera camera;
@@ -35,7 +37,7 @@ static Light* create_lights()
 	Light light;
 	Light* lights = array_create(Light, 1);
 
-	vec3 light_position = (vec3) {0.7f, 0.0f, 0.5f};
+	vec3 light_position = (vec3) {1.0f, 0.5f, 0.5f};
 	const r32 strongness = 1.0f;
 	vec3 color = (vec3) {strongness, strongness, strongness};
 	graphics_light_create(&light, light_position, color);
@@ -49,9 +51,26 @@ static Light* create_lights()
 	return lights;
 }
 
-static void menu_dummy_callback()
+static void create_test_entities()
 {
-	printf("dummy callback called!\n");
+	test_entities = array_create(Entity, 1);
+	int x_n = 5, y_n = 5;
+
+	const r32 distance = 0.3f;
+	for (int y = 0; y < y_n; ++y)
+	{
+		for (int x = 0; x < x_n; ++x)
+		{
+			Mesh m = graphics_mesh_create_from_obj_with_texture("./res/sphere.obj", -1, -1, -1, -1);
+			m.roughness_info.roughness = ((r32)x / (x_n - 1));
+			m.metallic_info.metallic = ((r32)y / (y_n - 1));
+			m.albedo_info.albedo = (vec3){1.0f, 0.0f, 0.0f};
+			Entity entity;
+			graphics_entity_create(&entity, m, (vec4){distance * x, distance * y, 0.0f, 1.0f},
+				quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){0.1f, 0.1f, 0.1f});
+			array_push(test_entities, &entity);
+		}
+	}
 }
 
 int core_init()
@@ -63,6 +82,8 @@ int core_init()
 	camera = create_camera();
 	// Create light
 	lights = create_lights();
+
+	create_test_entities();
 
 	u32 albedo = graphics_texture_create("./res/rustediron2_basecolor.png");
 	u32 metallic = graphics_texture_create("./res/rustediron2_metallic.png");
@@ -121,7 +142,7 @@ int core_init()
 	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){1.0f, 1.0f, 1.0f});
 #endif
 
-	menu_register_dummy_callback(menu_dummy_callback);
+	//menu_register_dummy_callback(menu_dummy_callback);
 
 	return 0;
 }
@@ -142,9 +163,15 @@ void core_update(r32 delta_time)
 
 void core_render()
 {
-	graphics_entity_render_pbr_shader(pbr_shader, &camera, &e, lights);
+	//graphics_entity_render_pbr_shader(pbr_shader, &camera, &e, lights, irradiance_map);
 	graphics_entity_render_basic_shader(basic_shader, &camera, &light_entity);
 	graphics_render_skybox(bound_tex, &camera);
+
+	for (u32 i = 0; i < array_get_length(test_entities); ++i)
+	{
+		Entity* current_entity = &test_entities[i];
+		graphics_entity_render_pbr_shader(pbr_shader, &camera, current_entity, lights, irradiance_map);
+	}
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)

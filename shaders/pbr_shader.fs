@@ -47,6 +47,7 @@ uniform Roughness_Info roughness_info;
 uniform Normal_Info normal_info;
 uniform int light_num;
 uniform Light lights[MAX_NUMBER_OF_LIGHTS];
+uniform	samplerCube irradiance_map;
 
 // GGX's NDF (Normal Distribution Function)
 // The NDF gives the distribution of a given normal over the surface
@@ -91,6 +92,12 @@ vec3 fresnel_schlick(vec3 H, vec3 view, vec3 F0)
   if (cos_theta > 1.0) cos_theta = 1.0;
   return F0 + (1.0 - F0) * pow(1.0 - min(cos_theta, 1.0), 5.0);
 }
+
+vec3 fresnel_schlick_roughness(float cos_theta, vec3 F0, float roughness)
+{
+  if (cos_theta > 1.0) cos_theta = 1.0;
+  return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(max(1.0 - cos_theta, 0.0), 5.0);
+}   
 
 vec3 shirley_diffuse_term(vec3 albedo, vec3 normal, vec3 fragment_to_light_vec, vec3 view) {
   float NdotL = max(dot(normal, fragment_to_light_vec), 0.0);
@@ -204,8 +211,13 @@ void main()
 	Lo += get_point_light_evaluation(lights[i], normal, view, metallic, albedo, roughness, F0);
   }
 
-  vec3 ambient = vec3(0.003, 0.003, 0.003) * albedo;
-  //Lo += ambient;
+  // ambient light
+  vec3 kS = fresnel_schlick_roughness(max(dot(normal, view), 0.0), F0, roughness); 
+  vec3 kD = 1.0 - kS;
+  vec3 irradiance = texture(irradiance_map, normal).rgb;
+  vec3 diffuse    = irradiance * albedo;
+  vec3 ambient    = (kD * diffuse); 
+  Lo += ambient;
 
   // HDR
   Lo = Lo / (Lo + vec3(1.0));
