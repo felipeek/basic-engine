@@ -113,5 +113,6 @@ Float_Image_Data graphics_image_data_to_float_image_data(Image_Data* image_data,
 Image_Data graphics_float_image_data_to_image_data(const Float_Image_Data* float_image_Data, u8* memory);
 u32 graphics_generate_cube_map_from_equirectangular_map(u32 equirectangular_map);
 void graphics_render_skybox(u32 skybox_texture, const Perspective_Camera* camera);
+u32 graphics_generate_irradiance_map_from_cube_map(u32 cube_map);
 
 #endif

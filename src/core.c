@@ -17,7 +17,7 @@ static Shader pbr_shader, basic_shader, equirectangular_to_cube_shader;
 static Perspective_Camera camera;
 static Light* lights;
 static Entity e, light_entity;
-static u32 cube_map_tex;
+static u32 cube_map_tex, irradiance_map, bound_tex;
 
 static Perspective_Camera create_camera()
 {
@@ -74,6 +74,8 @@ int core_init()
 	Float_Image_Data fid = graphics_float_image_load("./res/newport_loft.hdr");
 	u32 equirectangular_map = graphics_texture_create_from_float_data(&fid);
 	cube_map_tex = graphics_generate_cube_map_from_equirectangular_map(equirectangular_map);
+	irradiance_map = graphics_generate_irradiance_map_from_cube_map(cube_map_tex);
+	bound_tex = irradiance_map;
 
 #if 0
 	/* NORMALS TEST */
@@ -142,7 +144,7 @@ void core_render()
 {
 	graphics_entity_render_pbr_shader(pbr_shader, &camera, &e, lights);
 	graphics_entity_render_basic_shader(basic_shader, &camera, &light_entity);
-	graphics_render_skybox(cube_map_tex, &camera);
+	graphics_render_skybox(bound_tex, &camera);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
@@ -216,7 +218,6 @@ void core_input_process(boolean* key_state, r32 delta_time)
 	}
 	if (key_state[GLFW_KEY_N])
 	{
-		printf("tweaking..\n");
 		static boolean normal = false;
 
 		if (normal)
@@ -226,6 +227,18 @@ void core_input_process(boolean* key_state, r32 delta_time)
 
 		normal = !normal;
 		key_state[GLFW_KEY_N] = false;
+	}
+	if (key_state[GLFW_KEY_B])
+	{
+		static boolean tex = false;
+
+		if (tex)
+			bound_tex = irradiance_map;
+		else
+			bound_tex = cube_map_tex;
+
+		tex = !tex;
+		key_state[GLFW_KEY_B] = false;
 	}
 }
 
