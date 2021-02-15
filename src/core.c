@@ -71,7 +71,8 @@ int core_init()
 	Mesh m = graphics_mesh_create_from_obj_with_texture("./res/sphere.obj", normal, albedo, metallic, roughness);
 	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){0.1f, 0.1f, 0.1f});
 
-	u32 equirectangular_map = graphics_texture_create("./res/newport_loft.hdr");
+	Float_Image_Data fid = graphics_float_image_load("./res/newport_loft.hdr");
+	u32 equirectangular_map = graphics_texture_create_from_float_data(&fid);
 	cube_map_tex = graphics_generate_cube_map_from_equirectangular_map(equirectangular_map);
 
 #if 0
@@ -141,7 +142,7 @@ void core_render()
 {
 	graphics_entity_render_pbr_shader(pbr_shader, &camera, &e, lights);
 	graphics_entity_render_basic_shader(basic_shader, &camera, &light_entity);
-	//graphics_render_skybox(cube_map_tex, &camera);
+	graphics_render_skybox(cube_map_tex, &camera);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)

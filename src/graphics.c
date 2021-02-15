@@ -7,6 +7,56 @@
 #include <dynamic_array.h>
 #include <math.h>
 
+#define EQUIRECTANGULAR_TO_CUBE_VERTEX_SHADER_PATH "./shaders/equirectangular_to_cube_shader.vs"
+#define EQUIRECTANGULAR_TO_CUBE_FRAGMENT_SHADER_PATH "./shaders/equirectangular_to_cube_shader.fs"
+#define SKYBOX_VERTEX_SHADER_PATH "./shaders/skybox.vs"
+#define SKYBOX_FRAGMENT_SHADER_PATH "./shaders/skybox.fs"
+
+static r32 cube_vertices[] = {
+  // positions          
+  -1.0f,  1.0f, -1.0f,
+  -1.0f, -1.0f, -1.0f,
+  1.0f, -1.0f, -1.0f,
+  1.0f, -1.0f, -1.0f,
+  1.0f,  1.0f, -1.0f,
+  -1.0f,  1.0f, -1.0f,
+
+  -1.0f, -1.0f,  1.0f,
+  -1.0f, -1.0f, -1.0f,
+  -1.0f,  1.0f, -1.0f,
+  -1.0f,  1.0f, -1.0f,
+  -1.0f,  1.0f,  1.0f,
+  -1.0f, -1.0f,  1.0f,
+
+  1.0f, -1.0f, -1.0f,
+  1.0f, -1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f, -1.0f,
+  1.0f, -1.0f, -1.0f,
+
+  -1.0f, -1.0f,  1.0f,
+  -1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f, -1.0f,  1.0f,
+  -1.0f, -1.0f,  1.0f,
+
+  -1.0f,  1.0f, -1.0f,
+  1.0f,  1.0f, -1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  -1.0f,  1.0f,  1.0f,
+  -1.0f,  1.0f, -1.0f,
+
+  -1.0f, -1.0f, -1.0f,
+  -1.0f, -1.0f,  1.0f,
+  1.0f, -1.0f, -1.0f,
+  1.0f, -1.0f, -1.0f,
+  -1.0f, -1.0f,  1.0f,
+  1.0f, -1.0f,  1.0f
+};
+
 Image_Data graphics_image_load(const s8* image_path)
 {
 	Image_Data image_data;
@@ -480,7 +530,7 @@ u32 graphics_texture_create_cube_map()
 	return env_cube_map;
 }
 
-static mat4 get_transforms_to_generate_cube_map(vec3 light_position, vec3 view_direction, vec3 up_vector,
+static mat4 get_transforms_to_generate_cube_map(vec3 position, vec3 view_direction, vec3 up_vector,
 	r32 near_plane, r32 far_plane)
 {
   /* PROJECTION MATRIX */
@@ -521,9 +571,9 @@ static mat4 get_transforms_to_generate_cube_map(vec3 light_position, vec3 view_d
   vec3 v = gm_vec3_cross(w, u);
 
   mat4 view_matrix = (mat4) {
-    u.x, u.y, u.z, -gm_vec3_dot(u, light_position),
-    v.x, v.y, v.z, -gm_vec3_dot(v, light_position),
-    w.x, w.y, w.z, -gm_vec3_dot(w, light_position),
+    u.x, u.y, u.z, -gm_vec3_dot(u, position),
+    v.x, v.y, v.z, -gm_vec3_dot(v, position),
+    w.x, w.y, w.z, -gm_vec3_dot(w, position),
     0.0f, 0.0f, 0.0f, 1.0f
   };
 
@@ -531,73 +581,23 @@ static mat4 get_transforms_to_generate_cube_map(vec3 light_position, vec3 view_d
 }
 
 typedef struct {
-  Shader shader;
   boolean initialized;
   GLuint vao;
 } Render_Cube_Context;
 
-Render_Cube_Context cube_render;
+Render_Cube_Context render_cube_ctx;
 
-static r32 cube_vertices[] = {
-  // positions          
-  -1.0f,  1.0f, -1.0f,
-  -1.0f, -1.0f, -1.0f,
-  1.0f, -1.0f, -1.0f,
-  1.0f, -1.0f, -1.0f,
-  1.0f,  1.0f, -1.0f,
-  -1.0f,  1.0f, -1.0f,
-
-  -1.0f, -1.0f,  1.0f,
-  -1.0f, -1.0f, -1.0f,
-  -1.0f,  1.0f, -1.0f,
-  -1.0f,  1.0f, -1.0f,
-  -1.0f,  1.0f,  1.0f,
-  -1.0f, -1.0f,  1.0f,
-
-  1.0f, -1.0f, -1.0f,
-  1.0f, -1.0f,  1.0f,
-  1.0f,  1.0f,  1.0f,
-  1.0f,  1.0f,  1.0f,
-  1.0f,  1.0f, -1.0f,
-  1.0f, -1.0f, -1.0f,
-
-  -1.0f, -1.0f,  1.0f,
-  -1.0f,  1.0f,  1.0f,
-  1.0f,  1.0f,  1.0f,
-  1.0f,  1.0f,  1.0f,
-  1.0f, -1.0f,  1.0f,
-  -1.0f, -1.0f,  1.0f,
-
-  -1.0f,  1.0f, -1.0f,
-  1.0f,  1.0f, -1.0f,
-  1.0f,  1.0f,  1.0f,
-  1.0f,  1.0f,  1.0f,
-  -1.0f,  1.0f,  1.0f,
-  -1.0f,  1.0f, -1.0f,
-
-  -1.0f, -1.0f, -1.0f,
-  -1.0f, -1.0f,  1.0f,
-  1.0f, -1.0f, -1.0f,
-  1.0f, -1.0f, -1.0f,
-  -1.0f, -1.0f,  1.0f,
-  1.0f, -1.0f,  1.0f
-};
-
-#define EQUIRECTANGULAR_TO_CUBE_VERTEX_SHADER_PATH "./shaders/equirectangular_to_cube_shader.vs"
-#define EQUIRECTANGULAR_TO_CUBE_FRAGMENT_SHADER_PATH "./shaders/equirectangular_to_cube_shader.fs"
-
-static void renderer_cube_init()
+static void render_cube_init()
 {
-  if (!cube_render.initialized)
+  if (!render_cube_ctx.initialized)
   {
-    cube_render.shader = graphics_shader_create(EQUIRECTANGULAR_TO_CUBE_VERTEX_SHADER_PATH, EQUIRECTANGULAR_TO_CUBE_FRAGMENT_SHADER_PATH);
-    cube_render.initialized = true;
+    render_cube_ctx.initialized = true;
 
     u32 VBO;
-    glGenVertexArrays(1, &cube_render.vao);
+    glGenVertexArrays(1, &render_cube_ctx.vao);
     glGenBuffers(1, &VBO);
 
-    glBindVertexArray(cube_render.vao);
+    glBindVertexArray(render_cube_ctx.vao);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(cube_vertices), 0, GL_STATIC_DRAW);
@@ -612,8 +612,27 @@ static void renderer_cube_init()
   }
 }
 
+typedef struct {
+  Shader shader;
+  boolean initialized;
+} Render_Equirectangular_Map_Context;
+
+Render_Equirectangular_Map_Context render_equirectangular_map_ctx;
+
+static void render_equirectangular_map_init()
+{
+  if (!render_equirectangular_map_ctx.initialized)
+  {
+    render_equirectangular_map_ctx.shader = graphics_shader_create(EQUIRECTANGULAR_TO_CUBE_VERTEX_SHADER_PATH, EQUIRECTANGULAR_TO_CUBE_FRAGMENT_SHADER_PATH);
+    render_equirectangular_map_ctx.initialized = true;
+  }
+}
+
 u32 graphics_generate_cube_map_from_equirectangular_map(u32 equirectangular_map)
 {
+	render_cube_init();
+	render_equirectangular_map_init();
+
 	// Create framebuffer
 	unsigned int captureFBO, captureRBO;
 	glGenFramebuffers(1, &captureFBO);
@@ -624,7 +643,6 @@ u32 graphics_generate_cube_map_from_equirectangular_map(u32 equirectangular_map)
 	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
 
-	renderer_cube_init();
 	u32 cube_map = graphics_texture_create_cube_map();
 
 	mat4 cube_map_transforms[6];
@@ -641,16 +659,16 @@ u32 graphics_generate_cube_map_from_equirectangular_map(u32 equirectangular_map)
 	cube_map_transforms[5] = get_transforms_to_generate_cube_map((vec3){0.0f, 0.0f, 0.0f},
 		(vec3){0.0f, 0.0f, -1.0f}, (vec3){0.0f, -1.0f, 0.0f}, 0.1f, 10.0f);
 
-	glUseProgram(cube_render.shader);
-	GLint equirectangular_map_location = glGetUniformLocation(cube_render.shader, "equirectangular_map");
+	glUseProgram(render_equirectangular_map_ctx.shader);
+	GLint equirectangular_map_location = glGetUniformLocation(render_equirectangular_map_ctx.shader, "equirectangular_map");
 	glUniform1i(equirectangular_map_location, 0);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, equirectangular_map);
-	GLint transform_location = glGetUniformLocation(cube_render.shader, "transform_matrix");
+	GLint transform_location = glGetUniformLocation(render_equirectangular_map_ctx.shader, "transform_matrix");
 
 	glDepthMask(GL_FALSE);
 	glDepthFunc(GL_LEQUAL);
-	glBindVertexArray(cube_render.vao);
+	glBindVertexArray(render_cube_ctx.vao);
 	GLint m_viewport[4];
 	glGetIntegerv(GL_VIEWPORT, m_viewport);
 	glViewport(0, 0, 512, 512);
@@ -823,109 +841,37 @@ Mesh graphics_mesh_create_from_obj_with_texture(const s8* obj_path, u32 normal_m
 	return m;
 }
 
-
-
-
 /* **** SKYBOX ***** */
 
-#define SKYBOX_VERTEX_SHADER_PATH "./shaders/skybox.vs"
-#define SKYBOX_FRAGMENT_SHADER_PATH "./shaders/skybox.fs"
-
-/*
-  Sky Box
-*/
 
 typedef struct {
   Shader shader;
   boolean initialized;
-  GLuint vao;
 } Render_Skybox_Context;
 
-Render_Skybox_Context skybox_render;
+Render_Skybox_Context render_skybox_ctx;
 
-static r32 skybox_vertices[] = {
-  // positions          
-  -1.0f,  1.0f, -1.0f,
-  -1.0f, -1.0f, -1.0f,
-  1.0f, -1.0f, -1.0f,
-  1.0f, -1.0f, -1.0f,
-  1.0f,  1.0f, -1.0f,
-  -1.0f,  1.0f, -1.0f,
-
-  -1.0f, -1.0f,  1.0f,
-  -1.0f, -1.0f, -1.0f,
-  -1.0f,  1.0f, -1.0f,
-  -1.0f,  1.0f, -1.0f,
-  -1.0f,  1.0f,  1.0f,
-  -1.0f, -1.0f,  1.0f,
-
-  1.0f, -1.0f, -1.0f,
-  1.0f, -1.0f,  1.0f,
-  1.0f,  1.0f,  1.0f,
-  1.0f,  1.0f,  1.0f,
-  1.0f,  1.0f, -1.0f,
-  1.0f, -1.0f, -1.0f,
-
-  -1.0f, -1.0f,  1.0f,
-  -1.0f,  1.0f,  1.0f,
-  1.0f,  1.0f,  1.0f,
-  1.0f,  1.0f,  1.0f,
-  1.0f, -1.0f,  1.0f,
-  -1.0f, -1.0f,  1.0f,
-
-  -1.0f,  1.0f, -1.0f,
-  1.0f,  1.0f, -1.0f,
-  1.0f,  1.0f,  1.0f,
-  1.0f,  1.0f,  1.0f,
-  -1.0f,  1.0f,  1.0f,
-  -1.0f,  1.0f, -1.0f,
-
-  -1.0f, -1.0f, -1.0f,
-  -1.0f, -1.0f,  1.0f,
-  1.0f, -1.0f, -1.0f,
-  1.0f, -1.0f, -1.0f,
-  -1.0f, -1.0f,  1.0f,
-  1.0f, -1.0f,  1.0f
-};
-
-static void
-renderer_skybox_init()
+static void render_skybox_init()
 {
-  if (!skybox_render.initialized)
+  if (!render_skybox_ctx.initialized)
   {
-    skybox_render.shader = graphics_shader_create(SKYBOX_VERTEX_SHADER_PATH, SKYBOX_FRAGMENT_SHADER_PATH);
-    skybox_render.initialized = true;
-
-    u32 VBO;
-    glGenVertexArrays(1, &skybox_render.vao);
-    glGenBuffers(1, &VBO);
-
-    glBindVertexArray(skybox_render.vao);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(skybox_vertices), 0, GL_STATIC_DRAW);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(skybox_vertices), skybox_vertices);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
-    glEnableVertexAttribArray(0);
-
-    glBindVertexArray(0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    render_skybox_ctx.shader = graphics_shader_create(SKYBOX_VERTEX_SHADER_PATH, SKYBOX_FRAGMENT_SHADER_PATH);
+    render_skybox_ctx.initialized = true;
   }
 }
 
 void graphics_render_skybox(u32 skybox_texture, const Perspective_Camera* camera)
 {
-  renderer_skybox_init();
+  render_cube_init();
+  render_skybox_init();
 
-  glUseProgram(skybox_render.shader);
-  GLint skybox_texture_location = glGetUniformLocation(skybox_render.shader, "skybox_texture");
+  glUseProgram(render_skybox_ctx.shader);
+  GLint skybox_texture_location = glGetUniformLocation(render_skybox_ctx.shader, "skybox_texture");
   glUniform1i(skybox_texture_location, 0);
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_CUBE_MAP, skybox_texture);
-  GLint view_matrix_location = glGetUniformLocation(skybox_render.shader, "view_matrix");
-  GLint projection_matrix_location = glGetUniformLocation(skybox_render.shader, "projection_matrix");
+  GLint view_matrix_location = glGetUniformLocation(render_skybox_ctx.shader, "view_matrix");
+  GLint projection_matrix_location = glGetUniformLocation(render_skybox_ctx.shader, "projection_matrix");
 
   // We remove the translation from the view matrix, to pretend the camera is in the center of the world.
   mat4 view_matrix = camera->view_matrix;
@@ -939,10 +885,10 @@ void graphics_render_skybox(u32 skybox_texture, const Perspective_Camera* camera
 
   glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)view_matrix.data);
   glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)camera->projection_matrix.data);
-  glBindVertexArray(skybox_render.vao);
+  glBindVertexArray(render_cube_ctx.vao);
   glDepthMask(GL_FALSE);
   glDepthFunc(GL_LEQUAL);
-  glDrawArrays(GL_TRIANGLES, 0, sizeof(skybox_vertices) / (sizeof(r32) * 3));
+  glDrawArrays(GL_TRIANGLES, 0, sizeof(cube_vertices) / (sizeof(r32) * 3));
   glDepthFunc(GL_LESS);
   glDepthMask(GL_TRUE);
   glUseProgram(0);
