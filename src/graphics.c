@@ -11,6 +11,8 @@
 #define EQUIRECTANGULAR_TO_CUBE_FRAGMENT_SHADER_PATH "./shaders/equirectangular_to_cube_shader.fs"
 #define IRRADIANCE_VERTEX_SHADER_PATH "./shaders/irradiance.vs"
 #define IRRADIANCE_FRAGMENT_SHADER_PATH "./shaders/irradiance.fs"
+#define PREFILTER_ENVIRONMENT_MAP_VERTEX_SHADER_PATH "./shaders/prefilter_environment_map.vs"
+#define PREFILTER_ENVIRONMENT_MAP_FRAGMENT_SHADER_PATH "./shaders/prefilter_environment_map.fs"
 #define SKYBOX_VERTEX_SHADER_PATH "./shaders/skybox.vs"
 #define SKYBOX_FRAGMENT_SHADER_PATH "./shaders/skybox.fs"
 
@@ -521,7 +523,26 @@ void graphics_entity_render_pbr_shader(Shader shader, const Perspective_Camera* 
 	glUseProgram(0);
 }
 
-u32 graphics_texture_create_cube_map(GLint width, GLint height)
+static u32 graphics_texture_create_cube_map(GLint width, GLint height)
+{
+	unsigned int env_cube_map;
+	glGenTextures(1, &env_cube_map);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map);
+	for (unsigned int i = 0; i < 6; ++i)
+	{
+		// note that we store each face with 16 bit floating point values
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 
+					width, height, 0, GL_RGB, GL_FLOAT, 0);
+	}
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	return env_cube_map;
+}
+
+static u32 graphics_texture_create_irradiance_map(GLint width, GLint height)
 {
 	unsigned int env_cube_map;
 	glGenTextures(1, &env_cube_map);
@@ -538,6 +559,28 @@ u32 graphics_texture_create_cube_map(GLint width, GLint height)
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	return env_cube_map;
+}
+
+static u32 graphics_texture_create_prefilter_map(GLint width, GLint height)
+{
+	unsigned int prefilter_map;
+	glGenTextures(1, &prefilter_map);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, prefilter_map);
+	for (unsigned int i = 0; i < 6; ++i)
+	{
+		// note that we store each face with 16 bit floating point values
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 
+					width, height, 0, GL_RGB, GL_FLOAT, 0);
+	}
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+
+	return prefilter_map;
 }
 
 static mat4 get_transforms_to_generate_cube_map(vec3 position, vec3 view_direction, vec3 up_vector,
@@ -696,6 +739,10 @@ u32 graphics_generate_cube_map_from_equirectangular_map(u32 equirectangular_map)
 		glDrawArrays(GL_TRIANGLES, 0, sizeof(cube_vertices) / (sizeof(r32) * 3));
 	}
 
+	// generate mipmaps
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cube_map);
+	glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+
 	glDepthFunc(GL_LESS);
 	glDepthMask(GL_TRUE);
 	glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
@@ -739,7 +786,7 @@ u32 graphics_generate_irradiance_map_from_cube_map(u32 cube_map)
 	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, cube_map_face_width, cube_map_face_height);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
 
-	u32 irradiance_map = graphics_texture_create_cube_map(cube_map_face_width, cube_map_face_height);
+	u32 irradiance_map = graphics_texture_create_irradiance_map(cube_map_face_width, cube_map_face_height);
 
 	mat4 cube_map_transforms[6];
 	cube_map_transforms[0] = get_transforms_to_generate_cube_map((vec3){0.0f, 0.0f, 0.0f},
@@ -786,6 +833,103 @@ u32 graphics_generate_irradiance_map_from_cube_map(u32 cube_map)
 	glUseProgram(0);
 	glBindVertexArray(0);
 	return irradiance_map;
+}
+
+typedef struct {
+  Shader shader;
+  boolean initialized;
+} Render_Prefiltered_Environment_Map_Context;
+
+Render_Prefiltered_Environment_Map_Context render_prefiltered_environment_map_ctx;
+
+static void render_prefiltered_environment_map_init()
+{
+  if (!render_prefiltered_environment_map_ctx.initialized)
+  {
+    render_prefiltered_environment_map_ctx.shader = graphics_shader_create(PREFILTER_ENVIRONMENT_MAP_VERTEX_SHADER_PATH,
+		PREFILTER_ENVIRONMENT_MAP_FRAGMENT_SHADER_PATH);
+    render_prefiltered_environment_map_ctx.initialized = true;
+  }
+}
+
+u32 graphics_generate_prefiltered_environment_map_from_cube_map(u32 cube_map)
+{
+	const int cube_map_face_width = 128;
+	const int cube_map_face_height = 128;
+
+	render_cube_init();
+	render_prefiltered_environment_map_init();
+
+	// Create framebuffer
+	unsigned int captureFBO, captureRBO;
+	glGenFramebuffers(1, &captureFBO);
+	glGenRenderbuffers(1, &captureRBO);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+	glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, cube_map_face_width, cube_map_face_height);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+
+	u32 prefiltered_environment_map = graphics_texture_create_prefilter_map(cube_map_face_width, cube_map_face_height);
+
+	mat4 cube_map_transforms[6];
+	cube_map_transforms[0] = get_transforms_to_generate_cube_map((vec3){0.0f, 0.0f, 0.0f},
+		(vec3){1.0f, 0.0f, 0.0f}, (vec3){0.0f, -1.0f, 0.0f}, 0.1f, 10.0f);
+	cube_map_transforms[1] = get_transforms_to_generate_cube_map((vec3){0.0f, 0.0f, 0.0f},
+		(vec3){-1.0f, 0.0f, 0.0f}, (vec3){0.0f, -1.0f, 0.0f}, 0.1f, 10.0f);
+	cube_map_transforms[2] = get_transforms_to_generate_cube_map((vec3){0.0f, 0.0f, 0.0f},
+		(vec3){0.0f, 1.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f}, 0.1f, 10.0f);
+	cube_map_transforms[3] = get_transforms_to_generate_cube_map((vec3){0.0f, 0.0f, 0.0f},
+		(vec3){0.0f, -1.0f, 0.0f}, (vec3){0.0f, 0.0f, -1.0f}, 0.1f, 10.0f);
+	cube_map_transforms[4] = get_transforms_to_generate_cube_map((vec3){0.0f, 0.0f, 0.0f},
+		(vec3){0.0f, 0.0f, 1.0f}, (vec3){0.0f, -1.0f, 0.0f}, 0.1f, 10.0f);
+	cube_map_transforms[5] = get_transforms_to_generate_cube_map((vec3){0.0f, 0.0f, 0.0f},
+		(vec3){0.0f, 0.0f, -1.0f}, (vec3){0.0f, -1.0f, 0.0f}, 0.1f, 10.0f);
+
+	glUseProgram(render_prefiltered_environment_map_ctx.shader);
+	GLint cube_map_location = glGetUniformLocation(render_prefiltered_environment_map_ctx.shader, "cube_map");
+	glUniform1i(cube_map_location, 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cube_map);
+	GLint transform_location = glGetUniformLocation(render_prefiltered_environment_map_ctx.shader, "transform_matrix");
+
+	glDepthMask(GL_FALSE);
+	glDepthFunc(GL_LEQUAL);
+	glBindVertexArray(render_cube_ctx.vao);
+	GLint m_viewport[4];
+	glGetIntegerv(GL_VIEWPORT, m_viewport);
+	glViewport(0, 0, cube_map_face_width, cube_map_face_height);
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+
+	GLint roughness_location = glGetUniformLocation(render_prefiltered_environment_map_ctx.shader, "roughness");
+	const u32 max_mip_levels = 5;
+	for (u32 mip = 0; mip < max_mip_levels; ++mip)
+	{
+		u32 mip_width = cube_map_face_width * powf(0.5f, mip);
+		u32 mip_height = cube_map_face_height * powf(0.5f, mip);
+		glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mip_width, mip_height);
+		glViewport(0, 0, mip_width, mip_height);
+
+		r32 roughness = (r32)mip / (r32)(max_mip_levels - 1);
+		glUniform1f(roughness_location, roughness);
+		for (u32 i = 0; i < 6; ++i)
+		{
+			glUniformMatrix4fv(transform_location, 1, GL_TRUE, (GLfloat*)cube_map_transforms[i].data);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 
+							GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefiltered_environment_map, mip);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			glDrawArrays(GL_TRIANGLES, 0, sizeof(cube_vertices) / (sizeof(r32) * 3));
+		}
+	}
+
+	glDepthFunc(GL_LESS);
+	glDepthMask(GL_TRUE);
+	glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glUseProgram(0);
+	glBindVertexArray(0);
+	return prefiltered_environment_map;
 }
 
 u32 graphics_texture_create_from_data(const Image_Data* image_data)

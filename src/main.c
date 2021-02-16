@@ -125,6 +125,7 @@ s32 main(s32 argc, s8** argv)
 		return -1;
 
 	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	r64 last_frame = glfwGetTime();
