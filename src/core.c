@@ -2,10 +2,13 @@
 #include <dynamic_array.h>
 #include <stdio.h>
 #include <math.h>
+#include <stb_image_write.h>
 #include "core.h"
 #include "graphics.h"
 #include "obj.h"
 #include "menu.h"
+
+#define CLAMP(V, X, Y) (((V) < (X)) ? (X) : ((V) > (Y)) ? (Y) : (V))
 
 #define PBR_VERTEX_SHADER_PATH "./shaders/pbr_shader.vs"
 #define PBR_FRAGMENT_SHADER_PATH "./shaders/pbr_shader.fs"
@@ -90,6 +93,89 @@ static IBL_Data ibl_data_create(const char* hdr_tex_file)
 	return ibl_data;
 }
 
+static void extract_texture(u32 texture, GLenum texture_target, GLenum texture_specific_target, GLint level, const char* path)
+{
+	glBindTexture(texture_target, texture);
+
+	u32 width, height;
+	glGetTexLevelParameteriv(texture_specific_target, level, GL_TEXTURE_WIDTH, &width);
+	glGetTexLevelParameteriv(texture_specific_target, level, GL_TEXTURE_HEIGHT, &height);
+
+	r32* pixels = malloc(width * height * 3 * sizeof(r32));
+	glGetTexImage(texture_specific_target, level, GL_RGB, GL_FLOAT, pixels);
+
+	u8* u8_pixels = malloc(width * height * 3 * sizeof(u8));
+	for (u32 y = 0; y < height; ++y)
+	{
+		for (u32 x = 0; x < width; ++x)
+		{
+			r32 r = CLAMP(pixels[y * width * 3 + x * 3 + 0], 0.0f, 1.0f);
+			r32 g = CLAMP(pixels[y * width * 3 + x * 3 + 1], 0.0f, 1.0f);
+			r32 b = CLAMP(pixels[y * width * 3 + x * 3 + 2], 0.0f, 1.0f);
+			u8_pixels[y * width * 3 + x * 3 + 0] = (u8)floorf(255.0f * r);
+			u8_pixels[y * width * 3 + x * 3 + 1] = (u8)floorf(255.0f * g);
+			u8_pixels[y * width * 3 + x * 3 + 2] = (u8)floorf(255.0f * b);
+		}
+	}
+	stbi_write_png(path, width, height, 3, u8_pixels, width * 3 * sizeof(u8));
+	free(pixels);
+	free(u8_pixels);
+}
+
+static void read_ibl_textures(const IBL_Data* ibl_data)
+{
+	extract_texture(ibl_data->environment_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, "output/env_map_pos_x.png");
+	extract_texture(ibl_data->environment_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 0, "output/env_map_pos_y.png");
+	extract_texture(ibl_data->environment_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 0, "output/env_map_pos_z.png");
+	extract_texture(ibl_data->environment_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 0, "output/env_map_neg_x.png");
+	extract_texture(ibl_data->environment_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, "output/env_map_neg_y.png");
+	extract_texture(ibl_data->environment_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, "output/env_map_neg_z.png");
+
+	extract_texture(ibl_data->irradiance_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, "output/irr_map_pos_x.png");
+	extract_texture(ibl_data->irradiance_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 0, "output/irr_map_pos_y.png");
+	extract_texture(ibl_data->irradiance_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 0, "output/irr_map_pos_z.png");
+	extract_texture(ibl_data->irradiance_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 0, "output/irr_map_neg_x.png");
+	extract_texture(ibl_data->irradiance_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, "output/irr_map_neg_y.png");
+	extract_texture(ibl_data->irradiance_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, "output/irr_map_neg_z.png");
+
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, "output/prefiltered_map_pos_x_0.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 0, "output/prefiltered_map_pos_y_0.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 0, "output/prefiltered_map_pos_z_0.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 0, "output/prefiltered_map_neg_x_0.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, "output/prefiltered_map_neg_y_0.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, "output/prefiltered_map_neg_z_0.png");
+
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_X, 1, "output/prefiltered_map_pos_x_1.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 1, "output/prefiltered_map_pos_y_1.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 1, "output/prefiltered_map_pos_z_1.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 1, "output/prefiltered_map_neg_x_1.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 1, "output/prefiltered_map_neg_y_1.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, 1, "output/prefiltered_map_neg_z_1.png");
+
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_X, 2, "output/prefiltered_map_pos_x_2.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 2, "output/prefiltered_map_pos_y_2.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 2, "output/prefiltered_map_pos_z_2.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 2, "output/prefiltered_map_neg_x_2.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 2, "output/prefiltered_map_neg_y_2.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, 2, "output/prefiltered_map_neg_z_2.png");
+
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_X, 3, "output/prefiltered_map_pos_x_3.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 3, "output/prefiltered_map_pos_y_3.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 3, "output/prefiltered_map_pos_z_3.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 3, "output/prefiltered_map_neg_x_3.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 3, "output/prefiltered_map_neg_y_3.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, 3, "output/prefiltered_map_neg_z_3.png");
+
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_X, 4, "output/prefiltered_map_pos_x_4.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 4, "output/prefiltered_map_pos_y_4.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 4, "output/prefiltered_map_pos_z_4.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 4, "output/prefiltered_map_neg_x_4.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 4, "output/prefiltered_map_neg_y_4.png");
+	extract_texture(ibl_data->prefiltered_map, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, 4, "output/prefiltered_map_neg_z_4.png");
+
+	extract_texture(ibl_data->brdf_lut, GL_TEXTURE_2D, GL_TEXTURE_2D, 0, "output/brdf_lut.png");
+}
+
 int core_init()
 {
 	// Create shader
@@ -102,6 +188,7 @@ int core_init()
 
 	ibl_datas = array_create(IBL_Data, 1);
 	IBL_Data ibl_data = ibl_data_create("./res/newport_loft.hdr");
+	read_ibl_textures(&ibl_data);
 	array_push(ibl_datas, &ibl_data);
 	ibl_data = ibl_data_create("./res/immenstadter_horn_8k.hdr");
 	array_push(ibl_datas, &ibl_data);
