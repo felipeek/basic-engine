@@ -17,14 +17,20 @@ static Shader pbr_shader, basic_shader, equirectangular_to_cube_shader;
 static Perspective_Camera camera;
 static Light* lights;
 static Entity e, light_entity;
-static u32 cube_map_tex, irradiance_map, prefiltered_map, brdf_lut, bound_tex;
+
+typedef struct
+{
+	u32 environment_map, irradiance_map, prefiltered_map, brdf_lut;
+} IBL_Data;
+static IBL_Data* ibl_datas;
+static u32 bound_ibl_data = 0;
 
 static Entity* test_entities;
 
 static Perspective_Camera create_camera()
 {
 	Perspective_Camera camera;
-	vec4 camera_position =(vec4) {0.0f, 0.0f, 1.0f, 1.0f};
+	vec4 camera_position =(vec4) {0.0f, 2.0f, 6.0f, 1.0f};
 	r32 camera_near_plane = -0.01f;
 	r32 camera_far_plane = -1000.0f;
 	r32 camera_fov = 45.0f;
@@ -53,7 +59,6 @@ static Light* create_lights()
 
 static void create_test_entities()
 {
-	test_entities = array_create(Entity, 1);
 	int x_n = 5, y_n = 5;
 
 	const r32 distance = 0.3f;
@@ -73,6 +78,18 @@ static void create_test_entities()
 	}
 }
 
+static IBL_Data ibl_data_create(const char* hdr_tex_file)
+{
+	IBL_Data ibl_data;
+	Float_Image_Data fid = graphics_float_image_load(hdr_tex_file);
+	u32 equirectangular_map = graphics_texture_create_from_float_data(&fid);
+	ibl_data.environment_map = graphics_generate_cube_map_from_equirectangular_map(equirectangular_map);
+	ibl_data.irradiance_map = graphics_generate_irradiance_map_from_cube_map(ibl_data.environment_map);
+	ibl_data.prefiltered_map = graphics_generate_prefiltered_environment_map_from_cube_map(ibl_data.environment_map);
+	ibl_data.brdf_lut = graphics_generate_brdf_lut_tex();
+	return ibl_data;
+}
+
 int core_init()
 {
 	// Create shader
@@ -83,22 +100,40 @@ int core_init()
 	// Create light
 	lights = create_lights();
 
-	create_test_entities();
+	ibl_datas = array_create(IBL_Data, 1);
+	IBL_Data ibl_data = ibl_data_create("./res/newport_loft.hdr");
+	array_push(ibl_datas, &ibl_data);
+	ibl_data = ibl_data_create("./res/immenstadter_horn_8k.hdr");
+	array_push(ibl_datas, &ibl_data);
 
-	u32 albedo = graphics_texture_create("./res/rustediron2_basecolor.png");
-	u32 metallic = graphics_texture_create("./res/rustediron2_metallic.png");
-	u32 roughness = graphics_texture_create("./res/rustediron2_roughness.png");
-	u32 normal = graphics_texture_create("./res/rustediron2_normal.png");
-	Mesh m = graphics_mesh_create_from_obj_with_texture("./res/sphere.obj", normal, albedo, metallic, roughness);
-	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){0.1f, 0.1f, 0.1f});
+	test_entities = array_create(Entity, 1);
+	//create_test_entities();
 
-	Float_Image_Data fid = graphics_float_image_load("./res/newport_loft.hdr");
-	u32 equirectangular_map = graphics_texture_create_from_float_data(&fid);
-	cube_map_tex = graphics_generate_cube_map_from_equirectangular_map(equirectangular_map);
-	irradiance_map = graphics_generate_irradiance_map_from_cube_map(cube_map_tex);
-	prefiltered_map = graphics_generate_prefiltered_environment_map_from_cube_map(cube_map_tex);
-	brdf_lut = graphics_generate_brdf_lut_tex();
-	bound_tex = prefiltered_map;
+	//u32 albedo = graphics_texture_create("./res/rustediron2_basecolor.png");
+	//u32 metallic = graphics_texture_create("./res/rustediron2_metallic.png");
+	//u32 roughness = graphics_texture_create("./res/rustediron2_roughness.png");
+	//u32 normal = graphics_texture_create("./res/rustediron2_normal.png");
+	//Mesh m = graphics_mesh_create_from_obj_with_texture("./res/sphere.obj", normal, albedo, metallic, roughness);
+	//graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){0.1f, 0.1f, 0.1f});
+
+	u32 albedo = graphics_texture_create("./res/hydrant/DefaultMaterial_Base_Color.png");
+	u32 metallic = graphics_texture_create("./res/hydrant/DefaultMaterial_Metallic.png");
+	u32 roughness = graphics_texture_create("./res/hydrant/DefaultMaterial_Roughness.png");
+	u32 normal = graphics_texture_create("./res/hydrant/DefaultMaterial_Normal_OpenGL.png");
+	//u32 albedo = graphics_texture_create("./res/hydrant/tex2/hydrant_DefaultMaterial_BaseColor.png");
+	//u32 metallic = graphics_texture_create("./res/hydrant/tex2/hydrant_DefaultMaterial_Metallic.png");
+	//u32 roughness = graphics_texture_create("./res/hydrant/tex2/hydrant_DefaultMaterial_Roughness.png");
+	//u32 normal = graphics_texture_create("./res/hydrant/tex2/hydrant_DefaultMaterial_Normal.png");
+	Mesh m = graphics_mesh_create_from_obj_with_texture("./res/hydrant/hydrant.obj", normal, albedo, metallic, roughness);
+	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 360.0f - 45.0f), (vec3){1.0f, 1.0f, 1.0f});
+
+	//u32 albedo = graphics_texture_create("./res/coupe/coupe_d.png");
+	//u32 metallic = graphics_texture_create("./res/coupe/coupe_m.png");
+	//u32 roughness = graphics_texture_create("./res/coupe/coupe_r.png");
+	//u32 normal = graphics_texture_create("./res/coupe/coupe_n.png");
+	//Mesh m = graphics_mesh_create_from_obj_with_texture("./res/coupe/coupe.obj", normal, albedo, metallic, roughness);
+	//graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){1.0f, 1.0f, 1.0f});
+
 
 #if 0
 	/* NORMALS TEST */
@@ -165,14 +200,16 @@ void core_update(r32 delta_time)
 
 void core_render()
 {
-	//graphics_entity_render_pbr_shader(pbr_shader, &camera, &e, lights, irradiance_map);
+	graphics_entity_render_pbr_shader(pbr_shader, &camera, &e, lights, ibl_datas[bound_ibl_data].irradiance_map,
+	ibl_datas[bound_ibl_data].prefiltered_map, ibl_datas[bound_ibl_data].brdf_lut);
 	graphics_entity_render_basic_shader(basic_shader, &camera, &light_entity);
-	graphics_render_skybox(bound_tex, &camera);
+	graphics_render_skybox(ibl_datas[bound_ibl_data].environment_map, &camera);
 
 	for (u32 i = 0; i < array_get_length(test_entities); ++i)
 	{
 		Entity* current_entity = &test_entities[i];
-		graphics_entity_render_pbr_shader(pbr_shader, &camera, current_entity, lights, irradiance_map, prefiltered_map, brdf_lut);
+		graphics_entity_render_pbr_shader(pbr_shader, &camera, current_entity, lights, ibl_datas[bound_ibl_data].irradiance_map,
+			ibl_datas[bound_ibl_data].prefiltered_map, ibl_datas[bound_ibl_data].brdf_lut);
 	}
 }
 
@@ -259,14 +296,9 @@ void core_input_process(boolean* key_state, r32 delta_time)
 	}
 	if (key_state[GLFW_KEY_B])
 	{
-		static boolean tex = false;
-
-		if (tex)
-			bound_tex = irradiance_map;
-		else
-			bound_tex = cube_map_tex;
-
-		tex = !tex;
+		++bound_ibl_data;
+		if (bound_ibl_data == array_get_length(ibl_datas))
+			bound_ibl_data = 0;
 		key_state[GLFW_KEY_B] = false;
 	}
 }

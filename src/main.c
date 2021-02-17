@@ -95,6 +95,7 @@ static GLFWwindow* init_glfw()
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_SAMPLES, 4);
 	GLFWwindow* window = glfwCreateWindow(window_width, window_height, WINDOW_TITLE, 0, 0);
 	glfwSetWindowPos(window, 50, 50);
 	glfwMakeContextCurrent(window);
@@ -124,6 +125,7 @@ s32 main(s32 argc, s8** argv)
 	if (core_init())
 		return -1;
 
+	glEnable(GL_MULTISAMPLE);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
