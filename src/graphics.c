@@ -13,8 +13,21 @@
 #define IRRADIANCE_FRAGMENT_SHADER_PATH "./shaders/irradiance.fs"
 #define PREFILTER_ENVIRONMENT_MAP_VERTEX_SHADER_PATH "./shaders/prefilter_environment_map.vs"
 #define PREFILTER_ENVIRONMENT_MAP_FRAGMENT_SHADER_PATH "./shaders/prefilter_environment_map.fs"
+#define BRDF_LUT_VERTEX_SHADER_PATH "./shaders/brdf_lut.vs"
+#define BRDF_LUT_FRAGMENT_SHADER_PATH "./shaders/brdf_lut.fs"
 #define SKYBOX_VERTEX_SHADER_PATH "./shaders/skybox.vs"
 #define SKYBOX_FRAGMENT_SHADER_PATH "./shaders/skybox.fs"
+
+static r32 quad_vertices[] = {
+  // positions          
+  -1.0f,  -1.0f,
+  1.0f,  -1.0f,
+  -1.0f,  1.0f,
+
+  1.0f,  -1.0f,
+  1.0f,  1.0f,
+  -1.0f,  1.0f
+};
 
 static r32 cube_vertices[] = {
   // positions          
@@ -366,16 +379,24 @@ static void normals_update_uniforms(const Normal_Info* normal_info, Shader shade
 	}
 }
 
-static void irradiance_map_update_uniforms(u32 irradiance_map, Shader shader)
+static void ibl_update_uniforms(u32 irradiance_map, u32 prefiltered_map, u32 brdf_lut, Shader shader)
 {
 	glUseProgram(shader);
 	GLint irradiance_map_location = glGetUniformLocation(shader, "irradiance_map");
+	GLint prefiltered_map_location = glGetUniformLocation(shader, "prefiltered_map");
+	GLint brdf_lut_location = glGetUniformLocation(shader, "brdf_lut");
 	glUniform1i(irradiance_map_location, 4);
+	glUniform1i(prefiltered_map_location, 5);
+	glUniform1i(brdf_lut_location, 6);
 	glActiveTexture(GL_TEXTURE4);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, irradiance_map);
+	glActiveTexture(GL_TEXTURE5);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, prefiltered_map);
+	glActiveTexture(GL_TEXTURE6);
+	glBindTexture(GL_TEXTURE_2D, brdf_lut);
 }
 
-void graphics_mesh_render(Shader shader, Mesh mesh, u32 irradiance_map)
+void graphics_mesh_render(Shader shader, Mesh mesh, u32 irradiance_map, u32 prefiltered_map, u32 brdf_lut)
 {
 	glBindVertexArray(mesh.VAO);
 	glUseProgram(shader);
@@ -383,7 +404,7 @@ void graphics_mesh_render(Shader shader, Mesh mesh, u32 irradiance_map)
 	metallic_update_uniforms(&mesh.metallic_info, shader);
 	roughness_update_uniforms(&mesh.roughness_info, shader);
 	normals_update_uniforms(&mesh.normal_info, shader);
-	irradiance_map_update_uniforms(irradiance_map, shader);
+	ibl_update_uniforms(irradiance_map, prefiltered_map, brdf_lut, shader);
 	glDrawElements(GL_TRIANGLES, mesh.indexes_size, GL_UNSIGNED_INT, 0);
 	glUseProgram(0);
 	glBindVertexArray(0);
@@ -503,11 +524,12 @@ void graphics_entity_render_basic_shader(Shader shader, const Perspective_Camera
 	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)entity->model_matrix.data);
 	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)camera->view_matrix.data);
 	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)camera->projection_matrix.data);
-	graphics_mesh_render(shader, entity->mesh, 0);
+	graphics_mesh_render(shader, entity->mesh, 0, 0, 0);
 	glUseProgram(0);
 }
 
-void graphics_entity_render_pbr_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity, const Light* lights, u32 irradiance_map)
+void graphics_entity_render_pbr_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity, const Light* lights,
+	u32 irradiance_map, u32 prefiltered_map, u32 brdf_lut)
 {
 	glUseProgram(shader);
 	light_update_uniforms(lights, shader);
@@ -519,7 +541,7 @@ void graphics_entity_render_pbr_shader(Shader shader, const Perspective_Camera* 
 	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)entity->model_matrix.data);
 	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)camera->view_matrix.data);
 	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)camera->projection_matrix.data);
-	graphics_mesh_render(shader, entity->mesh, irradiance_map);
+	graphics_mesh_render(shader, entity->mesh, irradiance_map, prefiltered_map, brdf_lut);
 	glUseProgram(0);
 }
 
@@ -657,6 +679,38 @@ static void render_cube_init()
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(cube_vertices), cube_vertices);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
+    glEnableVertexAttribArray(0);
+
+    glBindVertexArray(0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+  }
+}
+
+typedef struct {
+  boolean initialized;
+  GLuint vao;
+} Render_Quad_Context;
+
+Render_Quad_Context render_quad_ctx;
+
+static void render_quad_init()
+{
+  if (!render_quad_ctx.initialized)
+  {
+    render_quad_ctx.initialized = true;
+
+    u32 VBO;
+    glGenVertexArrays(1, &render_quad_ctx.vao);
+    glGenBuffers(1, &VBO);
+
+    glBindVertexArray(render_quad_ctx.vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertices), 0, GL_STATIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(quad_vertices), quad_vertices);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
     glEnableVertexAttribArray(0);
 
     glBindVertexArray(0);
@@ -930,6 +984,77 @@ u32 graphics_generate_prefiltered_environment_map_from_cube_map(u32 cube_map)
 	glUseProgram(0);
 	glBindVertexArray(0);
 	return prefiltered_environment_map;
+}
+
+typedef struct {
+  Shader shader;
+  boolean initialized;
+} Render_Brdf_Lut_Context;
+
+Render_Brdf_Lut_Context render_brdf_lut_ctx;
+
+static void render_brdf_lut_init()
+{
+  if (!render_brdf_lut_ctx.initialized)
+  {
+    render_brdf_lut_ctx.shader = graphics_shader_create(BRDF_LUT_VERTEX_SHADER_PATH,
+		BRDF_LUT_FRAGMENT_SHADER_PATH);
+    render_brdf_lut_ctx.initialized = true;
+  }
+}
+
+u32 graphics_texture_create_brdf_lut_texture(u32 width, u32 height)
+{
+	u32 texture_id;
+
+	glGenTextures(1, &texture_id);
+	glBindTexture(GL_TEXTURE_2D, texture_id);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, width, height, 0, GL_RG, GL_FLOAT, 0);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+	return texture_id;
+}
+
+u32 graphics_generate_brdf_lut_tex()
+{
+	const int tex_width = 512;
+	const int tex_height = 512;
+
+	render_quad_init();
+	render_brdf_lut_init();
+
+	// Create framebuffer
+	unsigned int captureFBO, captureRBO;
+	glGenFramebuffers(1, &captureFBO);
+	glGenRenderbuffers(1, &captureRBO);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+	glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, tex_width, tex_height);
+
+	u32 brdf_lut_tex = graphics_texture_create_brdf_lut_texture(tex_width, tex_height);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdf_lut_tex, 0);
+
+	glUseProgram(render_brdf_lut_ctx.shader);
+
+	glBindVertexArray(render_quad_ctx.vao);
+	GLint m_viewport[4];
+	glGetIntegerv(GL_VIEWPORT, m_viewport);
+	glViewport(0, 0, tex_width, tex_height);
+
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glDrawArrays(GL_TRIANGLES, 0, sizeof(quad_vertices) / (sizeof(r32) * 2));
+
+	glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glUseProgram(0);
+	glBindVertexArray(0);
+	return brdf_lut_tex;
 }
 
 u32 graphics_texture_create_from_data(const Image_Data* image_data)

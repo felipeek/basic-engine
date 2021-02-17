@@ -1,6 +1,6 @@
 #version 330 core
 out vec4 fragment_color;
-in vec4 fragment_position;
+in vec3 fragment_position;
 
 uniform sampler2D equirectangular_map;
 
@@ -16,7 +16,7 @@ vec2 sample_spherical_map(vec3 v)
 
 void main()
 {		
-    vec2 uv = sample_spherical_map(normalize(fragment_position.xyz)); // make sure to normalize fragment_position
+    vec2 uv = sample_spherical_map(normalize(fragment_position)); // make sure to normalize fragment_position
     vec3 color = texture(equirectangular_map, uv).rgb;
     
     fragment_color = vec4(color, 1.0);

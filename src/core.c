@@ -17,7 +17,7 @@ static Shader pbr_shader, basic_shader, equirectangular_to_cube_shader;
 static Perspective_Camera camera;
 static Light* lights;
 static Entity e, light_entity;
-static u32 cube_map_tex, irradiance_map, prefiltered_map, bound_tex;
+static u32 cube_map_tex, irradiance_map, prefiltered_map, brdf_lut, bound_tex;
 
 static Entity* test_entities;
 
@@ -97,6 +97,7 @@ int core_init()
 	cube_map_tex = graphics_generate_cube_map_from_equirectangular_map(equirectangular_map);
 	irradiance_map = graphics_generate_irradiance_map_from_cube_map(cube_map_tex);
 	prefiltered_map = graphics_generate_prefiltered_environment_map_from_cube_map(cube_map_tex);
+	brdf_lut = graphics_generate_brdf_lut_tex();
 	bound_tex = prefiltered_map;
 
 #if 0
@@ -171,7 +172,7 @@ void core_render()
 	for (u32 i = 0; i < array_get_length(test_entities); ++i)
 	{
 		Entity* current_entity = &test_entities[i];
-		graphics_entity_render_pbr_shader(pbr_shader, &camera, current_entity, lights, irradiance_map);
+		graphics_entity_render_pbr_shader(pbr_shader, &camera, current_entity, lights, irradiance_map, prefiltered_map, brdf_lut);
 	}
 }
 

@@ -1,25 +1,29 @@
 #version 330 core
-out vec4 fragment_color;
-in vec3 fragment_position;
-
-uniform samplerCube cube_map;
-uniform float roughness;
+out vec2 fragment_color;
+in vec2 tex_coords;
 
 const float PI = 3.14159265359;
 
-float DistributionGGX(vec3 N, vec3 H, float roughness)
+float GeometrySchlickGGX(float NdotV, float roughness)
 {
-    float a = roughness*roughness;
-    float a2 = a*a;
-    float NdotH = max(dot(N, H), 0.0);
-    float NdotH2 = NdotH*NdotH;
+    float a = roughness;
+    float k = (a * a) / 2.0;
 
-    float nom   = a2;
-    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
-    denom = PI * denom * denom;
+    float nom   = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
 
     return nom / denom;
 }
+
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
+{
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
+}  
 
 float radical_inverse_vdC(uint bits) 
 {
@@ -59,42 +63,46 @@ vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness)
     return normalize(sampleVec);
 }
 
-void main()
+vec2 IntegrateBRDF(float NdotV, float roughness)
 {
-	vec3 N = normalize(fragment_position);
-    vec3 R = N;
-    vec3 V = R;
+    vec3 V;
+    V.x = sqrt(1.0 - NdotV*NdotV);
+    V.y = 0.0;
+    V.z = NdotV;
+
+    float A = 0.0;
+    float B = 0.0;
+
+    vec3 N = vec3(0.0, 0.0, 1.0);
 
     const uint SAMPLE_COUNT = 1024u;
-    float totalWeight = 0.0;   
-    vec3 prefilteredColor = vec3(0.0);     
     for(uint i = 0u; i < SAMPLE_COUNT; ++i)
     {
         vec2 Xi = hammersley(i, SAMPLE_COUNT);
         vec3 H  = ImportanceSampleGGX(Xi, N, roughness);
         vec3 L  = normalize(2.0 * dot(V, H) * H - V);
 
-        float NdotL = max(dot(N, L), 0.0);
+        float NdotL = max(L.z, 0.0);
+        float NdotH = max(H.z, 0.0);
+        float VdotH = max(dot(V, H), 0.0);
+
         if(NdotL > 0.0)
         {
-			// sample from the environment's mip level based on roughness/pdf
-            float D   = DistributionGGX(N, H, roughness);
-            float NdotH = max(dot(N, H), 0.0);
-            float HdotV = max(dot(H, V), 0.0);
-            float pdf = D * NdotH / (4.0 * HdotV) + 0.0001; 
+            float G = GeometrySmith(N, V, L, roughness);
+            float G_Vis = (G * VdotH) / (NdotH * NdotV);
+            float Fc = pow(1.0 - VdotH, 5.0);
 
-            float resolution = 512.0; // resolution of source cubemap (per face)
-            float saTexel  = 4.0 * PI / (6.0 * resolution * resolution);
-            float saSample = 1.0 / (float(SAMPLE_COUNT) * pdf + 0.0001);
-
-            float mipLevel = roughness == 0.0 ? 0.0 : 0.5 * log2(saSample / saTexel); 
-            
-            prefilteredColor += textureLod(cube_map, L, mipLevel).rgb * NdotL;
-            totalWeight      += NdotL;
+            A += (1.0 - Fc) * G_Vis;
+            B += Fc * G_Vis;
         }
     }
-    prefilteredColor = prefilteredColor / totalWeight;
+    A /= float(SAMPLE_COUNT);
+    B /= float(SAMPLE_COUNT);
+    return vec2(A, B);
+}
 
-    fragment_color = vec4(prefilteredColor, 1.0);
-    //fragment_color = vec4(texture(cube_map, N).rgb, 1.0);
+void main() 
+{
+    vec2 integratedBRDF = IntegrateBRDF(tex_coords.x, tex_coords.y);
+    fragment_color = integratedBRDF;
 }

@@ -1,6 +1,6 @@
 #version 330 core
 out vec4 fragment_color;
-in vec4 fragment_position;
+in vec3 fragment_position;
 
 uniform samplerCube cube_map;
 
@@ -9,7 +9,7 @@ const float PI = 3.14159265359;
 void main()
 {		
     // the sample direction equals the hemisphere's orientation 
-    vec3 normal = normalize(fragment_position.xyz);
+    vec3 normal = normalize(fragment_position);
   
     vec3 irradiance = vec3(0.0);
 

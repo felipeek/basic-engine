@@ -90,7 +90,7 @@ Shader graphics_shader_create(const s8* vertex_shader_path, const s8* fragment_s
 Mesh graphics_mesh_create_with_texture(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, u32 normal_map,
 	u32 albedo_map, u32 metallic_map, u32 roughness_map);
 Mesh graphics_mesh_create_from_obj_with_texture(const s8* obj_path, u32 normal_map, u32 albedo_map, u32 metallic_map, u32 roughness_map);
-void graphics_mesh_render(Shader shader, Mesh mesh, u32 irradiance_map);
+void graphics_mesh_render(Shader shader, Mesh mesh, u32 irradiance_map, u32 prefiltered_map, u32 brdf_lut);
 // If mesh already has an albedo/metallic/roughness map, the older diffuse map will be deleted if delete_*_map is true.
 void graphics_mesh_change_normal_map(Mesh* mesh, u32 normal_map, boolean delete_normal_map);
 void graphics_mesh_change_albedo_map(Mesh* mesh, u32 albedo_map, boolean delete_albedo_map);
@@ -103,7 +103,8 @@ void graphics_entity_set_position(Entity* entity, vec4 world_position);
 void graphics_entity_set_rotation(Entity* entity, Quaternion world_rotation);
 void graphics_entity_set_scale(Entity* entity, vec3 world_scale);
 void graphics_entity_render_basic_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity);
-void graphics_entity_render_pbr_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity, const Light* lights, u32 irradiance_map);
+void graphics_entity_render_pbr_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity, const Light* lights,
+	u32 irradiance_map, u32 prefiltered_map, u32 brdf_lut);
 void graphics_light_create(Light* light, vec3 position, vec3 color);
 u32 graphics_texture_create(const s8* texture_path);
 u32 graphics_texture_create_from_data(const Image_Data* image_data);
@@ -115,5 +116,6 @@ u32 graphics_generate_cube_map_from_equirectangular_map(u32 equirectangular_map)
 void graphics_render_skybox(u32 skybox_texture, const Perspective_Camera* camera);
 u32 graphics_generate_irradiance_map_from_cube_map(u32 cube_map);
 u32 graphics_generate_prefiltered_environment_map_from_cube_map(u32 cube_map);
+u32 graphics_generate_brdf_lut_tex();
 
 #endif

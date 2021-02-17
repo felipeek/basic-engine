@@ -48,6 +48,8 @@ uniform Normal_Info normal_info;
 uniform int light_num;
 uniform Light lights[MAX_NUMBER_OF_LIGHTS];
 uniform	samplerCube irradiance_map;
+uniform samplerCube prefiltered_map;
+uniform sampler2D brdf_lut;
 
 // GGX's NDF (Normal Distribution Function)
 // The NDF gives the distribution of a given normal over the surface
@@ -212,11 +214,19 @@ void main()
   }
 
   // ambient light
-  vec3 kS = fresnel_schlick_roughness(max(dot(normal, view), 0.0), F0, roughness); 
+  vec3 F = fresnel_schlick_roughness(max(dot(normal, view), 0.0), F0, roughness); 
+  vec3 kS = F;
   vec3 kD = 1.0 - kS;
+  kD *= 1.0 - metallic;
   vec3 irradiance = texture(irradiance_map, normal).rgb;
   vec3 diffuse    = irradiance * albedo;
-  vec3 ambient    = (kD * diffuse); 
+
+  const float MAX_REFLECTION_LOD = 4.0;
+  vec3 R = reflect(-view, normal);
+  vec3 prefiltered_color = textureLod(prefiltered_map, R, roughness * MAX_REFLECTION_LOD).rgb;
+  vec2 env_BRDF = texture(brdf_lut, vec2(max(dot(normal, view), 0.0), roughness)).rg;
+  vec3 specular = prefiltered_color * (F * env_BRDF.x + env_BRDF.y);
+  vec3 ambient = (kD * diffuse + specular); 
   Lo += ambient;
 
   // HDR
