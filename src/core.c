@@ -7,11 +7,8 @@
 #include "obj.h"
 #include "menu.h"
 
-#define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
-#define PHONG_FRAGMENT_SHADER_PATH "./shaders/phong_shader.fs"
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
-static Shader phong_shader;
 static Perspective_Camera camera;
 static Light* lights;
 static Entity e;
@@ -49,8 +46,6 @@ static void menu_dummy_callback()
 
 int core_init()
 {
-	// Create shader
-	phong_shader = graphics_shader_create(PHONG_VERTEX_SHADER_PATH, PHONG_FRAGMENT_SHADER_PATH);
 	// Create camera
 	camera = create_camera();
 	// Create light
@@ -76,7 +71,7 @@ void core_update(r32 delta_time)
 
 void core_render()
 {
-	graphics_entity_render_phong_shader(phong_shader, &camera, &e, lights);
+	graphics_entity_render_phong_shader(&camera, &e, lights);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)

@@ -7,6 +7,11 @@
 #include <dynamic_array.h>
 #include <math.h>
 
+#define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
+#define PHONG_FRAGMENT_SHADER_PATH "./shaders/phong_shader.fs"
+#define BASIC_VERTEX_SHADER_PATH "./shaders/basic_shader.vs"
+#define BASIC_FRAGMENT_SHADER_PATH "./shaders/basic_shader.fs"
+
 Image_Data graphics_image_load(const s8* image_path)
 {
 	Image_Data image_data;
@@ -114,6 +119,24 @@ Shader graphics_shader_create(const s8* vertex_shader_path, const s8* fragment_s
 	free(vertex_shader_code);
 	free(fragment_shader_code);
 	return shader_program;
+}
+
+typedef struct {
+	Shader phong_shader;
+	Shader basic_shader;
+	boolean initialized;
+} Predefined_Shaders;
+
+Predefined_Shaders predefined_shaders;
+
+static void init_predefined_shaders()
+{
+	if (!predefined_shaders.initialized)
+	{
+		predefined_shaders.phong_shader = graphics_shader_create(PHONG_VERTEX_SHADER_PATH, PHONG_FRAGMENT_SHADER_PATH);
+		predefined_shaders.basic_shader = graphics_shader_create(BASIC_VERTEX_SHADER_PATH, BASIC_FRAGMENT_SHADER_PATH);
+		predefined_shaders.initialized = true;
+	}
 }
 
 // Vertices must be Vertex[4]
@@ -389,8 +412,10 @@ void graphics_entity_set_scale(Entity* entity, vec3 world_scale)
 	recalculate_model_matrix(entity);
 }
 
-void graphics_entity_render_basic_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity)
+void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const Entity* entity)
 {
+	init_predefined_shaders();
+	Shader shader = predefined_shaders.basic_shader;
 	glUseProgram(shader);
 	GLint model_matrix_location = glGetUniformLocation(shader, "model_matrix");
 	GLint view_matrix_location = glGetUniformLocation(shader, "view_matrix");
@@ -402,8 +427,10 @@ void graphics_entity_render_basic_shader(Shader shader, const Perspective_Camera
 	glUseProgram(0);
 }
 
-void graphics_entity_render_phong_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity, const Light* lights)
+void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const Entity* entity, const Light* lights)
 {
+	init_predefined_shaders();
+	Shader shader = predefined_shaders.phong_shader;
 	glUseProgram(shader);
 	light_update_uniforms(lights, shader);
 	GLint camera_position_location = glGetUniformLocation(shader, "camera_position");
