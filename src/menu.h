@@ -1,5 +1,5 @@
-#ifndef GIMMESH_MENU_H
-#define GIMMESH_MENU_H
+#ifndef BASIC_ENGINE_MENU_H
+#define BASIC_ENGINE_MENU_H
 #include <GLFW/glfw3.h>
 #include "common.h"
 
