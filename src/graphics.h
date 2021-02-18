@@ -92,8 +92,8 @@ void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_norm
 void graphics_entity_set_position(Entity* entity, vec4 world_position);
 void graphics_entity_set_rotation(Entity* entity, Quaternion world_rotation);
 void graphics_entity_set_scale(Entity* entity, vec3 world_scale);
-void graphics_entity_render_basic_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity);
-void graphics_entity_render_phong_shader(Shader shader, const Perspective_Camera* camera, const Entity* entity, const Light* lights);
+void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const Entity* entity);
+void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const Entity* entity, const Light* lights);
 void graphics_light_create(Light* light, vec4 position, vec4 ambient_color, vec4 diffuse_color, vec4 specular_color);
 u32 graphics_texture_create(const s8* texture_path);
 u32 graphics_texture_create_from_data(const Image_Data* image_data);
