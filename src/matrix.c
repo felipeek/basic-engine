@@ -5,6 +5,20 @@
 #include <math.h>
 #include <assert.h>
 
+Matrix matrix_copy(const Matrix* m)
+{
+	Matrix copy;
+	copy.data = malloc(m->rows * sizeof(r32*));
+	for (u32 i = 0; i < m->rows; ++i)
+	{
+		copy.data[i] = malloc(m->columns * sizeof(r32));
+		memcpy(copy.data[i], m->data[i], m->columns * sizeof(r32));
+	}
+	copy.rows = m->rows;
+	copy.columns = m->columns;
+	return copy;
+}
+
 Matrix matrix_create(u32 rows, u32 columns)
 {
 	Matrix m;
@@ -187,13 +201,28 @@ static r32 LUPDeterminant(r32 **A, int *P, int N) {
     return (P[N] - N) % 2 == 0 ? det : -det;
 }
 
+r32 matrix_determinant(const Matrix* m)
+{
+	assert(m->rows == m->columns);
+	Matrix tmp = matrix_copy(m);
+	int P[m->rows + 1];
+	if (!LUPDecompose(tmp.data, m->rows, 0.00001f, P))
+	{
+		printf("Unable to get determinant of matrix! TOL failed.\n");
+		matrix_destroy(&tmp);
+		return 0.0f;
+	}
+	r32 d = LUPDeterminant(tmp.data, P, m->rows);
+	matrix_destroy(&tmp);
+	return d;
+}
+
 Matrix matrix_invert(const Matrix* m)
 {
 	assert(m->rows == m->columns);
-	Matrix tmp = matrix_create(m->rows, m->columns);
-	memcpy(tmp.data, m->data, m->columns * m->rows * sizeof(r32));
+	Matrix tmp = matrix_copy(m);
 	int P[m->rows + 1];
-	if (!LUPDecompose(tmp.data, m->rows, 0.01f, P))
+	if (!LUPDecompose(tmp.data, m->rows, 0.00001f, P))
 	{
 		printf("Unable to invert matrix! TOL failed.\n");
 		matrix_destroy(&tmp);
@@ -201,6 +230,7 @@ Matrix matrix_invert(const Matrix* m)
 	}
 	Matrix inv = matrix_create(m->rows, m->columns);
 	LUPInvert(tmp.data, P, m->rows, inv.data);
+	matrix_destroy(&tmp);
 	return inv;
 }
 

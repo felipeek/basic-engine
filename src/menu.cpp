@@ -24,6 +24,7 @@ typedef struct Joint_Definition {
 	vec3 rotation;
 	vec3 scale;
 	vec3 color;
+	vec3 rotation_axis;
 	struct Joint_Definition* children;
 } Joint_Definition;
 
@@ -66,6 +67,7 @@ static Joint_Definition create_joint_definition()
 	jd.rotation = (vec3){0.0f, 0.0f, 0.0f};
 	jd.scale = (vec3){1.0f, 1.0f, 1.0f};
 	jd.color = (vec3){1.0f, 0.0f, 0.0f};
+	jd.rotation_axis = (vec3){0.0f, 0.0f, 1.0f};
 	return jd;
 }
 
@@ -82,18 +84,24 @@ static void set_up_arm_pose()
 	destroy_joint_definition(&root);
 	root = create_joint_definition();
 	root.translation = (vec3){-1.0f, 0.0f, 0.0f};
+	root.rotation = (vec3){0.3f, 0.5f, 0.3f};
 	root.scale = (vec3){0.61f, 0.025f, 0.025};
 	root.color = (vec3){1.0f, 0.0f, 0.0f};
+	root.rotation_axis = (vec3){0.0f, 1.0f, 0.0f};
 	
 	Joint_Definition forearm = create_joint_definition();
 	forearm.translation = (vec3){1.3f, 0.0f, 0.0f};
+	forearm.rotation = (vec3){0.3f, 0.2f, 0.3f};
 	forearm.scale = (vec3){0.61f, 0.025f, 0.025};
 	forearm.color = (vec3){0.0f, 1.0f, 0.0f};
+	forearm.rotation_axis = (vec3){0.0f, 0.0f, 1.0f};
 
 	Joint_Definition hand = create_joint_definition();
 	hand.translation = (vec3){1.3f, 0.0f, 0.0f};
+	hand.rotation = (vec3){0.1f, 0.2f, 0.3f};
 	hand.scale = (vec3){0.35f, 0.025f, 0.025};
 	hand.color = (vec3){0.0f, 0.0f, 1.0f};
+	hand.rotation_axis = (vec3){0.0f, 0.0f, 1.0f};
 
 	array_push(forearm.children, &hand);
 	array_push(root.children, &forearm);

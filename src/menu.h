@@ -8,6 +8,7 @@ typedef struct Joint_Definition {
 	vec3 rotation;
 	vec3 scale;
 	vec3 color;
+	vec3 rotation_axis;
 	struct Joint_Definition* children;
 } Joint_Definition;
 

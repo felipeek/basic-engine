@@ -58,13 +58,14 @@ static Hierarchical_Model_Joint create_joint_from_definition(const Joint_Definit
 	rotation = quaternion_product(&rotation, &rotation_z);
 	vec3 scale = joint_definition->scale;
 	vec4 color = (vec4){joint_definition->color.x, joint_definition->color.y, joint_definition->color.z, 1.0f};
+	vec3 rotation_axis = joint_definition->rotation_axis;
 	Hierarchical_Model_Joint* children = array_create(Hierarchical_Model_Joint, 1);
 	for (u32 i = 0; i < array_get_length(joint_definition->children); ++i)
 	{
 		Hierarchical_Model_Joint child = create_joint_from_definition(&joint_definition->children[i]);
 		array_push(children, &child);
 	}
-	hierarchical_model_joint_create(&joint, translation, rotation, scale, color, cube_mesh, children, NULL);
+	hierarchical_model_joint_create(&joint, translation, rotation, scale, color, rotation_axis, cube_mesh, children, NULL);
 	return joint;
 }
 
@@ -94,7 +95,7 @@ int core_init()
 	graphics_renderer_primitives_init(&render_primitives_ctx);
 
 	Mesh sphere_mesh = graphics_mesh_create_from_obj("./res/sphere.obj", 0);
-	graphics_entity_create_with_color(&sphere, sphere_mesh, (vec4){3.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f),
+	graphics_entity_create_with_color(&sphere, sphere_mesh, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f),
 		(vec3){0.1f, 0.1f, 0.1f}, (vec4){1.0f, 0.0f, 1.0f, 1.0f});
 
 	cube_mesh = graphics_mesh_create_from_obj("./res/moved_cube.obj", 0);
@@ -112,8 +113,10 @@ void core_update(r32 delta_time)
 {
 	if (is_hierarchical_model_created)
 	{
+		hierarchical_model_update(&hierarchical_model);
 		Hierarchical_Model_Joint* leaf_joint = &hierarchical_model.children[0].children[0];
-		rotate_joints_towards_target_point(leaf_joint, gm_vec4_to_vec3(sphere.world_position));
+		for (u32 i = 0; i < 5000; ++i)
+			rotate_joints_towards_target_point(leaf_joint, gm_vec4_to_vec3(sphere.world_position));
 	}
 }
 
@@ -127,15 +130,15 @@ void core_render()
 
 
 	// render end-effector
-	//if (is_hierarchical_model_created)
-	//{
-	//	mat4 last_joint_transform = hierarchical_model.root.children[0].children[0].e.model_matrix;
-	//	vec4 end_effector_position_in_local_coordinates = (vec4){2.0f, 0.0f, 0.0f, 1.0f};
-	//	vec4 E = gm_mat4_multiply_vec4(&last_joint_transform, end_effector_position_in_local_coordinates);
-	//	vec3 E3 = gm_vec4_to_vec3(E);
-	//	graphics_renderer_debug_points(&render_primitives_ctx, &E3, 1, (vec4){1.0f, 0.0f, 1.0f, 1.0f});
-	//	graphics_renderer_primitives_flush(&render_primitives_ctx, &camera);
-	//}
+	if (is_hierarchical_model_created)
+	{
+		mat4 last_joint_transform = hierarchical_model.children[0].children[0].e.model_matrix;
+		vec4 end_effector_position_in_local_coordinates = (vec4){2.0f, 0.0f, 0.0f, 1.0f};
+		vec4 E = gm_mat4_multiply_vec4(&last_joint_transform, end_effector_position_in_local_coordinates);
+		vec3 E3 = gm_vec4_to_vec3(E);
+		graphics_renderer_debug_points(&render_primitives_ctx, &E3, 1, (vec4){1.0f, 0.0f, 1.0f, 1.0f});
+		graphics_renderer_primitives_flush(&render_primitives_ctx, &camera);
+	}
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
