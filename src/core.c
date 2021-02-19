@@ -13,6 +13,8 @@
 static Perspective_Camera camera;
 static Light* lights;
 static Mesh cube_mesh;
+static Render_Primitives_Context render_primitives_ctx;
+static Entity sphere;
 
 // Hierarchical model
 static boolean is_hierarchical_model_created;
@@ -67,10 +69,13 @@ static Hierarchical_Model_Joint create_joint_from_definition(const Joint_Definit
 
 static void hierarchical_model_set_callback(const Joint_Definition* joint_definition)
 {
+	if (is_hierarchical_model_created)
+		hierarchical_model_joint_destroy_recursively(&hierarchical_model.root);
 	Hierarchical_Model_Joint root = create_joint_from_definition(joint_definition);
 	hierarchical_model_create(&hierarchical_model, root);
 	is_hierarchical_model_created = true;
 }
+
 
 int core_init()
 {
@@ -78,6 +83,12 @@ int core_init()
 	camera = create_camera();
 	// Create light
 	lights = create_lights();
+
+	graphics_renderer_primitives_init(&render_primitives_ctx);
+
+	Mesh sphere_mesh = graphics_mesh_create_from_obj("./res/sphere.obj", 0);
+	graphics_entity_create_with_color(&sphere, sphere_mesh, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f),
+		(vec3){0.1f, 0.1f, 0.1f}, (vec4){1.0f, 0.0f, 1.0f, 1.0f});
 
 	cube_mesh = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	menu_register_hierarchical_model_set_callback(hierarchical_model_set_callback);
@@ -99,12 +110,15 @@ void core_render()
 {
 	if (is_hierarchical_model_created)
 		hierarchical_model_render(&hierarchical_model, &camera, lights);
+	graphics_entity_render_phong_shader(&camera, &sphere, lights);
+	//graphics_renderer_debug_points(&render_primitives_ctx, &target_position, 1, (vec4){1.0f, 0.0f, 1.0f, 1.0f});
+	//graphics_renderer_primitives_flush(&render_primitives_ctx, &camera);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
 {
 	r32 movement_speed = 3.0f;
-	r32 rotation_speed = 300.0f;
+	r32 translation_speed = 0.01f;
 
 	if (key_state[GLFW_KEY_LEFT_SHIFT])
 		movement_speed = 0.5f;
@@ -119,45 +133,45 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		camera_move_right(&camera, -movement_speed * delta_time);
 	if (key_state[GLFW_KEY_D])
 		camera_move_right(&camera, movement_speed * delta_time);
-	//if (key_state[GLFW_KEY_X])
-	//{
-	//	if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
-	//	{
-	//		Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, rotation_speed * delta_time);
-	//		graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
-	//	}
-	//	else
-	//	{
-	//		Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, -rotation_speed * delta_time);
-	//		graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
-	//	}
-	//}
-	//if (key_state[GLFW_KEY_Y])
-	//{
-	//	if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
-	//	{
-	//		Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, rotation_speed * delta_time);
-	//		graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
-	//	}
-	//	else
-	//	{
-	//		Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, -rotation_speed * delta_time);
-	//		graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
-	//	}
-	//}
-	//if (key_state[GLFW_KEY_Z])
-	//{
-	//	if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
-	//	{
-	//		Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, rotation_speed * delta_time);
-	//		graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
-	//	}
-	//	else
-	//	{
-	//		Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, -rotation_speed * delta_time);
-	//		graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
-	//	}
-	//}
+	if (key_state[GLFW_KEY_X])
+	{
+		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
+		{
+			vec4 delta = (vec4){-translation_speed, 0.0f, 0.0f, 0.0f};
+			graphics_entity_set_position(&sphere, gm_vec4_add(sphere.world_position, delta));
+		}
+		else
+		{
+			vec4 delta = (vec4){translation_speed, 0.0f, 0.0f, 0.0f};
+			graphics_entity_set_position(&sphere, gm_vec4_add(sphere.world_position, delta));
+		}
+	}
+	if (key_state[GLFW_KEY_Y])
+	{
+		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
+		{
+			vec4 delta = (vec4){0.0f, -translation_speed, 0.0f, 0.0f};
+			graphics_entity_set_position(&sphere, gm_vec4_add(sphere.world_position, delta));
+		}
+		else
+		{
+			vec4 delta = (vec4){0.0f, translation_speed, 0.0f, 0.0f};
+			graphics_entity_set_position(&sphere, gm_vec4_add(sphere.world_position, delta));
+		}
+	}
+	if (key_state[GLFW_KEY_Z])
+	{
+		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
+		{
+			vec4 delta = (vec4){0.0f, 0.0f, -translation_speed, 0.0f};
+			graphics_entity_set_position(&sphere, gm_vec4_add(sphere.world_position, delta));
+		}
+		else
+		{
+			vec4 delta = (vec4){0.0f, 0.0f, translation_speed, 0.0f};
+			graphics_entity_set_position(&sphere, gm_vec4_add(sphere.world_position, delta));
+		}
+	}
 	if (key_state[GLFW_KEY_L])
 	{
 		static boolean wireframe = false;

@@ -65,6 +65,23 @@ typedef struct
 	s32 width, height, channels;
 } Float_Image_Data;
 
+// Primitives rendering
+typedef struct {
+  u32 shader;
+  // Vector rendering
+  u32 vector_vao;
+  u32 vector_vbo;
+
+  void* data_ptr;
+  int vertex_count;
+
+  // Point rendering
+  u32 point_vao;
+  u32 point_vbo;
+  void* point_data_ptr;
+  int point_count;
+} Render_Primitives_Context;
+
 Image_Data graphics_image_load(const s8* image_path);
 Float_Image_Data graphics_float_image_load(const s8* image_path);
 Float_Image_Data graphics_float_image_copy(const Float_Image_Data* image_data);
@@ -101,5 +118,11 @@ u32 graphics_texture_create_from_float_data(const Float_Image_Data* image_data);
 void graphics_texture_delete(u32 texture_id);
 Float_Image_Data graphics_image_data_to_float_image_data(Image_Data* image_data, r32* memory);
 Image_Data graphics_float_image_data_to_image_data(const Float_Image_Data* float_image_Data, u8* memory);
+
+// Render primitives
+void graphics_renderer_primitives_init(Render_Primitives_Context* primitives_ctx);
+void graphics_renderer_primitives_flush(Render_Primitives_Context* primitives_ctx, const Perspective_Camera* camera);
+void graphics_renderer_debug_points(Render_Primitives_Context* primitives_ctx, vec3* points, int point_count, vec4 color);
+void graphics_renderer_debug_vector(Render_Primitives_Context* primitives_ctx, vec3 position, vec3 v, vec4 color);
 
 #endif

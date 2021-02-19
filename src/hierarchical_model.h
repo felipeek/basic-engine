@@ -21,6 +21,7 @@ typedef struct {
 void hierarchical_model_create(Hierarchical_Model* hierarchical_model, Hierarchical_Model_Joint root);
 void hierarchical_model_joint_create(Hierarchical_Model_Joint* joint, vec4 translation, Quaternion rotation, vec3 scale,
 	vec4 color, Mesh mesh, Hierarchical_Model_Joint* children);
+void hierarchical_model_joint_destroy_recursively(Hierarchical_Model_Joint* joint);
 void hierarchical_model_create(Hierarchical_Model* hierarchical_model, Hierarchical_Model_Joint root);
 void hierarchical_model_render(Hierarchical_Model* hierarchical_model, const Perspective_Camera* camera, const Light* lights);
 

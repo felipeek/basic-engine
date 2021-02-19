@@ -14,6 +14,16 @@ void hierarchical_model_joint_create(Hierarchical_Model_Joint* joint, vec4 trans
 	joint->e = e;
 }
 
+void hierarchical_model_joint_destroy_recursively(Hierarchical_Model_Joint* joint)
+{
+	for (u32 i = 0; i < array_get_length(joint->children); ++i)
+	{
+		hierarchical_model_joint_destroy_recursively(&joint->children[i]);
+	}
+	graphics_entity_destroy(&joint->e);
+	array_release(joint->children);
+}
+
 void hierarchical_model_create(Hierarchical_Model* hierarchical_model, Hierarchical_Model_Joint root)
 {
 	hierarchical_model->root = root;

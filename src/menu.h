@@ -11,7 +11,7 @@ typedef struct Joint_Definition {
 	struct Joint_Definition* children;
 } Joint_Definition;
 
-typedef void (*Hierarchical_Model_Set_Callback)(const Joint_Definition* root);
+typedef void (*Hierarchical_Model_Set_Callback)(const Joint_Definition* joint_definition);
 
 void menu_register_hierarchical_model_set_callback(Hierarchical_Model_Set_Callback f);
 void menu_char_click_process(GLFWwindow* window, u32 c);
