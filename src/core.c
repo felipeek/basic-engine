@@ -6,17 +6,19 @@
 #include "graphics.h"
 #include "obj.h"
 #include "menu.h"
+#include "hierarchical_model.h"
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
 static Perspective_Camera camera;
 static Light* lights;
 static Entity e;
+static Hierarchical_Model hierarchical_model;
 
 static Perspective_Camera create_camera()
 {
 	Perspective_Camera camera;
-	vec4 camera_position =(vec4) {0.0f, 0.0f, 1.0f, 1.0f};
+	vec4 camera_position = (vec4) {0.0f, 0.0f, 5.0f, 1.0f};
 	r32 camera_near_plane = -0.01f;
 	r32 camera_far_plane = -1000.0f;
 	r32 camera_fov = 45.0f;
@@ -39,9 +41,9 @@ static Light* create_lights()
 	return lights;
 }
 
-static void menu_dummy_callback()
+static void hierarchical_model_set_callback(u32 num_joints, vec3* translations, vec3* rotations, vec3* scales)
 {
-	printf("dummy callback called!\n");
+	printf("dummy callback called with %u joints!\n", num_joints);
 }
 
 int core_init()
@@ -54,7 +56,8 @@ int core_init()
 	Mesh m = graphics_mesh_create_from_obj_with_color("./res/cow.obj", 0, (vec4){1.0f, 0.0f, 0.0f, 0.0f});
 	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){1.0f, 1.0f, 1.0f});
 
-	menu_register_dummy_callback(menu_dummy_callback);
+	menu_register_hierarchical_model_set_callback(hierarchical_model_set_callback);
+	//hierarchical_model_create(&hierarchical_model);
 
 	return 0;
 }
@@ -71,7 +74,8 @@ void core_update(r32 delta_time)
 
 void core_render()
 {
-	graphics_entity_render_phong_shader(&camera, &e, lights);
+	//graphics_entity_render_phong_shader(&camera, &e, lights);
+	//hierarchical_model_render(&hierarchical_model, &camera, lights);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)

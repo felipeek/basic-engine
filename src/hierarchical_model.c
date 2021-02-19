@@ -1,63 +1,69 @@
 #include "hierarchical_model.h"
 #include <dynamic_array.h>
 
-void hierarchical_model_create(Hierarchical_Model* hierarchical_model)
+void hierarchical_model_joint_create(Hierarchical_Model_Joint* joint, vec4 translation, Quaternion rotation, vec3 scale,
+	Hierarchical_Model_Joint* children)
 {
 	Entity e;
-	Mesh m = graphics_mesh_create_from_obj_with_color("./res/cube.obj", 0, (vec4){1.0f, 0.0f, 0.0f, 0.0f});
+	joint->children = children;
+	joint->translation = translation;
+	joint->rotation = rotation;
+	joint->scale = scale;
+	Mesh m = graphics_mesh_create_from_obj_with_color("./res/cube.obj", 0, (vec4){0.0f, 1.0f, 0.0f, 1.0f});
 	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f},
 		quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){1.0f, 1.0f, 1.0f});
-	hierarchical_model->root.children = array_create(Hierarchical_Model, 1);
-	hierarchical_model->root.translation = (vec4){0.0f, 0.0f, 0.0f, 1.0f};
-	hierarchical_model->root.rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f);
-	hierarchical_model->root.scale = (vec3){1.0f, 1.0f, 1.0f};
-	hierarchical_model->root.e = e;
-
-	Hierarchical_Model_Joint joint;
-	joint.children = array_create(Hierarchical_Model, 1);
-	joint.translation = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
-	joint.rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f);
-	joint.scale = (vec3){1.0f, 1.0f, 1.0f};
-	joint.e = e;
+	joint->e = e;
 }
 
-static mat4 generate_model_matrix_for_joint(Hierarchical_Model_Joint* joint)
+void hierarchical_model_create(Hierarchical_Model* hierarchical_model, Hierarchical_Model_Joint root)
+{
+	hierarchical_model->root = root;
+}
+
+static mat4 get_model_matrix(vec4 translation, Quaternion rotation, vec3 scale)
 {
 	r32 s, c;
 
 	mat4 scale_matrix = (mat4) {
-		joint->scale.x, 0.0f, 0.0f, 0.0f,
-			0.0f, joint->scale.y, 0.0f, 0.0f,
-			0.0f, 0.0f, joint->scale.z, 0.0f,
+		scale.x, 0.0f, 0.0f, 0.0f,
+			0.0f, scale.y, 0.0f, 0.0f,
+			0.0f, 0.0f, scale.z, 0.0f,
 			0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	mat4 rotation_matrix = quaternion_get_matrix(&joint->rotation);
+	mat4 rotation_matrix = quaternion_get_matrix(&rotation);
 
 	mat4 translation_matrix = (mat4) {
-		1.0f, 0.0f, 0.0f, joint->translation.x,
-			0.0f, 1.0f, 0.0f, joint->translation.y,
-			0.0f, 0.0f, 1.0f, joint->translation.z,
+		1.0f, 0.0f, 0.0f, translation.x,
+			0.0f, 1.0f, 0.0f, translation.y,
+			0.0f, 0.0f, 1.0f, translation.z,
 			0.0f, 0.0f, 0.0f, 1.0f
 	};
 
 	mat4 model_matrix = gm_mat4_multiply(&rotation_matrix, &scale_matrix);
-	model_matrix = gm_mat4_multiply(&translation_matrix, &model_matrix);
-	return model_matrix;
+	return gm_mat4_multiply(&translation_matrix, &model_matrix);
 }
 
-static void render_joint(const Hierarchical_Model_Joint* joint, const Hierarchical_Model_Joint* parent)
+static void render_joint(Hierarchical_Model_Joint* joint, mat4 parent_transform, const Perspective_Camera* camera, const Light* lights)
 {
-	mat4 parent_transform = parent->e.model_matrix;
-	vec4 joint_position = gm_mat4_multiply_vec4(&parent_transform, joint->translation);
-	joint_position = gm_vec4_scalar_product(1.0f / joint_position.w, joint_position);
-	joint_position.w = 1.0f; // ensure
-	graphics_entity_set_position(&joint->e, joint_position);
-	graphics_entity_set_rotation(&joint->e, joint->rotation);
-	graphics_entity_set_scale(&joint->e, joint->scale);
-	graphics_entity_render_phong_shader(&)
+	mat4 joint_transform = get_model_matrix(joint->translation, joint->rotation, joint->scale);
+	joint_transform = gm_mat4_multiply(&parent_transform, &joint_transform);
+	graphics_entity_set_model_matrix(&joint->e, joint_transform);
+	graphics_entity_render_phong_shader(camera, &joint->e, lights);
+
+	// Render children
+	for (u32 i = 0; i < array_get_length(joint->children); ++i)
+		render_joint(&joint->children[i], joint_transform, camera, lights);
 }
 
-void hierarchical_model_render(Hierarchical_Model* hierarchical_model)
+void hierarchical_model_render(Hierarchical_Model* hierarchical_model, const Perspective_Camera* camera, const Light* lights)
 {
+	Hierarchical_Model_Joint* root = &hierarchical_model->root;
+	mat4 root_transform = get_model_matrix(root->translation, root->rotation, root->scale);
+	graphics_entity_set_model_matrix(&root->e, root_transform);
+	graphics_entity_render_phong_shader(camera, &root->e, lights);
+
+	// Render children
+	for (u32 i = 0; i < array_get_length(root->children); ++i)
+		render_joint(&root->children[i], root_transform, camera, lights);
 }

@@ -412,6 +412,11 @@ void graphics_entity_set_scale(Entity* entity, vec3 world_scale)
 	recalculate_model_matrix(entity);
 }
 
+void graphics_entity_set_model_matrix(Entity* entity, mat4 model_matrix)
+{
+	entity->model_matrix = model_matrix;
+}
+
 void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const Entity* entity)
 {
 	init_predefined_shaders();

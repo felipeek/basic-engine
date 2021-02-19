@@ -13,14 +13,19 @@
 
 #define GLSL_VERSION "#version 330"
 #define MENU_TITLE "Basic Engine"
+#define MAX_NUM_JOINTS 64
 
-typedef void (*Dummy_Callback)();
+typedef struct {
+	float x, y, z;
+} vec3;
 
-static Dummy_Callback dummy_callback;
+typedef void (*Hierarchical_Model_Set_Callback)(u32 num_joints, vec3* translations, vec3* rotations, vec3* scales);
 
-extern "C" void menu_register_dummy_callback(Dummy_Callback f)
+static Hierarchical_Model_Set_Callback hierarchical_model_set_callback;
+
+extern "C" void menu_register_hierarchical_model_set_callback(Hierarchical_Model_Set_Callback f)
 {
-	dummy_callback = f;
+	hierarchical_model_set_callback = f;
 }
 
 extern "C" void menu_char_click_process(GLFWwindow* window, u32 c)
@@ -67,11 +72,41 @@ static void draw_main_window()
 		return;
 	}
 
-	if (ImGui::Button("Dummy"))
+	if (ImGui::CollapsingHeader("Hierarchical Model Creator", 0))
 	{
-		if (dummy_callback)
+		static u32 number_of_joints = 1;
+		static vec3 translations[MAX_NUM_JOINTS];
+		static vec3 rotations[MAX_NUM_JOINTS];
+		static vec3 scales[MAX_NUM_JOINTS];
+		char buffer[64];
+
+		if (ImGui::Button("+"))
 		{
-			dummy_callback();
+			if (number_of_joints < MAX_NUM_JOINTS)
+				++number_of_joints;
+		}
+
+		ImGui::SameLine(0.0f, -1.0f);
+		if (ImGui::Button("-"))
+		{
+			if (number_of_joints > 1)
+				--number_of_joints;
+		}
+
+		for (u32 i = 0; i < number_of_joints; ++i) {
+			ImGui::Text("Joint %u", i);
+			if (ImGui::DragFloat3("Translation", (r32*)&translations[i], 0.1f, -FLT_MAX, FLT_MAX, "%.3f"))
+			{
+				hierarchical_model_set_callback(number_of_joints, translations, rotations, scales);
+			}
+			if (ImGui::DragFloat3("Rotation", (r32*)&rotations[i], 0.1f, -FLT_MAX, FLT_MAX, "%.3f"))
+			{
+				hierarchical_model_set_callback(number_of_joints, translations, rotations, scales);
+			}
+			if (ImGui::DragFloat3("Scale", (r32*)&scales[i], 0.1f, -FLT_MAX, FLT_MAX, "%.3f"))
+			{
+				hierarchical_model_set_callback(number_of_joints, translations, rotations, scales);
+			}
 		}
 	}
 
