@@ -19,24 +19,50 @@ typedef struct {
 	float x, y, z;
 } vec3;
 
+typedef enum {
+	ROTATION_AXIS_X,
+	ROTATION_AXIS_Y,
+	ROTATION_AXIS_Z
+} Rotation_Axis;
+
 typedef struct Joint_Definition {
 	vec3 translation;
 	vec3 rotation;
 	vec3 scale;
 	vec3 color;
-	vec3 rotation_axis;
+	Rotation_Axis rotation_axis;
 	struct Joint_Definition* children;
 } Joint_Definition;
+
+typedef enum {
+	IK_METHOD_INVERSE,
+	IK_METHOD_PSEUDO_INVERSE,
+	IK_METHOD_TRANSPOSE
+} IK_Method;
 
 static Joint_Definition root;
 
 typedef void (*Hierarchical_Model_Set_Callback)(const Joint_Definition* joint_definition);
+typedef void (*Animate_Callback)(IK_Method ik_method);
+typedef void (*Stop_Callback)();
 
 static Hierarchical_Model_Set_Callback hierarchical_model_set_callback;
+static Animate_Callback animate_callback;
+static Stop_Callback stop_callback;
 
 extern "C" void menu_register_hierarchical_model_set_callback(Hierarchical_Model_Set_Callback f)
 {
 	hierarchical_model_set_callback = f;
+}
+
+extern "C" void menu_register_animate_callback(Animate_Callback f)
+{
+	animate_callback = f;
+}
+
+extern "C" void menu_register_stop_callback(Stop_Callback f)
+{
+	stop_callback = f;
 }
 
 extern "C" void menu_char_click_process(GLFWwindow* window, u32 c)
@@ -67,7 +93,7 @@ static Joint_Definition create_joint_definition()
 	jd.rotation = (vec3){0.0f, 0.0f, 0.0f};
 	jd.scale = (vec3){1.0f, 1.0f, 1.0f};
 	jd.color = (vec3){1.0f, 0.0f, 0.0f};
-	jd.rotation_axis = (vec3){0.0f, 0.0f, 1.0f};
+	jd.rotation_axis = ROTATION_AXIS_Z;
 	return jd;
 }
 
@@ -87,21 +113,21 @@ static void set_up_arm_pose()
 	root.rotation = (vec3){0.3f, 0.5f, 0.3f};
 	root.scale = (vec3){0.61f, 0.025f, 0.025};
 	root.color = (vec3){1.0f, 0.0f, 0.0f};
-	root.rotation_axis = (vec3){0.0f, 1.0f, 0.0f};
+	root.rotation_axis = ROTATION_AXIS_Y;
 	
 	Joint_Definition forearm = create_joint_definition();
 	forearm.translation = (vec3){1.3f, 0.0f, 0.0f};
 	forearm.rotation = (vec3){0.3f, 0.2f, 0.3f};
 	forearm.scale = (vec3){0.61f, 0.025f, 0.025};
 	forearm.color = (vec3){0.0f, 1.0f, 0.0f};
-	forearm.rotation_axis = (vec3){0.0f, 0.0f, 1.0f};
+	forearm.rotation_axis = ROTATION_AXIS_Z;
 
 	Joint_Definition hand = create_joint_definition();
 	hand.translation = (vec3){1.3f, 0.0f, 0.0f};
 	hand.rotation = (vec3){0.1f, 0.2f, 0.3f};
 	hand.scale = (vec3){0.35f, 0.025f, 0.025};
 	hand.color = (vec3){0.0f, 0.0f, 1.0f};
-	hand.rotation_axis = (vec3){0.0f, 0.0f, 1.0f};
+	hand.rotation_axis = ROTATION_AXIS_Z;
 
 	array_push(forearm.children, &hand);
 	array_push(root.children, &forearm);
@@ -125,6 +151,22 @@ static void display_joint_definition(Joint_Definition* joint)
 	if (ImGui::DragFloat3("Color", (r32*)&joint->color, 0.01f, 0.0f, 1.0f, "%.3f"))
 	{
 		hierarchical_model_set_callback(&root);
+	}
+	const char* axis[] = { "X Axis", "Y Axis", "Z Axis" };
+	const char* selected_axis = axis[joint->rotation_axis];
+	if (ImGui::BeginCombo("Rotation Axis", selected_axis))
+	{
+		for (int n = 0; n < IM_ARRAYSIZE(axis); n++)
+		{
+			bool is_selected = (selected_axis == axis[n]);
+			if (ImGui::Selectable(axis[n], is_selected))
+			{
+				joint->rotation_axis = (Rotation_Axis)n;
+			}
+			if (is_selected)
+				ImGui::SetItemDefaultFocus();
+		}
+		ImGui::EndCombo();
 	}
 
 	const r32 INDENTATION = 50.0f;
@@ -171,6 +213,36 @@ static void draw_main_window()
 	{
 		set_up_arm_pose();
 		hierarchical_model_set_callback(&root);
+	}
+
+	static IK_Method ik_method = IK_METHOD_INVERSE;
+	const char* ik_methods[] = { "Inverse", "Pseudo-Inverse", "Transpose" };
+	const char* selected_ik_method = ik_methods[ik_method];
+
+	if (ImGui::BeginCombo("IK Method", selected_ik_method)) // The second parameter is the label previewed before opening the combo.
+	{
+		for (int n = 0; n < IM_ARRAYSIZE(ik_methods); n++)
+		{
+			bool is_selected = (selected_ik_method == ik_methods[n]); // You can store your selection however you want, outside or inside your objects
+			if (ImGui::Selectable(ik_methods[n], is_selected))
+			{
+				ik_method = (IK_Method)n;
+				selected_ik_method = ik_methods[n];
+			}
+			if (is_selected)
+				ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
+		}
+		ImGui::EndCombo();
+	}
+
+	if (ImGui::Button("Animate"))
+	{
+		animate_callback(ik_method);
+	}
+
+	if (ImGui::Button("Stop"))
+	{
+		stop_callback();
 	}
 
 	ImGui::End();

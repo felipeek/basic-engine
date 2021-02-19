@@ -9,7 +9,7 @@
 #include "hierarchical_model.h"
 #include "inverse_kinematics.h"
 
-#define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
+#define NUMBER_OF_IK_ITERATIONS_PER_FRAME 5000
 
 static Perspective_Camera camera;
 static Light* lights;
@@ -18,8 +18,9 @@ static Render_Primitives_Context render_primitives_ctx;
 static Entity sphere;
 
 // Hierarchical model
-static boolean is_hierarchical_model_created;
+static boolean is_hierarchical_model_created, is_animating;
 static Hierarchical_Model_Joint hierarchical_model;
+static IK_Method ik_method;
 
 static Perspective_Camera create_camera()
 {
@@ -47,6 +48,17 @@ static Light* create_lights()
 	return lights;
 }
 
+static vec3 get_rotation_axis(Rotation_Axis rotation_axis)
+{
+	switch (rotation_axis)
+	{
+		default:
+		case ROTATION_AXIS_X: return (vec3){1.0f, 0.0f, 0.0f};
+		case ROTATION_AXIS_Y: return (vec3){0.0f, 1.0f, 0.0f};
+		case ROTATION_AXIS_Z: return (vec3){0.0f, 0.0f, 1.0f};
+	}
+}
+
 static Hierarchical_Model_Joint create_joint_from_definition(const Joint_Definition* joint_definition)
 {
 	Hierarchical_Model_Joint joint;
@@ -58,7 +70,7 @@ static Hierarchical_Model_Joint create_joint_from_definition(const Joint_Definit
 	rotation = quaternion_product(&rotation, &rotation_z);
 	vec3 scale = joint_definition->scale;
 	vec4 color = (vec4){joint_definition->color.x, joint_definition->color.y, joint_definition->color.z, 1.0f};
-	vec3 rotation_axis = joint_definition->rotation_axis;
+	vec3 rotation_axis = get_rotation_axis(joint_definition->rotation_axis);
 	Hierarchical_Model_Joint* children = array_create(Hierarchical_Model_Joint, 1);
 	for (u32 i = 0; i < array_get_length(joint_definition->children); ++i)
 	{
@@ -85,6 +97,19 @@ static void hierarchical_model_set_callback(const Joint_Definition* joint_defini
 	is_hierarchical_model_created = true;
 }
 
+static void animate_callback(IK_Method ik_method)
+{
+	if (!is_hierarchical_model_created)
+		return;
+	is_animating = true;
+	ik_method = ik_method;
+}
+
+static void stop_callback()
+{
+	is_animating = false;
+}
+
 int core_init()
 {
 	// Create camera
@@ -100,6 +125,8 @@ int core_init()
 
 	cube_mesh = graphics_mesh_create_from_obj("./res/moved_cube.obj", 0);
 	menu_register_hierarchical_model_set_callback(hierarchical_model_set_callback);
+	menu_register_animate_callback(animate_callback);
+	menu_register_stop_callback(stop_callback);
 
 	return 0;
 }
@@ -114,9 +141,12 @@ void core_update(r32 delta_time)
 	if (is_hierarchical_model_created)
 	{
 		hierarchical_model_update(&hierarchical_model);
-		Hierarchical_Model_Joint* leaf_joint = &hierarchical_model.children[0].children[0];
-		for (u32 i = 0; i < 5000; ++i)
-			rotate_joints_towards_target_point(leaf_joint, gm_vec4_to_vec3(sphere.world_position));
+		if (is_animating)
+		{
+			Hierarchical_Model_Joint* leaf_joint = &hierarchical_model.children[0].children[0];
+			for (u32 i = 0; i < NUMBER_OF_IK_ITERATIONS_PER_FRAME; ++i)
+				rotate_joints_towards_target_point(leaf_joint, gm_vec4_to_vec3(sphere.world_position), ik_method);
+		}
 	}
 }
 

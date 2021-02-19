@@ -11,6 +11,18 @@ static vec3 get_position_from_matrix(mat4 m)
 	return position;
 }
 
+static u32 get_joint_height(Hierarchical_Model_Joint* leaf_joint)
+{
+	Hierarchical_Model_Joint* current = leaf_joint;
+	u32 h = 0;
+	while (current)
+	{
+		++h;
+		current = current->parent;
+	}
+	return h;
+}
+
 static vec3 get_end_effector(Hierarchical_Model_Joint* leaf_joint)
 {
 	// Here, we are leveraging the fact that we know the exact shape of the joint...
@@ -96,34 +108,74 @@ static Matrix calculate_angles(Matrix jacobian, vec3 beta)
 	return angles;
 }
 
-void rotate_joints_towards_target_point(Hierarchical_Model_Joint* leaf_joint, vec3 target_point)
+static Matrix get_rotation_angles_using_inverse(Hierarchical_Model_Joint* leaf_joint, vec3 target_point, vec3 end_effector)
 {
-	const r32 MINIMUM_DISTANCE_TO_CONSIDER_CORRECT = 0.1f;
-	const r32 delta = 0.0001f;
-	Matrix angles;
-
-	vec3 v, end_effector = get_end_effector(leaf_joint);
-	if (gm_vec3_length(gm_vec3_subtract(target_point, end_effector)) < MINIMUM_DISTANCE_TO_CONSIDER_CORRECT)
-		return;
+	vec3 v;
 	Matrix jacobian = generate_jacobian(leaf_joint, target_point, &v, end_effector);
-	r32 det = matrix_determinant(&jacobian);
-	//printf("DET: %.3f\n", det);
+	//r32 det = matrix_determinant(&jacobian); printf("determinant: %.3f\n", det);
 	Matrix jacobian_inverse = matrix_invert(&jacobian);
 	Matrix v_m = matrix_from_vec3(v);
-	angles = matrix_multiply(&jacobian_inverse, &v_m);
+	Matrix angles = matrix_multiply(&jacobian_inverse, &v_m);
 	matrix_destroy(&v_m);
 	matrix_destroy(&jacobian_inverse);
+	matrix_destroy(&jacobian);
+	return angles;
+}
+
+static Matrix get_rotation_angles_using_transpose(Hierarchical_Model_Joint* leaf_joint, vec3 target_point, vec3 end_effector)
+{
+	vec3 v;
+	Matrix jacobian = generate_jacobian(leaf_joint, target_point, &v, end_effector);
+	Matrix jacobian_transpose = matrix_transpose(&jacobian);
+	Matrix v_m = matrix_from_vec3(v);
+	Matrix angles = matrix_multiply(&jacobian_transpose, &v_m);
+	matrix_destroy(&v_m);
+	matrix_destroy(&jacobian_transpose);
+	matrix_destroy(&jacobian);
+	return angles;
+}
+
+void rotate_joints_towards_target_point(Hierarchical_Model_Joint* leaf_joint, vec3 target_point, IK_Method ik_method)
+{
+	const r32 MINIMUM_DISTANCE_TO_CONSIDER_CORRECT = 0.1f;
+	const r32 DELTA = 0.0001f;
+
+	vec3 end_effector = get_end_effector(leaf_joint);
+
+	// If the end effector is close enough to the target point, we stop animating
+	if (gm_vec3_length(gm_vec3_subtract(target_point, end_effector)) < MINIMUM_DISTANCE_TO_CONSIDER_CORRECT)
+		return;
+	
+	Matrix angles;
+	switch (ik_method)
+	{
+		default:
+		case IK_METHOD_INVERSE: {
+			u32 height = get_joint_height(leaf_joint);
+			if (height != 3)
+			{
+				fprintf(stderr, "Cannot use INVERSE ik method when number of joints is not 3!\n");
+				return;
+			}
+			angles = get_rotation_angles_using_inverse(leaf_joint, target_point, end_effector);
+		} break;
+		case IK_METHOD_PSEUDO_INVERSE: {
+			angles = get_rotation_angles_using_inverse(leaf_joint, target_point, end_effector);
+		} break;
+		case IK_METHOD_TRANSPOSE: {
+			angles = get_rotation_angles_using_transpose(leaf_joint, target_point, end_effector);
+		} break;
+	}
 
 	Hierarchical_Model_Joint* current_joint = leaf_joint;
-	printf("Angles: <%.3f, %.3f, %.3f>\n", angles.data[0][0], angles.data[1][0], angles.data[2][0]);
+	//printf("Angles: <%.3f, %.3f, %.3f>\n", angles.data[0][0], angles.data[1][0], angles.data[2][0]);
 	for (s32 i = angles.rows - 1; i >= 0; --i)
 	{
 		r32 angle = angles.data[i][0];
-		Quaternion rotation = quaternion_new(current_joint->rotation_axis, delta * angle);
+		Quaternion rotation = quaternion_new(current_joint->rotation_axis, DELTA * angle);
 		current_joint->rotation = quaternion_product(&rotation, &current_joint->rotation);
 		current_joint = current_joint->parent;
 	}
 
-	matrix_destroy(&jacobian);
 	matrix_destroy(&angles);
 }
