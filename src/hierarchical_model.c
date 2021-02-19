@@ -2,16 +2,15 @@
 #include <dynamic_array.h>
 
 void hierarchical_model_joint_create(Hierarchical_Model_Joint* joint, vec4 translation, Quaternion rotation, vec3 scale,
-	Hierarchical_Model_Joint* children)
+	vec4 color, Mesh mesh, Hierarchical_Model_Joint* children)
 {
 	Entity e;
 	joint->children = children;
 	joint->translation = translation;
 	joint->rotation = rotation;
 	joint->scale = scale;
-	Mesh m = graphics_mesh_create_from_obj_with_color("./res/cube.obj", 0, (vec4){0.0f, 1.0f, 0.0f, 1.0f});
-	graphics_entity_create(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f},
-		quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){1.0f, 1.0f, 1.0f});
+	graphics_entity_create_with_color(&e, mesh, (vec4){0.0f, 0.0f, 0.0f, 1.0f},
+		quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){1.0f, 1.0f, 1.0f}, color);
 	joint->e = e;
 }
 

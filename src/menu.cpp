@@ -19,7 +19,17 @@ typedef struct {
 	float x, y, z;
 } vec3;
 
-typedef void (*Hierarchical_Model_Set_Callback)(u32 num_joints, vec3* translations, vec3* rotations, vec3* scales);
+typedef struct Joint_Definition {
+	vec3 translation;
+	vec3 rotation;
+	vec3 scale;
+	vec3 color;
+	struct Joint_Definition* children;
+} Joint_Definition;
+
+static Joint_Definition root;
+
+typedef void (*Hierarchical_Model_Set_Callback)(const Joint_Definition* joint_definition);
 
 static Hierarchical_Model_Set_Callback hierarchical_model_set_callback;
 
@@ -48,18 +58,57 @@ extern "C" void menu_scroll_change_process(GLFWwindow* window, s64 x_offset, s64
 	ImGui_ImplGlfw_ScrollCallback(window, x_offset, y_offset);
 }
 
-extern "C" void menu_init(GLFWwindow* window)
+static Joint_Definition create_joint_definition()
 {
-	// Setup Dear ImGui binding
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	Joint_Definition jd;
+	jd.children = array_create(Joint_Definition, 1);
+	jd.translation = (vec3){0.0f, 0.0f, 0.0f};
+	jd.rotation = (vec3){0.0f, 0.0f, 0.0f};
+	jd.scale = (vec3){1.0f, 1.0f, 1.0f};
+	jd.color = (vec3){1.0f, 0.0f, 0.0f};
+	return jd;
+}
 
-	ImGui_ImplGlfw_InitForOpenGL(window, false);
-	ImGui_ImplOpenGL3_Init(GLSL_VERSION);
+static void display_joint_definition(Joint_Definition* joint)
+{
+	ImGui::PushID(joint);
+	if (ImGui::DragFloat3("Translation", (r32*)&joint->translation, 0.01f, -FLT_MAX, FLT_MAX, "%.3f"))
+	{
+		hierarchical_model_set_callback(&root);
+	}
+	if (ImGui::DragFloat3("Rotation", (r32*)&joint->rotation, 0.1f, 0.0f, FLT_MAX, "%.3f"))
+	{
+		hierarchical_model_set_callback(&root);
+	}
+	if (ImGui::DragFloat3("Scale", (r32*)&joint->scale, 0.01f, 0.0f, FLT_MAX, "%.3f"))
+	{
+		hierarchical_model_set_callback(&root);
+	}
+	if (ImGui::DragFloat3("Color", (r32*)&joint->color, 0.01f, 0.0f, 1.0f, "%.3f"))
+	{
+		hierarchical_model_set_callback(&root);
+	}
 
-	// Setup style
-	ImGui::StyleColorsDark();
+	const r32 INDENTATION = 50.0f;
+	ImGui::Indent(INDENTATION);
+	for (u32 i = 0; i < array_get_length(joint->children); ++i)
+	{
+		ImGui::Text("Joint %u", i);
+		display_joint_definition(&joint->children[i]);
+	}
+	if (ImGui::Button("+"))
+	{
+		Joint_Definition jd = create_joint_definition();
+		array_push(joint->children, &jd);
+	}
+	ImGui::SameLine(0.0f, -1.0f);
+	if (ImGui::Button("-"))
+	{
+		array_pop(joint->children);
+	}
+	ImGui::Indent(-INDENTATION);
+
+	ImGui::PopID();
 }
 
 static void draw_main_window()
@@ -74,40 +123,10 @@ static void draw_main_window()
 
 	if (ImGui::CollapsingHeader("Hierarchical Model Creator", 0))
 	{
-		static u32 number_of_joints = 1;
-		static vec3 translations[MAX_NUM_JOINTS];
-		static vec3 rotations[MAX_NUM_JOINTS];
-		static vec3 scales[MAX_NUM_JOINTS];
 		char buffer[64];
 
-		if (ImGui::Button("+"))
-		{
-			if (number_of_joints < MAX_NUM_JOINTS)
-				++number_of_joints;
-		}
-
-		ImGui::SameLine(0.0f, -1.0f);
-		if (ImGui::Button("-"))
-		{
-			if (number_of_joints > 1)
-				--number_of_joints;
-		}
-
-		for (u32 i = 0; i < number_of_joints; ++i) {
-			ImGui::Text("Joint %u", i);
-			if (ImGui::DragFloat3("Translation", (r32*)&translations[i], 0.1f, -FLT_MAX, FLT_MAX, "%.3f"))
-			{
-				hierarchical_model_set_callback(number_of_joints, translations, rotations, scales);
-			}
-			if (ImGui::DragFloat3("Rotation", (r32*)&rotations[i], 0.1f, -FLT_MAX, FLT_MAX, "%.3f"))
-			{
-				hierarchical_model_set_callback(number_of_joints, translations, rotations, scales);
-			}
-			if (ImGui::DragFloat3("Scale", (r32*)&scales[i], 0.1f, -FLT_MAX, FLT_MAX, "%.3f"))
-			{
-				hierarchical_model_set_callback(number_of_joints, translations, rotations, scales);
-			}
-		}
+		ImGui::Text("Root Joint");
+		display_joint_definition(&root);
 	}
 
 	ImGui::End();
@@ -128,6 +147,22 @@ extern "C" void menu_render()
 	// Rendering
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+extern "C" void menu_init(GLFWwindow* window)
+{
+	// Setup Dear ImGui binding
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+	ImGui_ImplGlfw_InitForOpenGL(window, false);
+	ImGui_ImplOpenGL3_Init(GLSL_VERSION);
+
+	// Setup style
+	ImGui::StyleColorsDark();
+
+	root = create_joint_definition();
 }
 
 extern "C" void menu_destroy()

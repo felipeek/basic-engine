@@ -12,7 +12,10 @@
 
 static Perspective_Camera camera;
 static Light* lights;
-static Entity e;
+static Mesh cube_mesh;
+
+// Hierarchical model
+static boolean is_hierarchical_model_created;
 static Hierarchical_Model hierarchical_model;
 
 static Perspective_Camera create_camera()
@@ -41,9 +44,32 @@ static Light* create_lights()
 	return lights;
 }
 
-static void hierarchical_model_set_callback(u32 num_joints, vec3* translations, vec3* rotations, vec3* scales)
+static Hierarchical_Model_Joint create_joint_from_definition(const Joint_Definition* joint_definition)
 {
-	printf("dummy callback called with %u joints!\n", num_joints);
+	Hierarchical_Model_Joint joint;
+	vec4 translation = (vec4){joint_definition->translation.x, joint_definition->translation.y, joint_definition->translation.z, 1.0f};
+	Quaternion rotation_x = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, joint_definition->rotation.x);
+	Quaternion rotation_y = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, joint_definition->rotation.y);
+	Quaternion rotation_z = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, joint_definition->rotation.z);
+	Quaternion rotation = quaternion_product(&rotation_x, &rotation_y);
+	rotation = quaternion_product(&rotation, &rotation_z);
+	vec3 scale = joint_definition->scale;
+	vec4 color = (vec4){joint_definition->color.x, joint_definition->color.y, joint_definition->color.z, 1.0f};
+	Hierarchical_Model_Joint* children = array_create(Hierarchical_Model_Joint, 1);
+	for (u32 i = 0; i < array_get_length(joint_definition->children); ++i)
+	{
+		Hierarchical_Model_Joint child = create_joint_from_definition(&joint_definition->children[i]);
+		array_push(children, &child);
+	}
+	hierarchical_model_joint_create(&joint, translation, rotation, scale, color, cube_mesh, children);
+	return joint;
+}
+
+static void hierarchical_model_set_callback(const Joint_Definition* joint_definition)
+{
+	Hierarchical_Model_Joint root = create_joint_from_definition(joint_definition);
+	hierarchical_model_create(&hierarchical_model, root);
+	is_hierarchical_model_created = true;
 }
 
 int core_init()
@@ -53,12 +79,8 @@ int core_init()
 	// Create light
 	lights = create_lights();
 
-	Mesh m = graphics_mesh_create_from_obj("./res/cow.obj", 0);
-	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
-
+	cube_mesh = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	menu_register_hierarchical_model_set_callback(hierarchical_model_set_callback);
-	//hierarchical_model_create(&hierarchical_model);
 
 	return 0;
 }
@@ -75,8 +97,8 @@ void core_update(r32 delta_time)
 
 void core_render()
 {
-	//graphics_entity_render_phong_shader(&camera, &e, lights);
-	//hierarchical_model_render(&hierarchical_model, &camera, lights);
+	if (is_hierarchical_model_created)
+		hierarchical_model_render(&hierarchical_model, &camera, lights);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
@@ -97,45 +119,45 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		camera_move_right(&camera, -movement_speed * delta_time);
 	if (key_state[GLFW_KEY_D])
 		camera_move_right(&camera, movement_speed * delta_time);
-	if (key_state[GLFW_KEY_X])
-	{
-		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
-		{
-			Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
-		}
-		else
-		{
-			Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, -rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
-		}
-	}
-	if (key_state[GLFW_KEY_Y])
-	{
-		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
-		{
-			Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
-		}
-		else
-		{
-			Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, -rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
-		}
-	}
-	if (key_state[GLFW_KEY_Z])
-	{
-		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
-		{
-			Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
-		}
-		else
-		{
-			Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, -rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
-		}
-	}
+	//if (key_state[GLFW_KEY_X])
+	//{
+	//	if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
+	//	{
+	//		Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, rotation_speed * delta_time);
+	//		graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+	//	}
+	//	else
+	//	{
+	//		Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, -rotation_speed * delta_time);
+	//		graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+	//	}
+	//}
+	//if (key_state[GLFW_KEY_Y])
+	//{
+	//	if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
+	//	{
+	//		Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, rotation_speed * delta_time);
+	//		graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+	//	}
+	//	else
+	//	{
+	//		Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, -rotation_speed * delta_time);
+	//		graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+	//	}
+	//}
+	//if (key_state[GLFW_KEY_Z])
+	//{
+	//	if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
+	//	{
+	//		Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, rotation_speed * delta_time);
+	//		graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+	//	}
+	//	else
+	//	{
+	//		Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, -rotation_speed * delta_time);
+	//		graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+	//	}
+	//}
 	if (key_state[GLFW_KEY_L])
 	{
 		static boolean wireframe = false;
