@@ -33,7 +33,6 @@ typedef struct
 	u32 VAO, VBO, EBO;
 	s32 indexes_size;
 	Normal_Mapping_Info normal_info;
-	Diffuse_Info diffuse_info;
 } Mesh;
 
 typedef struct
@@ -43,6 +42,7 @@ typedef struct
 	Quaternion world_rotation;
 	vec3 world_scale;
 	mat4 model_matrix;
+	Diffuse_Info diffuse_info;
 } Entity;
 
 typedef struct
@@ -73,22 +73,21 @@ void graphics_float_image_Free(Float_Image_Data* image_data);
 void graphics_image_save(const s8* image_path, const Image_Data* image_data);
 void graphics_float_image_save(const s8* image_path, const Float_Image_Data* image_data);
 Shader graphics_shader_create(const s8* vertex_shader_path, const s8* fragment_shader_path);
-Mesh graphics_quad_create_with_texture(u32 texture);
-Mesh graphics_quad_create_with_color(vec4 color);
-Mesh graphics_mesh_create_with_texture(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info, u32 diffuse_map);
-Mesh graphics_mesh_create_with_color(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info, vec4 diffuse_color);
-Mesh graphics_mesh_create_from_obj_with_color(const s8* obj_path, Normal_Mapping_Info* normal_info, vec4 diffuse_color);
-Mesh graphics_mesh_create_from_obj_with_texture(const s8* obj_path, Normal_Mapping_Info* normal_info, u32 diffuse_map);
+Mesh graphics_quad_create();
+Mesh graphics_mesh_create(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info);
+Mesh graphics_mesh_create_from_obj(const s8* obj_path, Normal_Mapping_Info* normal_info);
 void graphics_mesh_render(Shader shader, Mesh mesh);
-// If mesh already has a diffuse map, the older diffuse map will be deleted if delete_diffuse_map is true.
-// If mesh has a color instead of a diffuse map, the mesh will lose the color and be set to use the diffuse map.
-void graphics_mesh_change_diffuse_map(Mesh* mesh, u32 diffuse_map, boolean delete_diffuse_map);
-// If the mesh already has a color, the older color will be deleted.
-// If mesh has a diffuse map instead of a color, the diffuse map will be deleted if delete_diffuse_map is true
-// The mesh will be set to use the color.
-void graphics_mesh_change_color(Mesh* mesh, vec4 color, boolean delete_diffuse_map);
-void graphics_entity_create(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale);
-void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_normal_map, boolean delete_diffuse_map);
+void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color);
+void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture);
+void graphics_entity_destroy(Entity* entity);
+// If entity already has a diffuse map, the older diffuse map will be deleted if delete_diffuse_map is true.
+// If entity has a color instead of a diffuse map, the mesh will lose the color and be set to use the diffuse map.
+void graphics_entity_change_diffuse_map(Entity* entity, u32 diffuse_map, boolean delete_diffuse_map);
+// If the entity already has a color, the older color will be deleted.
+// If entity has a diffuse map instead of a color, the diffuse map will be deleted if delete_diffuse_map is true
+// The entity will be set to use the color.
+void graphics_entity_change_color(Entity* entity, vec4 color, boolean delete_diffuse_map);
+void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_normal_map);
 void graphics_entity_set_position(Entity* entity, vec4 world_position);
 void graphics_entity_set_rotation(Entity* entity, Quaternion world_rotation);
 void graphics_entity_set_scale(Entity* entity, vec3 world_scale);

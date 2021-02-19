@@ -167,7 +167,7 @@ static void fill_quad_vertices_and_indexes(r32 size, Vertex* vertices, u32* indi
 	indices[5] = 2;
 }
 
-Mesh graphics_quad_create_with_texture(u32 texture)
+Mesh graphics_quad_create()
 {
 	r32 size = 1.0f;
 	Vertex vertices[4];
@@ -175,23 +175,11 @@ Mesh graphics_quad_create_with_texture(u32 texture)
 
 	fill_quad_vertices_and_indexes(size, vertices, indices);
 
-	return graphics_mesh_create_with_texture(vertices, sizeof(vertices) / sizeof(Vertex), indices,
-		sizeof(indices) / sizeof(u32), 0, texture);
+	return graphics_mesh_create(vertices, sizeof(vertices) / sizeof(Vertex), indices,
+		sizeof(indices) / sizeof(u32), 0);
 }
 
-Mesh graphics_quad_create_with_color(vec4 color)
-{
-	r32 size = 1.0f;
-	Vertex vertices[4];
-	u32 indices[6];
-
-	fill_quad_vertices_and_indexes(size, vertices, indices);
-
-	return graphics_mesh_create_with_color(vertices, sizeof(vertices) / sizeof(Vertex), indices,
-		sizeof(indices) / sizeof(u32), 0, color);
-}
-
-static Mesh create_simple_mesh(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info)
+Mesh graphics_mesh_create(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info)
 {
 	Mesh mesh;
 	GLuint VBO, EBO, VAO;
@@ -237,22 +225,6 @@ static Mesh create_simple_mesh(Vertex* vertices, s32 vertices_size, u32* indices
 	else
 		mesh.normal_info = *normal_info;
 
-	return mesh;
-}
-
-Mesh graphics_mesh_create_with_color(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info, vec4 diffuse_color)
-{
-	Mesh mesh = create_simple_mesh(vertices, vertices_size, indices, indices_size, normal_info);
-	mesh.diffuse_info.use_diffuse_map = false;
-	mesh.diffuse_info.diffuse_color = diffuse_color;
-	return mesh;
-}
-
-Mesh graphics_mesh_create_with_texture(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info, u32 diffuse_map)
-{
-	Mesh mesh = create_simple_mesh(vertices, vertices_size, indices, indices_size, normal_info);
-	mesh.diffuse_info.use_diffuse_map = true;
-	mesh.diffuse_info.diffuse_map = diffuse_map;
 	return mesh;
 }
 
@@ -323,29 +295,28 @@ void graphics_mesh_render(Shader shader, Mesh mesh)
 {
 	glBindVertexArray(mesh.VAO);
 	glUseProgram(shader);
-	diffuse_update_uniforms(&mesh.diffuse_info, shader);
 	normals_update_uniforms(&mesh.normal_info, shader);
 	glDrawElements(GL_TRIANGLES, mesh.indexes_size, GL_UNSIGNED_INT, 0);
 	glUseProgram(0);
 	glBindVertexArray(0);
 }
 
-void graphics_mesh_change_diffuse_map(Mesh* mesh, u32 diffuse_map, boolean delete_diffuse_map)
+void graphics_entity_change_diffuse_map(Entity* entity, u32 diffuse_map, boolean delete_diffuse_map)
 {
-	if (delete_diffuse_map && mesh->diffuse_info.use_diffuse_map)
-		glDeleteTextures(1, &mesh->diffuse_info.diffuse_map);
+	if (delete_diffuse_map && entity->diffuse_info.use_diffuse_map)
+		glDeleteTextures(1, &entity->diffuse_info.diffuse_map);
 
-	mesh->diffuse_info.diffuse_map = diffuse_map;
-	mesh->diffuse_info.use_diffuse_map = true;
+	entity->diffuse_info.diffuse_map = diffuse_map;
+	entity->diffuse_info.use_diffuse_map = true;
 }
 
-void graphics_mesh_change_color(Mesh* mesh, vec4 color, boolean delete_diffuse_map)
+void graphics_entity_change_color(Entity* entity, vec4 color, boolean delete_diffuse_map)
 {
-	if (delete_diffuse_map && mesh->diffuse_info.use_diffuse_map)
-		glDeleteTextures(1, &mesh->diffuse_info.diffuse_map);
+	if (delete_diffuse_map && entity->diffuse_info.use_diffuse_map)
+		glDeleteTextures(1, &entity->diffuse_info.diffuse_map);
 
-	mesh->diffuse_info.use_diffuse_map = false;
-	mesh->diffuse_info.diffuse_color = color;
+	entity->diffuse_info.use_diffuse_map = false;
+	entity->diffuse_info.diffuse_color = color;
 }
 
 static void recalculate_model_matrix(Entity* entity)
@@ -372,24 +343,41 @@ static void recalculate_model_matrix(Entity* entity)
 	entity->model_matrix = gm_mat4_multiply(&translation_matrix, &entity->model_matrix);
 }
 
-void graphics_entity_create(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale)
+void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color)
 {
 	entity->mesh = mesh;
 	entity->world_position = world_position;
 	entity->world_rotation = world_rotation;
 	entity->world_scale = world_scale;
+	entity->diffuse_info.diffuse_color = color;
+	entity->diffuse_info.use_diffuse_map = false;
 	recalculate_model_matrix(entity);
 }
 
-void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_normal_map, boolean delete_diffuse_map)
+void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture)
+{
+	entity->mesh = mesh;
+	entity->world_position = world_position;
+	entity->world_rotation = world_rotation;
+	entity->world_scale = world_scale;
+	entity->diffuse_info.diffuse_map = texture;
+	entity->diffuse_info.use_diffuse_map = true;
+	recalculate_model_matrix(entity);
+}
+
+void graphics_entity_destroy(Entity* entity)
+{
+	if (entity->diffuse_info.use_diffuse_map)
+		glDeleteTextures(1, &entity->diffuse_info.diffuse_map);
+}
+
+void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_normal_map)
 {
 	glDeleteBuffers(1, &entity->mesh.VBO);
 	glDeleteBuffers(1, &entity->mesh.EBO);
 	glDeleteVertexArrays(1, &entity->mesh.VAO);
 	if (delete_normal_map && entity->mesh.normal_info.use_normal_map)
 		glDeleteTextures(1, &entity->mesh.normal_info.normal_map_texture);
-	if (delete_diffuse_map && entity->mesh.diffuse_info.use_diffuse_map)
-		glDeleteTextures(1, &entity->mesh.diffuse_info.diffuse_map);
 
 	entity->mesh = mesh;
 }
@@ -448,6 +436,7 @@ void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const
 	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)entity->model_matrix.data);
 	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)camera->view_matrix.data);
 	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)camera->projection_matrix.data);
+	diffuse_update_uniforms(&entity->diffuse_info, shader);
 	graphics_mesh_render(shader, entity->mesh);
 	glUseProgram(0);
 }
@@ -592,23 +581,12 @@ Image_Data graphics_float_image_data_to_image_data(const Float_Image_Data* float
 	return id;
 }
 
-Mesh graphics_mesh_create_from_obj_with_color(const s8* obj_path, Normal_Mapping_Info* normal_info, vec4 diffuse_color)
+Mesh graphics_mesh_create_from_obj(const s8* obj_path, Normal_Mapping_Info* normal_info)
 {
 	Vertex* vertices;
 	u32* indexes;
 	obj_parse(obj_path, &vertices, &indexes);
-	Mesh m = graphics_mesh_create_with_color(vertices, array_get_length(vertices), indexes, array_get_length(indexes), normal_info, diffuse_color);
-	array_release(vertices);
-	array_release(indexes);
-	return m;
-}
-
-Mesh graphics_mesh_create_from_obj_with_texture(const s8* obj_path, Normal_Mapping_Info* normal_info, u32 diffuse_map)
-{
-	Vertex* vertices;
-	u32* indexes;
-	obj_parse(obj_path, &vertices, &indexes);
-	Mesh m = graphics_mesh_create_with_texture(vertices, array_get_length(vertices), indexes, array_get_length(indexes), normal_info, diffuse_map);
+	Mesh m = graphics_mesh_create(vertices, array_get_length(vertices), indexes, array_get_length(indexes), normal_info);
 	array_release(vertices);
 	array_release(indexes);
 	return m;
