@@ -722,3 +722,27 @@ void graphics_renderer_debug_vector(Render_Primitives_Context* primitives_ctx, v
 
 	primitives_ctx->vertex_count += 2;
 }
+
+mat4 graphics_generate_model_matrix(vec4 translation, Quaternion rotation, vec3 scale)
+{
+	r32 s, c;
+
+	mat4 scale_matrix = (mat4) {
+		scale.x, 0.0f, 0.0f, 0.0f,
+			0.0f, scale.y, 0.0f, 0.0f,
+			0.0f, 0.0f, scale.z, 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f
+	};
+
+	mat4 rotation_matrix = quaternion_get_matrix(&rotation);
+
+	mat4 translation_matrix = (mat4) {
+		1.0f, 0.0f, 0.0f, translation.x,
+			0.0f, 1.0f, 0.0f, translation.y,
+			0.0f, 0.0f, 1.0f, translation.z,
+			0.0f, 0.0f, 0.0f, 1.0f
+	};
+
+	mat4 model_matrix = gm_mat4_multiply(&rotation_matrix, &scale_matrix);
+	return gm_mat4_multiply(&translation_matrix, &model_matrix);
+}

@@ -81,18 +81,18 @@ static void set_up_arm_pose()
 {
 	destroy_joint_definition(&root);
 	root = create_joint_definition();
-	root.translation = (vec3){-1.21f, 0.0f, 0.0f};
-	root.scale = (vec3){0.55f, 0.16f, 0.31f};
+	root.translation = (vec3){-1.0f, 0.0f, 0.0f};
+	root.scale = (vec3){0.61f, 0.025f, 0.025};
 	root.color = (vec3){1.0f, 0.0f, 0.0f};
 	
 	Joint_Definition forearm = create_joint_definition();
-	forearm.translation = (vec3){1.87f, 0.0f, 0.0f};
-	forearm.scale = (vec3){0.84f, 1.0f, 0.83f};
+	forearm.translation = (vec3){1.3f, 0.0f, 0.0f};
+	forearm.scale = (vec3){0.61f, 0.025f, 0.025};
 	forearm.color = (vec3){0.0f, 1.0f, 0.0f};
 
 	Joint_Definition hand = create_joint_definition();
-	hand.translation = (vec3){1.38f, 0.0f, 0.0f};
-	hand.scale = (vec3){0.35f, 1.0f, 0.65f};
+	hand.translation = (vec3){1.3f, 0.0f, 0.0f};
+	hand.scale = (vec3){0.35f, 0.025f, 0.025};
 	hand.color = (vec3){0.0f, 0.0f, 1.0f};
 
 	array_push(forearm.children, &hand);
@@ -106,7 +106,7 @@ static void display_joint_definition(Joint_Definition* joint)
 	{
 		hierarchical_model_set_callback(&root);
 	}
-	if (ImGui::DragFloat3("Rotation", (r32*)&joint->rotation, 0.1f, 0.0f, FLT_MAX, "%.3f"))
+	if (ImGui::DragFloat3("Rotation", (r32*)&joint->rotation, 0.1f, -180.0f, 180.0f, "%.3f"))
 	{
 		hierarchical_model_set_callback(&root);
 	}

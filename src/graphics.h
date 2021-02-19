@@ -118,6 +118,7 @@ u32 graphics_texture_create_from_float_data(const Float_Image_Data* image_data);
 void graphics_texture_delete(u32 texture_id);
 Float_Image_Data graphics_image_data_to_float_image_data(Image_Data* image_data, r32* memory);
 Image_Data graphics_float_image_data_to_image_data(const Float_Image_Data* float_image_Data, u8* memory);
+mat4 graphics_generate_model_matrix(vec4 translation, Quaternion rotation, vec3 scale);
 
 // Render primitives
 void graphics_renderer_primitives_init(Render_Primitives_Context* primitives_ctx);

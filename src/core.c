@@ -7,6 +7,7 @@
 #include "obj.h"
 #include "menu.h"
 #include "hierarchical_model.h"
+#include "inverse_kinematics.h"
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
@@ -18,7 +19,7 @@ static Entity sphere;
 
 // Hierarchical model
 static boolean is_hierarchical_model_created;
-static Hierarchical_Model hierarchical_model;
+static Hierarchical_Model_Joint hierarchical_model;
 
 static Perspective_Camera create_camera()
 {
@@ -63,19 +64,25 @@ static Hierarchical_Model_Joint create_joint_from_definition(const Joint_Definit
 		Hierarchical_Model_Joint child = create_joint_from_definition(&joint_definition->children[i]);
 		array_push(children, &child);
 	}
-	hierarchical_model_joint_create(&joint, translation, rotation, scale, color, cube_mesh, children);
+	hierarchical_model_joint_create(&joint, translation, rotation, scale, color, cube_mesh, children, NULL);
 	return joint;
+}
+
+static void fill_joint_parents(Hierarchical_Model_Joint* joint, const Hierarchical_Model_Joint* parent)
+{
+	for (u32 i = 0; i < array_get_length(joint->children); ++i)
+		fill_joint_parents(&joint->children[i], joint);
+	joint->parent = parent;
 }
 
 static void hierarchical_model_set_callback(const Joint_Definition* joint_definition)
 {
 	if (is_hierarchical_model_created)
-		hierarchical_model_joint_destroy_recursively(&hierarchical_model.root);
-	Hierarchical_Model_Joint root = create_joint_from_definition(joint_definition);
-	hierarchical_model_create(&hierarchical_model, root);
+		hierarchical_model_joint_destroy_recursively(&hierarchical_model);
+	hierarchical_model = create_joint_from_definition(joint_definition);
+	fill_joint_parents(&hierarchical_model, NULL);	// second-pass just to fill the parents... can't fill at creation time because of chicken-egg problem
 	is_hierarchical_model_created = true;
 }
-
 
 int core_init()
 {
@@ -87,10 +94,10 @@ int core_init()
 	graphics_renderer_primitives_init(&render_primitives_ctx);
 
 	Mesh sphere_mesh = graphics_mesh_create_from_obj("./res/sphere.obj", 0);
-	graphics_entity_create_with_color(&sphere, sphere_mesh, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f),
+	graphics_entity_create_with_color(&sphere, sphere_mesh, (vec4){3.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f),
 		(vec3){0.1f, 0.1f, 0.1f}, (vec4){1.0f, 0.0f, 1.0f, 1.0f});
 
-	cube_mesh = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	cube_mesh = graphics_mesh_create_from_obj("./res/moved_cube.obj", 0);
 	menu_register_hierarchical_model_set_callback(hierarchical_model_set_callback);
 
 	return 0;
@@ -103,7 +110,11 @@ void core_destroy()
 
 void core_update(r32 delta_time)
 {
-
+	if (is_hierarchical_model_created)
+	{
+		Hierarchical_Model_Joint* leaf_joint = &hierarchical_model.children[0].children[0];
+		rotate_joints_towards_target_point(leaf_joint, gm_vec4_to_vec3(sphere.world_position));
+	}
 }
 
 void core_render()
@@ -113,6 +124,18 @@ void core_render()
 	graphics_entity_render_phong_shader(&camera, &sphere, lights);
 	//graphics_renderer_debug_points(&render_primitives_ctx, &target_position, 1, (vec4){1.0f, 0.0f, 1.0f, 1.0f});
 	//graphics_renderer_primitives_flush(&render_primitives_ctx, &camera);
+
+
+	// render end-effector
+	//if (is_hierarchical_model_created)
+	//{
+	//	mat4 last_joint_transform = hierarchical_model.root.children[0].children[0].e.model_matrix;
+	//	vec4 end_effector_position_in_local_coordinates = (vec4){2.0f, 0.0f, 0.0f, 1.0f};
+	//	vec4 E = gm_mat4_multiply_vec4(&last_joint_transform, end_effector_position_in_local_coordinates);
+	//	vec3 E3 = gm_vec4_to_vec3(E);
+	//	graphics_renderer_debug_points(&render_primitives_ctx, &E3, 1, (vec4){1.0f, 0.0f, 1.0f, 1.0f});
+	//	graphics_renderer_primitives_flush(&render_primitives_ctx, &camera);
+	//}
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
