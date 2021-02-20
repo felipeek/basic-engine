@@ -97,6 +97,8 @@ static Joint_Definition create_joint_definition()
 	jd.scale = (vec3){1.0f, 1.0f, 1.0f};
 	jd.color = (vec3){1.0f, 0.0f, 0.0f};
 	jd.rotation_axis = ROTATION_AXIS_Z;
+	jd.follow_target_point = false;
+	jd.target_point = (vec3){1.0f, 0.0f, 0.0f};
 	return jd;
 }
 
