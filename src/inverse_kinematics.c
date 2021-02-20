@@ -34,6 +34,14 @@ static vec3 get_end_effector(Hierarchical_Model_Joint* leaf_joint)
 	return gm_vec4_to_vec3(end_effector_position);
 }
 
+static vec3 clamp_mag(vec3 w, r32 d)
+{
+	r32 l = gm_vec3_length(w);
+	if (l <= d)
+		return w;
+	return gm_vec3_scalar_product(d / l, w);
+}
+
 static Matrix generate_jacobian(Hierarchical_Model_Joint* leaf_joint, vec3 target_point, vec3* v, vec3 end_effector)
 {
 	// We start by collecting all joint positions
@@ -54,6 +62,8 @@ static Matrix generate_jacobian(Hierarchical_Model_Joint* leaf_joint, vec3 targe
 
 	// Calculate the vector 'v' (left side of the equation)
 	*v = gm_vec3_subtract(G, E);
+	//const r32 D_max = 0.1f;
+	//*v = clamp_mag(*v, D_max);
 
 	// Finally, calculate the jacobian
 	Matrix jacobian = matrix_create(3, array_get_length(joint_positions));
