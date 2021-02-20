@@ -31,6 +31,8 @@ typedef struct Joint_Definition {
 	vec3 scale;
 	vec3 color;
 	Rotation_Axis rotation_axis;
+	boolean follow_target_point;
+	vec3 target_point;
 	struct Joint_Definition* children;
 } Joint_Definition;
 
@@ -110,27 +112,83 @@ static void set_up_arm_pose()
 	destroy_joint_definition(&root);
 	root = create_joint_definition();
 	root.translation = (vec3){-1.0f, 0.0f, 0.0f};
-	root.rotation = (vec3){0.3f, 0.5f, 0.3f};
+	root.rotation = (vec3){0.0f, 0.0f, 0.0f};
 	root.scale = (vec3){0.61f, 0.025f, 0.025};
 	root.color = (vec3){1.0f, 0.0f, 0.0f};
 	root.rotation_axis = ROTATION_AXIS_Y;
+	root.follow_target_point = false;
 	
 	Joint_Definition forearm = create_joint_definition();
 	forearm.translation = (vec3){1.3f, 0.0f, 0.0f};
-	forearm.rotation = (vec3){0.3f, 0.2f, 0.3f};
+	forearm.rotation = (vec3){0.0f, 0.0f, 45.0f};	// add rotation to avoid singularities...
 	forearm.scale = (vec3){0.61f, 0.025f, 0.025};
 	forearm.color = (vec3){0.0f, 1.0f, 0.0f};
 	forearm.rotation_axis = ROTATION_AXIS_Z;
+	forearm.follow_target_point = false;
 
 	Joint_Definition hand = create_joint_definition();
 	hand.translation = (vec3){1.3f, 0.0f, 0.0f};
-	hand.rotation = (vec3){0.1f, 0.2f, 0.3f};
+	hand.rotation = (vec3){0.0f, 0.0f, 45.0f}; // add rotation to avoid singularities...
 	hand.scale = (vec3){0.35f, 0.025f, 0.025};
 	hand.color = (vec3){0.0f, 0.0f, 1.0f};
 	hand.rotation_axis = ROTATION_AXIS_Z;
+	hand.follow_target_point = true;
+	hand.target_point = (vec3){1.0f, 1.0f, 0.0f};
 
 	array_push(forearm.children, &hand);
 	array_push(root.children, &forearm);
+}
+
+static void set_up_two_handles_pose()
+{
+	destroy_joint_definition(&root);
+	root = create_joint_definition();
+	root.translation = (vec3){0.0f, -1.0f, 0.0f};
+	root.rotation = (vec3){0.0f, 0.0f, 90.0f};
+	root.scale = (vec3){0.61f, 0.025f, 0.025};
+	root.color = (vec3){1.0f, 0.0f, 0.0f};
+	root.rotation_axis = ROTATION_AXIS_X;
+	root.follow_target_point = false;
+	
+	Joint_Definition forearm = create_joint_definition();
+	forearm.translation = (vec3){1.3f, 0.05f, 0.0f};
+	forearm.rotation = (vec3){0.0f, 0.0f, 45.0f};
+	forearm.scale = (vec3){0.61f, 0.025f, 0.025};
+	forearm.color = (vec3){0.0f, 1.0f, 0.0f};
+	forearm.rotation_axis = ROTATION_AXIS_Y;
+	forearm.follow_target_point = false;
+
+	Joint_Definition hand = create_joint_definition();
+	hand.translation = (vec3){1.3f, 0.0f, 0.0f};
+	hand.rotation = (vec3){0.0f, 45.0f, 45.0f}; // add rotation to avoid singularities
+	hand.scale = (vec3){0.35f, 0.025f, 0.025};
+	hand.color = (vec3){0.0f, 0.0f, 1.0f};
+	hand.rotation_axis = ROTATION_AXIS_Z;
+	hand.follow_target_point = true;
+	hand.target_point = (vec3){-1.7f, 1.0f, 0.0f};
+
+	array_push(forearm.children, &hand);
+	array_push(root.children, &forearm);
+
+	Joint_Definition forearm2 = create_joint_definition();
+	forearm2.translation = (vec3){1.3f, -0.05f, 0.0f};
+	forearm2.rotation = (vec3){0.0f, 0.0f, -45.0f};
+	forearm2.scale = (vec3){0.61f, 0.025f, 0.025};
+	forearm2.color = (vec3){0.0f, 1.0f, 0.0f};
+	forearm2.rotation_axis = ROTATION_AXIS_X;
+	forearm2.follow_target_point = false;
+
+	Joint_Definition hand2 = create_joint_definition();
+	hand2.translation = (vec3){1.3f, 0.0f, 0.0f};
+	hand2.rotation = (vec3){0.0f, 45.0f, 45.0f};
+	hand2.scale = (vec3){0.35f, 0.025f, 0.025};
+	hand2.color = (vec3){0.0f, 0.0f, 1.0f};
+	hand2.rotation_axis = ROTATION_AXIS_Y;
+	hand2.follow_target_point = true;
+	hand2.target_point = (vec3){0.4f, 1.8f, 0.0f};
+
+	array_push(forearm2.children, &hand2);
+	array_push(root.children, &forearm2);
 }
 
 static void display_joint_definition(Joint_Definition* joint)
@@ -167,6 +225,21 @@ static void display_joint_definition(Joint_Definition* joint)
 				ImGui::SetItemDefaultFocus();
 		}
 		ImGui::EndCombo();
+	}
+
+	bool aux = joint->follow_target_point;
+	if (ImGui::Checkbox("Follow target point", &aux))
+	{
+		joint->follow_target_point = aux;
+		hierarchical_model_set_callback(&root);
+	}
+
+	if (joint->follow_target_point)
+	{
+		if (ImGui::DragFloat3("Target Point", (r32*)&joint->target_point, 0.01f, -FLT_MAX, FLT_MAX, "%.3f"))
+		{
+			hierarchical_model_set_callback(&root);
+		}
 	}
 
 	const r32 INDENTATION = 50.0f;
@@ -215,6 +288,12 @@ static void draw_main_window()
 		hierarchical_model_set_callback(&root);
 	}
 
+	if (ImGui::Button("Set up two handles pose"))
+	{
+		set_up_two_handles_pose();
+		hierarchical_model_set_callback(&root);
+	}
+
 	static IK_Method ik_method = IK_METHOD_INVERSE;
 	const char* ik_methods[] = { "Inverse", "Pseudo-Inverse", "Transpose" };
 	const char* selected_ik_method = ik_methods[ik_method];
@@ -243,6 +322,7 @@ static void draw_main_window()
 	if (ImGui::Button("Stop"))
 	{
 		stop_callback();
+		hierarchical_model_set_callback(&root);
 	}
 
 	ImGui::End();

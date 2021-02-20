@@ -217,21 +217,20 @@ r32 matrix_determinant(const Matrix* m)
 	return d;
 }
 
-Matrix matrix_invert(const Matrix* m)
+s32 matrix_invert(const Matrix* m, Matrix* out)
 {
 	assert(m->rows == m->columns);
 	Matrix tmp = matrix_copy(m);
 	int P[m->rows + 1];
 	if (!LUPDecompose(tmp.data, m->rows, 0.00001f, P))
 	{
-		printf("Unable to invert matrix! TOL failed.\n");
 		matrix_destroy(&tmp);
-		return matrix_identity(m->rows);
+		return -1;
 	}
-	Matrix inv = matrix_create(m->rows, m->columns);
-	LUPInvert(tmp.data, P, m->rows, inv.data);
+	*out = matrix_create(m->rows, m->columns);
+	LUPInvert(tmp.data, P, m->rows, out->data);
 	matrix_destroy(&tmp);
-	return inv;
+	return 0;
 }
 
 Matrix matrix_from_vec3(vec3 v)

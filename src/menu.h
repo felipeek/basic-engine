@@ -15,6 +15,8 @@ typedef struct Joint_Definition {
 	vec3 scale;
 	vec3 color;
 	Rotation_Axis rotation_axis;
+	boolean follow_target_point;
+	vec3 target_point;
 	struct Joint_Definition* children;
 } Joint_Definition;
 

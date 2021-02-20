@@ -2,7 +2,8 @@
 #include <dynamic_array.h>
 
 void hierarchical_model_joint_create(Hierarchical_Model_Joint* joint, vec4 translation, Quaternion rotation, vec3 scale,
-	vec4 color, vec3 rotation_axis, Mesh mesh, Hierarchical_Model_Joint* children, Hierarchical_Model_Joint* parent)
+	vec4 color, vec3 rotation_axis, boolean follow_target_point, vec3 target_point, Mesh mesh,
+	Hierarchical_Model_Joint* children, Hierarchical_Model_Joint* parent)
 {
 	Entity e;
 	joint->children = children;
@@ -11,6 +12,9 @@ void hierarchical_model_joint_create(Hierarchical_Model_Joint* joint, vec4 trans
 	joint->rotation = rotation;
 	joint->scale = scale;
 	joint->rotation_axis = rotation_axis;
+	joint->follow_target_point = follow_target_point;
+	joint->hit_target_point = false;
+	joint->target_point = target_point;
 	graphics_entity_create_with_color(&e, mesh, (vec4){0.0f, 0.0f, 0.0f, 1.0f},
 		quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){1.0f, 1.0f, 1.0f}, color);
 	joint->e = e;
