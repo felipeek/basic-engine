@@ -39,13 +39,14 @@ typedef struct Joint_Definition {
 typedef enum {
 	IK_METHOD_INVERSE,
 	IK_METHOD_PSEUDO_INVERSE,
-	IK_METHOD_TRANSPOSE
+	IK_METHOD_TRANSPOSE,
+	IK_METHOD_DAMPED_LEAST_SQUARES
 } IK_Method;
 
 static Joint_Definition root;
 
 typedef void (*Hierarchical_Model_Set_Callback)(const Joint_Definition* joint_definition);
-typedef void (*Animate_Callback)(IK_Method ik_method);
+typedef void (*Animate_Callback)(IK_Method ik_method, r32 lambda);
 typedef void (*Stop_Callback)();
 
 static Hierarchical_Model_Set_Callback hierarchical_model_set_callback;
@@ -295,7 +296,7 @@ static void draw_main_window()
 	}
 
 	static IK_Method ik_method = IK_METHOD_INVERSE;
-	const char* ik_methods[] = { "Inverse", "Pseudo-Inverse", "Transpose" };
+	const char* ik_methods[] = { "Inverse", "Pseudo-Inverse", "Transpose", "Damped Least Squares" };
 	const char* selected_ik_method = ik_methods[ik_method];
 
 	if (ImGui::BeginCombo("IK Method", selected_ik_method)) // The second parameter is the label previewed before opening the combo.
@@ -314,9 +315,15 @@ static void draw_main_window()
 		ImGui::EndCombo();
 	}
 
+	static r32 lambda = 0.2f;
+	if (ik_method == IK_METHOD_DAMPED_LEAST_SQUARES)
+	{
+		ImGui::DragFloat("Lambda", &lambda, 0.01f, 0.0f, FLT_MAX);
+	}
+
 	if (ImGui::Button("Animate"))
 	{
-		animate_callback(ik_method);
+		animate_callback(ik_method, lambda);
 	}
 
 	if (ImGui::Button("Stop"))

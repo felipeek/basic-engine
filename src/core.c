@@ -21,6 +21,7 @@ static Entity sphere;
 static boolean is_hierarchical_model_created, is_animating;
 static Hierarchical_Model_Joint hierarchical_model;
 static IK_Method ik_method;
+static r32 lambda;
 
 // Mouse binding to target positions
 static boolean is_mouse_bound_to_joint_target_position;
@@ -133,12 +134,13 @@ static void hierarchical_model_set_callback(const Joint_Definition* joint_defini
 	is_hierarchical_model_created = true;
 }
 
-static void animate_callback(IK_Method _ik_method)
+static void animate_callback(IK_Method _ik_method, r32 _lambda)
 {
 	if (!is_hierarchical_model_created)
 		return;
 	is_animating = true;
 	ik_method = _ik_method;
+	lambda = _lambda;
 }
 
 static void stop_callback()
@@ -177,7 +179,7 @@ static void animate_joint_recursively(Hierarchical_Model_Joint* joint)
 	if (joint->follow_target_point)
 		for (u32 i = 0; i < NUMBER_OF_IK_ITERATIONS_PER_FRAME; ++i)
 		{
-			s32 still_going = rotate_joints_towards_target_point(joint, joint->target_point, ik_method);
+			s32 still_going = rotate_joints_towards_target_point(joint, joint->target_point, ik_method, lambda);
 			joint->hit_target_point = !still_going;
 		}
 
@@ -224,15 +226,15 @@ void core_render()
 	//graphics_renderer_primitives_flush(&render_primitives_ctx, &camera);
 
 	// render end-effector
-	if (is_hierarchical_model_created)
-	{
-		mat4 last_joint_transform = hierarchical_model.children[0].children[0].e.model_matrix;
-		vec4 end_effector_position_in_local_coordinates = (vec4){2.0f, 0.0f, 0.0f, 1.0f};
-		vec4 E = gm_mat4_multiply_vec4(&last_joint_transform, end_effector_position_in_local_coordinates);
-		vec3 E3 = gm_vec4_to_vec3(E);
-		graphics_renderer_debug_points(&render_primitives_ctx, &E3, 1, (vec4){1.0f, 0.0f, 1.0f, 1.0f});
-		graphics_renderer_primitives_flush(&render_primitives_ctx, &camera);
-	}
+	//if (is_hierarchical_model_created)
+	//{
+	//	mat4 last_joint_transform = hierarchical_model.children[0].children[0].e.model_matrix;
+	//	vec4 end_effector_position_in_local_coordinates = (vec4){2.0f, 0.0f, 0.0f, 1.0f};
+	//	vec4 E = gm_mat4_multiply_vec4(&last_joint_transform, end_effector_position_in_local_coordinates);
+	//	vec3 E3 = gm_vec4_to_vec3(E);
+	//	graphics_renderer_debug_points(&render_primitives_ctx, &E3, 1, (vec4){1.0f, 0.0f, 1.0f, 1.0f});
+	//	graphics_renderer_primitives_flush(&render_primitives_ctx, &camera);
+	//}
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)

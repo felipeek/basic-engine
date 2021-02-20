@@ -23,11 +23,12 @@ typedef struct Joint_Definition {
 typedef enum {
 	IK_METHOD_INVERSE,
 	IK_METHOD_PSEUDO_INVERSE,
-	IK_METHOD_TRANSPOSE
+	IK_METHOD_TRANSPOSE,
+	IK_METHOD_DAMPED_LEAST_SQUARES
 } IK_Method;
 
 typedef void (*Hierarchical_Model_Set_Callback)(const Joint_Definition* joint_definition);
-typedef void (*Animate_Callback)(IK_Method ik_method);
+typedef void (*Animate_Callback)(IK_Method ik_method, r32 lambda);
 typedef void (*Stop_Callback)();
 
 void menu_register_hierarchical_model_set_callback(Hierarchical_Model_Set_Callback f);

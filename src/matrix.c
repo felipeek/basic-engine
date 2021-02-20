@@ -241,3 +241,26 @@ Matrix matrix_from_vec3(vec3 v)
 	m.data[2][0] = v.z;
 	return m;
 }
+
+Matrix matrix_scalar_multiply(const Matrix* m, r32 scalar)
+{
+	Matrix result = matrix_copy(m);
+	for (u32 i = 0; i < m->rows; ++i)
+		for (u32 j = 0; j < m->columns; ++j)
+			result.data[i][j] = result.data[i][j] * scalar;
+
+	return result;
+}
+
+Matrix matrix_sum(const Matrix* m1, const Matrix* m2)
+{
+	assert(m1->rows == m2->rows);
+	assert(m1->columns == m2->columns);
+
+	Matrix copy = matrix_create(m1->rows, m1->columns);
+	for (u32 i = 0; i < m1->rows; ++i)
+		for (u32 j = 0; j < m1->columns; ++j)
+			copy.data[i][j] = m1->data[i][j] + m2->data[i][j];
+
+	return copy;
+}

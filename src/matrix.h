@@ -18,4 +18,6 @@ s32 matrix_invert(const Matrix* m, Matrix* out);
 Matrix matrix_from_vec3(vec3 v);
 r32 matrix_determinant(const Matrix* m);
 Matrix matrix_identity(u32 dimension);
+Matrix matrix_scalar_multiply(const Matrix* m, r32 scalar);
+Matrix matrix_sum(const Matrix* m1, const Matrix* m2);
 #endif
