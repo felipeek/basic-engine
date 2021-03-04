@@ -6,17 +6,20 @@
 #include "graphics.h"
 #include "obj.h"
 #include "menu.h"
+#include "physics.h"
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
 static Perspective_Camera camera;
 static Light* lights;
 static Entity e;
+static Physics_Force* forces;
+static Render_Primitives_Context pctx;
 
 static Perspective_Camera create_camera()
 {
 	Perspective_Camera camera;
-	vec4 camera_position =(vec4) {0.0f, 0.0f, 1.0f, 1.0f};
+	vec4 camera_position =(vec4) {0.0f, 0.0f, 10.0f, 1.0f};
 	r32 camera_near_plane = -0.01f;
 	r32 camera_far_plane = -1000.0f;
 	r32 camera_fov = 45.0f;
@@ -51,11 +54,14 @@ int core_init()
 	// Create light
 	lights = create_lights();
 
+	forces = array_create(Physics_Force, 1);
+
 	Mesh m = graphics_mesh_create_from_obj("./res/cow.obj", 0);
 	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 
 	menu_register_dummy_callback(menu_dummy_callback);
+	graphics_renderer_primitives_init(&pctx);
 
 	return 0;
 }
@@ -67,12 +73,18 @@ void core_destroy()
 
 void core_update(r32 delta_time)
 {
-
+	physics_update(&e, forces);
+	array_clear(forces);
 }
 
 void core_render()
 {
 	graphics_entity_render_phong_shader(&camera, &e, lights);
+	vec3 p = (vec3){1.0f, -1.0f, 1.0f};
+	vec3 f = gm_vec3_add(p, (vec3){0.0f, 0.0f, -1.0f});
+	graphics_renderer_debug_points(&pctx, &p, 1, (vec4){0.0f, 1.0f, 0.0f, 1.0f});
+	graphics_renderer_debug_points(&pctx, &f, 1, (vec4){0.0f, 0.0f, 1.0f, 1.0f});
+	graphics_renderer_primitives_flush(&pctx, &camera);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
@@ -143,6 +155,17 @@ void core_input_process(boolean* key_state, r32 delta_time)
 
 		wireframe = !wireframe;
 		key_state[GLFW_KEY_L] = false;
+	}
+	if (key_state[GLFW_KEY_M])
+	{
+		Physics_Force pf;
+		//pf.force = (vec4){0.0f, 0.0f, -0.1f, 0.0f};
+		//pf.position = (vec4){-1.0f, -1.0f, 1.0f, 1.0f};
+		//array_push(forces, &pf);
+		pf.force = (vec4){0.0f, 0.0f, -1.0f, 0.0f};
+		pf.position = (vec4){1.0f, -1.0f, 1.0f, 1.0f};
+		array_push(forces, &pf);
+		key_state[GLFW_KEY_M] = false;
 	}
 }
 
