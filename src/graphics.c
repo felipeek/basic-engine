@@ -215,6 +215,8 @@ Mesh graphics_mesh_create(Vertex* vertices, s32 vertices_size, u32* indices, s32
 	mesh.VBO = VBO;
 	mesh.EBO = EBO;
 	mesh.indexes_size = indices_size;
+	mesh.vertices = vertices;
+	mesh.indices = indices;
 
 	if (!normal_info)
 	{
@@ -586,8 +588,6 @@ Mesh graphics_mesh_create_from_obj(const s8* obj_path, Normal_Mapping_Info* norm
 	u32* indexes;
 	obj_parse(obj_path, &vertices, &indexes);
 	Mesh m = graphics_mesh_create(vertices, array_get_length(vertices), indexes, array_get_length(indexes), normal_info);
-	array_release(vertices);
-	array_release(indexes);
 	return m;
 }
 

@@ -1,7 +1,7 @@
 #include "physics.h"
 #include <dynamic_array.h>
 
-void physics_update(Entity* e, Physics_Force* forces) {
+void physics_update(Entity* e, Physics_Force* forces, r32 dt) {
 	if (array_get_length(forces) != 0) {
 		printf("lol");
 	}
@@ -35,11 +35,11 @@ void physics_update(Entity* e, Physics_Force* forces) {
 	assert(total_torque.w == 0.0f);
 
 	// Calculate orientation change
-	r32 angular_velocity_length = gm_vec4_length(angular_velocity);
+	r32 angular_velocity_length = dt * gm_vec4_length(angular_velocity);
 	Quaternion orientation_change = quaternion_new(gm_vec3_normalize(gm_vec4_to_vec3(angular_velocity)), angular_velocity_length);
-	vec4 position_change = linear_velocity;
-	vec4 angular_momentum_change = total_torque;
-	vec4 linear_momentum_change = total_force;
+	vec4 position_change = gm_vec4_scalar_product(dt, linear_velocity);
+	vec4 angular_momentum_change = gm_vec4_scalar_product(dt, total_torque);
+	vec4 linear_momentum_change = gm_vec4_scalar_product(dt, total_force);
 	assert(angular_momentum_change.w == 0.0f);
 	assert(linear_momentum_change.w == 0.0f);
 	assert(position_change.w == 0.0f);

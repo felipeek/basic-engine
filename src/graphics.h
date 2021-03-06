@@ -33,6 +33,8 @@ typedef struct
 	u32 VAO, VBO, EBO;
 	s32 indexes_size;
 	Normal_Mapping_Info normal_info;
+	Vertex* vertices;
+	u32* indices;
 } Mesh;
 
 typedef struct

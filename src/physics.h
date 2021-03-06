@@ -9,6 +9,6 @@ typedef struct {
 	vec4 force;
 } Physics_Force;
 
-void physics_update(Entity* e, Physics_Force* forces);
+void physics_update(Entity* e, Physics_Force* forces, r32 dt);
 
 #endif
