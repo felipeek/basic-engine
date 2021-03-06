@@ -8,18 +8,33 @@
 #include "menu.h"
 #include "physics.h"
 #include "collision.h"
+#include <float.h>
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
 static Perspective_Camera camera;
 static Light* lights;
 static Entity* entities;
-static vec3* collision_points;
 static Physics_Force* forces;
 static Render_Primitives_Context pctx;
 // Mouse binding to target positions
 static boolean is_mouse_bound_to_joint_target_position;
 static Entity* bound;
+
+typedef struct {
+	vec3 position;
+	vec3 direction;
+} Vector;
+static Vector* normals;
+
+typedef struct {
+	vec3 start_position;			// The collision position [at the start of the frame], in world space
+	vec3 collide_position;			// The collision position [at the time of collision], in world space
+	vec3 end_position;				// The collision position [at the end of the frame], in world space
+	vec3 normal;					// The normal to the collision impact, in world space
+	r32 frame_relative_time;		// The time, relative to the frame, that the collision happened (0 -> start of frame, 1 -> end of frame)
+} Collision_Point;
+static Collision_Point* all_collision_points;
 
 static Perspective_Camera create_camera()
 {
@@ -61,7 +76,8 @@ int core_init()
 
 	forces = array_create(Physics_Force, 1);
 	entities = array_create(Entity, 1);
-	collision_points = array_create(vec3, 1);
+	all_collision_points = array_create(Collision_Point, 1);
+	normals = array_create(Vector, 1);
 
 	Entity e;
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
@@ -84,8 +100,67 @@ void core_destroy()
 	array_release(lights);
 }
 
-static void check_entity_entity_collision(Entity* e1, Entity* e2)
+// e1 -> entity that has the collided_vertex
+// e2 -> entity that we know the collided_vertex collided with
+// collided_vertex -> the vertex that collided, that is, it is assumed it is inside e2.
+static Collision_Point fetch_collision_point_information(Entity* e1, Entity* e2, Vertex* collided_vertex)
 {
+	vec4 vertex_in_this_frame = gm_mat4_multiply_vec4(&e1->model_matrix, collided_vertex->position);
+	vec4 vertex_in_last_frame = gm_mat4_multiply_vec4(&e1->lf_model_matrix, collided_vertex->position);
+
+	s32 found_collision = 0;
+	r32 nearest_collision;
+	vec3 normal_of_nearest_collision;
+	vec3 exact_collision_position;
+	for (u32 i = 0; i < array_get_length(e2->mesh.indices); i += 3) {
+		Vertex* v1 = &e2->mesh.vertices[e2->mesh.indices[i + 0]];
+		Vertex* v2 = &e2->mesh.vertices[e2->mesh.indices[i + 1]];
+		Vertex* v3 = &e2->mesh.vertices[e2->mesh.indices[i + 2]];
+		vec4 transformed_v1 = gm_mat4_multiply_vec4(&e2->model_matrix, v1->position);
+		vec4 transformed_v2 = gm_mat4_multiply_vec4(&e2->model_matrix, v2->position);
+		vec4 transformed_v3 = gm_mat4_multiply_vec4(&e2->model_matrix, v3->position);
+
+		vec3 intersection;
+		r32 d;
+		s32 collides = collision_check_edge_collides_triangle(
+			gm_vec4_to_vec3(vertex_in_this_frame),
+			gm_vec4_to_vec3(vertex_in_last_frame),
+			gm_vec4_to_vec3(transformed_v1),
+			gm_vec4_to_vec3(transformed_v2),
+			gm_vec4_to_vec3(transformed_v3),
+			&d,
+			&intersection
+		);
+
+		if (collides) {
+			// calculate normal
+			vec3 v2v1 = gm_vec4_to_vec3(gm_vec4_subtract(transformed_v2, transformed_v1));
+			vec3 v3v1 = gm_vec4_to_vec3(gm_vec4_subtract(transformed_v3, transformed_v1));
+			vec3 normal = gm_vec3_normalize(gm_vec3_cross(v2v1, v3v1));
+
+			if (!found_collision || d < nearest_collision) {
+				nearest_collision = d;
+				normal_of_nearest_collision = normal;
+				exact_collision_position = intersection;
+			}
+			found_collision = 1;
+		}
+	}
+
+	assert(found_collision);
+
+	Collision_Point cp;
+	cp.start_position = gm_vec4_to_vec3(vertex_in_last_frame);
+	cp.collide_position = exact_collision_position;
+	cp.end_position = gm_vec4_to_vec3(vertex_in_last_frame);
+	cp.normal = normal_of_nearest_collision;
+	cp.frame_relative_time = nearest_collision;
+	return cp;
+}
+
+static Collision_Point* check_entity_entity_collision(Entity* e1, Entity* e2)
+{
+	Collision_Point* collision_points = array_create(Collision_Point, 1);
 	s32 found_vertex_collision = 0;
 
 	// TEST e1 against e2
@@ -120,8 +195,8 @@ static void check_entity_entity_collision(Entity* e1, Entity* e2)
 
 		// if !is_vertex_outside_mesh, then the vertex WAS inside the mesh, so there IS collision!
 		if (!is_vertex_outside_mesh) {
-			vec3 v = gm_vec4_to_vec3(transformed_point);
-			array_push(collision_points, &v);
+			Collision_Point cp = fetch_collision_point_information(e1, e2, point);
+			array_push(collision_points, &cp);
 			found_vertex_collision = 1;
 			// keep going to render all collision points
 			//break;
@@ -160,8 +235,8 @@ static void check_entity_entity_collision(Entity* e1, Entity* e2)
 
 		// if !is_vertex_outside_mesh, then the vertex WAS inside the mesh, so there IS collision!
 		if (!is_vertex_outside_mesh) {
-			vec3 v = gm_vec4_to_vec3(transformed_point);
-			array_push(collision_points, &v);
+			Collision_Point cp = fetch_collision_point_information(e2, e1, point);
+			array_push(collision_points, &cp);
 			found_vertex_collision = 1;
 			// keep going to render all collision points
 			//break;
@@ -175,7 +250,7 @@ static void check_entity_entity_collision(Entity* e1, Entity* e2)
 	if (found_vertex_collision) {
 		e1->diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
 		e2->diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
-		return;
+		return collision_points;
 	}
 
 	/*
@@ -217,6 +292,7 @@ static void check_entity_entity_collision(Entity* e1, Entity* e2)
 				gm_vec4_to_vec3(transformed_v1),
 				gm_vec4_to_vec3(transformed_v2),
 				gm_vec4_to_vec3(transformed_v3),
+				0,
 				&intersection
 			);
 
@@ -229,6 +305,7 @@ static void check_entity_entity_collision(Entity* e1, Entity* e2)
 				gm_vec4_to_vec3(transformed_v1),
 				gm_vec4_to_vec3(transformed_v2),
 				gm_vec4_to_vec3(transformed_v3),
+				0,
 				&intersection
 			);
 
@@ -241,6 +318,7 @@ static void check_entity_entity_collision(Entity* e1, Entity* e2)
 				gm_vec4_to_vec3(transformed_v1),
 				gm_vec4_to_vec3(transformed_v2),
 				gm_vec4_to_vec3(transformed_v3),
+				0,
 				&intersection
 			);
 
@@ -254,7 +332,9 @@ static void check_entity_entity_collision(Entity* e1, Entity* e2)
 				average_point = gm_vec3_add(average_point, edge1_collisions[i]);
 			}
 			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge1_collisions), average_point);
-			array_push(collision_points, &average_point);
+			Collision_Point cp = {0};
+			cp.end_position = average_point;
+			array_push(collision_points, &cp);
 		}
 		if (array_get_length(edge2_collisions) > 0) {
 			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
@@ -262,7 +342,9 @@ static void check_entity_entity_collision(Entity* e1, Entity* e2)
 				average_point = gm_vec3_add(average_point, edge2_collisions[i]);
 			}
 			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge2_collisions), average_point);
-			array_push(collision_points, &average_point);
+			Collision_Point cp = {0};
+			cp.end_position = average_point;
+			array_push(collision_points, &cp);
 		}
 		if (array_get_length(edge3_collisions) > 0) {
 			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
@@ -270,7 +352,9 @@ static void check_entity_entity_collision(Entity* e1, Entity* e2)
 				average_point = gm_vec3_add(average_point, edge3_collisions[i]);
 			}
 			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge3_collisions), average_point);
-			array_push(collision_points, &average_point);
+			Collision_Point cp = {0};
+			cp.end_position = average_point;
+			array_push(collision_points, &cp);
 		}
 
 		if (array_get_length(edge1_collisions) > 0 ||
@@ -310,6 +394,7 @@ static void check_entity_entity_collision(Entity* e1, Entity* e2)
 				gm_vec4_to_vec3(transformed_v1),
 				gm_vec4_to_vec3(transformed_v2),
 				gm_vec4_to_vec3(transformed_v3),
+				0,
 				&intersection
 			);
 
@@ -322,6 +407,7 @@ static void check_entity_entity_collision(Entity* e1, Entity* e2)
 				gm_vec4_to_vec3(transformed_v1),
 				gm_vec4_to_vec3(transformed_v2),
 				gm_vec4_to_vec3(transformed_v3),
+				0,
 				&intersection
 			);
 
@@ -334,6 +420,7 @@ static void check_entity_entity_collision(Entity* e1, Entity* e2)
 				gm_vec4_to_vec3(transformed_v1),
 				gm_vec4_to_vec3(transformed_v2),
 				gm_vec4_to_vec3(transformed_v3),
+				0,
 				&intersection
 			);
 
@@ -347,7 +434,9 @@ static void check_entity_entity_collision(Entity* e1, Entity* e2)
 				average_point = gm_vec3_add(average_point, edge1_collisions[i]);
 			}
 			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge1_collisions), average_point);
-			array_push(collision_points, &average_point);
+			Collision_Point cp = {0};
+			cp.end_position = average_point;
+			array_push(collision_points, &cp);
 		}
 		if (array_get_length(edge2_collisions) > 0) {
 			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
@@ -355,7 +444,9 @@ static void check_entity_entity_collision(Entity* e1, Entity* e2)
 				average_point = gm_vec3_add(average_point, edge2_collisions[i]);
 			}
 			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge2_collisions), average_point);
-			array_push(collision_points, &average_point);
+			Collision_Point cp = {0};
+			cp.end_position = average_point;
+			array_push(collision_points, &cp);
 		}
 		if (array_get_length(edge3_collisions) > 0) {
 			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
@@ -363,7 +454,9 @@ static void check_entity_entity_collision(Entity* e1, Entity* e2)
 				average_point = gm_vec3_add(average_point, edge1_collisions[i]);
 			}
 			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge3_collisions), average_point);
-			array_push(collision_points, &average_point);
+			Collision_Point cp = {0};
+			cp.end_position = average_point;
+			array_push(collision_points, &cp);
 		}
 
 		if (array_get_length(edge1_collisions) > 0 ||
@@ -382,13 +475,14 @@ static void check_entity_entity_collision(Entity* e1, Entity* e2)
 	array_release(edge1_collisions);
 	array_release(edge2_collisions);
 	array_release(edge3_collisions);
+	return collision_points;
 }
 
 void core_update(r32 delta_time)
 {
 	//physics_update(&e, forces, delta_time);
 	array_clear(forces);
-	array_clear(collision_points);
+	array_clear(all_collision_points);
 	for (u32 i = 0; i < array_get_length(entities); ++i) {
 		entities[i].diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
 	}
@@ -397,7 +491,10 @@ void core_update(r32 delta_time)
 		Entity* first_entity = &entities[i];
 		for (u32 j = i + 1; j < array_get_length(entities); ++j) { // for each other entity
 			Entity* other_entity = &entities[j];
-			check_entity_entity_collision(first_entity, other_entity);
+			Collision_Point* got = check_entity_entity_collision(first_entity, other_entity);
+			for (u32 k = 0; k < array_get_length(got); ++k) {
+				array_push(all_collision_points, &got[k]);
+			}
 		}
 	}
 }
@@ -408,7 +505,8 @@ void core_render()
 	//glCullFace(GL_CCW);
 	for (u32 i = 0; i < array_get_length(entities); ++i)
 		graphics_entity_render_phong_shader(&camera, &entities[i], lights);
-	graphics_renderer_debug_points(&pctx, collision_points, array_get_length(collision_points), (vec4){0.0f, 0.0f, 1.0f, 1.0f});
+	for (u32 i = 0; i < array_get_length(all_collision_points); ++i)
+		graphics_renderer_debug_points(&pctx, &all_collision_points[i].end_position, 1, (vec4){0.0f, 0.0f, 1.0f, 1.0f});
 	graphics_renderer_primitives_flush(&pctx, &camera);
 
 	//vec3 p = (vec3){1.0f, -1.0f, 1.0f};

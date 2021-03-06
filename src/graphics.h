@@ -47,6 +47,11 @@ typedef struct
 	vec4 linear_momentum;
 	vec4 angular_momentum;
 	Diffuse_Info diffuse_info;
+
+	// Last frame information
+	mat4 lf_model_matrix;
+	vec4 lf_linear_momentum;
+	vec4 lf_angular_momentum;
 } Entity;
 
 typedef struct
