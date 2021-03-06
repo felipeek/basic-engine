@@ -29,7 +29,7 @@ s32 collision_intersection_ray_plane(vec3 ray_position, vec3 ray_direction, vec3
   return true;
 }
 
-s32 collision_check_edge_collides_triangle(vec3 edge_p1, vec3 edge_p2, vec3 t1, vec3 t2, vec3 t3) {
+s32 collision_check_edge_collides_triangle(vec3 edge_p1, vec3 edge_p2, vec3 t1, vec3 t2, vec3 t3, vec3* intersection) {
 	vec3 v1 = gm_vec3_subtract(t2, t1);
 	vec3 v2 = gm_vec3_subtract(t3, t1);
 	vec3 plane_normal = gm_vec3_cross(v1, v2);
@@ -45,11 +45,10 @@ s32 collision_check_edge_collides_triangle(vec3 edge_p1, vec3 edge_p2, vec3 t1, 
 		// edge intersects triangle plane
 		// find intersection point
 
-		vec3 intersection;
-		assert(collision_intersection_ray_plane(edge_p1, gm_vec3_subtract(edge_p2, edge_p1), t1, plane_normal, &intersection));
+		assert(collision_intersection_ray_plane(edge_p1, gm_vec3_subtract(edge_p2, edge_p1), t1, plane_normal, intersection));
 
 		// now we need to check its 2D containment inside the face (using barycentric coords)
-		vec3 v3 = gm_vec3_subtract(intersection, t1);
+		vec3 v3 = gm_vec3_subtract(*intersection, t1);
 		r32 d00 = gm_vec3_dot(v1, v1);
 		r32 d01 = gm_vec3_dot(v1, v2);
 		r32 d11 = gm_vec3_dot(v2, v2);

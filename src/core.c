@@ -14,6 +14,7 @@
 static Perspective_Camera camera;
 static Light* lights;
 static Entity* entities;
+static vec3* collision_points;
 static Physics_Force* forces;
 static Render_Primitives_Context pctx;
 // Mouse binding to target positions
@@ -60,6 +61,7 @@ int core_init()
 
 	forces = array_create(Physics_Force, 1);
 	entities = array_create(Entity, 1);
+	collision_points = array_create(vec3, 1);
 
 	Entity e;
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
@@ -67,7 +69,8 @@ int core_init()
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 	array_push(entities, &e);
 	graphics_entity_create_with_color(&e, m, (vec4){1.2f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+		//(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+		(vec3){0.3f, 0.3f, 0.3f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 	array_push(entities, &e);
 
 	menu_register_dummy_callback(menu_dummy_callback);
@@ -81,135 +84,320 @@ void core_destroy()
 	array_release(lights);
 }
 
+static void check_entity_entity_collision(Entity* e1, Entity* e2)
+{
+	s32 found_vertex_collision = 0;
+
+	// TEST e1 against e2
+	for (u32 v = 0; v < array_get_length(e1->mesh.vertices); ++v) { // for each vertex of e1
+		Vertex* point = &e1->mesh.vertices[v];
+		vec4 transformed_point = gm_mat4_multiply_vec4(&e1->model_matrix, point->position);
+		//vec4 transformed_point = gm_mat4_multiply_vec4(&e1->model_matrix, e1->world_position);
+
+		s32 is_vertex_outside_mesh = 0;
+		// for each vertex we need to check if it is inside the other mesh.
+		for (u32 t = 0; t < array_get_length(e2->mesh.indices); t += 3) {
+			Vertex* v1 = &e2->mesh.vertices[e2->mesh.indices[t + 0]];
+			Vertex* v2 = &e2->mesh.vertices[e2->mesh.indices[t + 1]];
+			Vertex* v3 = &e2->mesh.vertices[e2->mesh.indices[t + 2]];
+			vec4 transformed_v1 = gm_mat4_multiply_vec4(&e2->model_matrix, v1->position);
+			vec4 transformed_v2 = gm_mat4_multiply_vec4(&e2->model_matrix, v2->position);
+			vec4 transformed_v3 = gm_mat4_multiply_vec4(&e2->model_matrix, v3->position);
+
+			// 1 -> out
+			// 0 -> in
+			is_vertex_outside_mesh = collision_check_point_side_of_triangle(
+				gm_vec4_to_vec3(transformed_point),
+				gm_vec4_to_vec3(transformed_v1),
+				gm_vec4_to_vec3(transformed_v2),
+				gm_vec4_to_vec3(transformed_v3)
+			);
+
+			// if the vertex is outside the triangle, then we know that this vertex is NOT inside the mesh
+			if (is_vertex_outside_mesh)
+				break;
+		}
+
+		// if !is_vertex_outside_mesh, then the vertex WAS inside the mesh, so there IS collision!
+		if (!is_vertex_outside_mesh) {
+			vec3 v = gm_vec4_to_vec3(transformed_point);
+			array_push(collision_points, &v);
+			found_vertex_collision = 1;
+			// keep going to render all collision points
+			//break;
+		}
+	}
+
+	// TEST e2 against e1
+	for (u32 v = 0; v < array_get_length(e2->mesh.vertices); ++v) { // for each vertex of e2
+		Vertex* point = &e2->mesh.vertices[v];
+		vec4 transformed_point = gm_mat4_multiply_vec4(&e2->model_matrix, point->position);
+		//vec4 transformed_point = gm_mat4_multiply_vec4(&e2->model_matrix, e2->world_position);
+
+		s32 is_vertex_outside_mesh = 0;
+		// for each vertex we need to check if it is inside the other mesh.
+		for (u32 t = 0; t < array_get_length(e1->mesh.indices); t += 3) {
+			Vertex* v1 = &e1->mesh.vertices[e1->mesh.indices[t + 0]];
+			Vertex* v2 = &e1->mesh.vertices[e1->mesh.indices[t + 1]];
+			Vertex* v3 = &e1->mesh.vertices[e1->mesh.indices[t + 2]];
+			vec4 transformed_v1 = gm_mat4_multiply_vec4(&e1->model_matrix, v1->position);
+			vec4 transformed_v2 = gm_mat4_multiply_vec4(&e1->model_matrix, v2->position);
+			vec4 transformed_v3 = gm_mat4_multiply_vec4(&e1->model_matrix, v3->position);
+
+			// 1 -> out
+			// 0 -> in
+			is_vertex_outside_mesh = collision_check_point_side_of_triangle(
+				gm_vec4_to_vec3(transformed_point),
+				gm_vec4_to_vec3(transformed_v1),
+				gm_vec4_to_vec3(transformed_v2),
+				gm_vec4_to_vec3(transformed_v3)
+			);
+
+			// if the vertex is outside the triangle, then we know that this vertex is NOT inside the mesh
+			if (is_vertex_outside_mesh)
+				break;
+		}
+
+		// if !is_vertex_outside_mesh, then the vertex WAS inside the mesh, so there IS collision!
+		if (!is_vertex_outside_mesh) {
+			vec3 v = gm_vec4_to_vec3(transformed_point);
+			array_push(collision_points, &v);
+			found_vertex_collision = 1;
+			// keep going to render all collision points
+			//break;
+		}
+	}
+
+	// At this point, we analysed all vertices.
+	// We now analyze the edges
+	// However if we already found some vertices, we skip this part
+
+	if (found_vertex_collision) {
+		e1->diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
+		e2->diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
+		return;
+	}
+
+	/*
+		@TODO: improve edge-edge collision point detection
+		we are generating two distinct points in the most common scenario (when there are no vertices colliding)
+		i think we should generate a single one, just like with vertices?
+	*/
+
+	vec3* edge1_collisions = array_create(vec3, 1);
+	vec3* edge2_collisions = array_create(vec3, 1);
+	vec3* edge3_collisions = array_create(vec3, 1);
+
+	// TEST e1 against e2
+	s32 found_edge_collision = 0;
+	for (u32 v = 0; v < array_get_length(e1->mesh.indices); v += 3) { // for each edge of e1
+		Vertex* f1 = &e1->mesh.vertices[e1->mesh.indices[v]];
+		Vertex* f2 = &e1->mesh.vertices[e1->mesh.indices[v + 1]];
+		Vertex* f3 = &e1->mesh.vertices[e1->mesh.indices[v + 2]];
+		vec4 transformed_f1 = gm_mat4_multiply_vec4(&e1->model_matrix, f1->position);
+		vec4 transformed_f2 = gm_mat4_multiply_vec4(&e1->model_matrix, f2->position);
+		vec4 transformed_f3 = gm_mat4_multiply_vec4(&e1->model_matrix, f3->position);
+		array_clear(edge1_collisions);
+		array_clear(edge2_collisions);
+		array_clear(edge3_collisions);
+
+		// for each vertex we need to check if it is inside the other mesh.
+		for (u32 t = 0; t < array_get_length(e2->mesh.indices); t += 3) {
+			Vertex* v1 = &e2->mesh.vertices[e2->mesh.indices[t + 0]];
+			Vertex* v2 = &e2->mesh.vertices[e2->mesh.indices[t + 1]];
+			Vertex* v3 = &e2->mesh.vertices[e2->mesh.indices[t + 2]];
+			vec4 transformed_v1 = gm_mat4_multiply_vec4(&e2->model_matrix, v1->position);
+			vec4 transformed_v2 = gm_mat4_multiply_vec4(&e2->model_matrix, v2->position);
+			vec4 transformed_v3 = gm_mat4_multiply_vec4(&e2->model_matrix, v3->position);
+			vec3 intersection;
+
+			s32 edge_collides = collision_check_edge_collides_triangle(
+				gm_vec4_to_vec3(transformed_f1),
+				gm_vec4_to_vec3(transformed_f2),
+				gm_vec4_to_vec3(transformed_v1),
+				gm_vec4_to_vec3(transformed_v2),
+				gm_vec4_to_vec3(transformed_v3),
+				&intersection
+			);
+
+			// if the edge collides with the face, then there is a collision
+			if (edge_collides) array_push(edge1_collisions, &intersection);
+
+			edge_collides = collision_check_edge_collides_triangle(
+				gm_vec4_to_vec3(transformed_f2),
+				gm_vec4_to_vec3(transformed_f3),
+				gm_vec4_to_vec3(transformed_v1),
+				gm_vec4_to_vec3(transformed_v2),
+				gm_vec4_to_vec3(transformed_v3),
+				&intersection
+			);
+
+			// if the edge collides with the face, then there is a collision
+			if (edge_collides) array_push(edge2_collisions, &intersection);
+
+			edge_collides = collision_check_edge_collides_triangle(
+				gm_vec4_to_vec3(transformed_f3),
+				gm_vec4_to_vec3(transformed_f1),
+				gm_vec4_to_vec3(transformed_v1),
+				gm_vec4_to_vec3(transformed_v2),
+				gm_vec4_to_vec3(transformed_v3),
+				&intersection
+			);
+
+			// if the edge collides with the face, then there is a collision
+			if (edge_collides) array_push(edge3_collisions, &intersection);
+		}
+
+		if (array_get_length(edge1_collisions) > 0) {
+			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
+			for (u32 i = 0; i < array_get_length(edge1_collisions); ++i) {
+				average_point = gm_vec3_add(average_point, edge1_collisions[i]);
+			}
+			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge1_collisions), average_point);
+			array_push(collision_points, &average_point);
+		}
+		if (array_get_length(edge2_collisions) > 0) {
+			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
+			for (u32 i = 0; i < array_get_length(edge2_collisions); ++i) {
+				average_point = gm_vec3_add(average_point, edge2_collisions[i]);
+			}
+			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge2_collisions), average_point);
+			array_push(collision_points, &average_point);
+		}
+		if (array_get_length(edge3_collisions) > 0) {
+			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
+			for (u32 i = 0; i < array_get_length(edge3_collisions); ++i) {
+				average_point = gm_vec3_add(average_point, edge3_collisions[i]);
+			}
+			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge3_collisions), average_point);
+			array_push(collision_points, &average_point);
+		}
+
+		if (array_get_length(edge1_collisions) > 0 ||
+			array_get_length(edge2_collisions) > 0 ||
+			array_get_length(edge3_collisions) > 0) {
+			// collision!
+			found_edge_collision = 1;
+			break;
+		}
+	}
+
+	// TEST e2 against e1
+	for (u32 v = 0; v < array_get_length(e2->mesh.indices); v += 3) { // for each edge of e2
+		Vertex* f1 = &e2->mesh.vertices[e2->mesh.indices[v]];
+		Vertex* f2 = &e2->mesh.vertices[e2->mesh.indices[v + 1]];
+		Vertex* f3 = &e2->mesh.vertices[e2->mesh.indices[v + 2]];
+		vec4 transformed_f1 = gm_mat4_multiply_vec4(&e2->model_matrix, f1->position);
+		vec4 transformed_f2 = gm_mat4_multiply_vec4(&e2->model_matrix, f2->position);
+		vec4 transformed_f3 = gm_mat4_multiply_vec4(&e2->model_matrix, f3->position);
+		array_clear(edge1_collisions);
+		array_clear(edge2_collisions);
+		array_clear(edge3_collisions);
+
+		// for each vertex we need to check if it is inside the other mesh.
+		for (u32 t = 0; t < array_get_length(e1->mesh.indices); t += 3) {
+			Vertex* v1 = &e1->mesh.vertices[e1->mesh.indices[t + 0]];
+			Vertex* v2 = &e1->mesh.vertices[e1->mesh.indices[t + 1]];
+			Vertex* v3 = &e1->mesh.vertices[e1->mesh.indices[t + 2]];
+			vec4 transformed_v1 = gm_mat4_multiply_vec4(&e1->model_matrix, v1->position);
+			vec4 transformed_v2 = gm_mat4_multiply_vec4(&e1->model_matrix, v2->position);
+			vec4 transformed_v3 = gm_mat4_multiply_vec4(&e1->model_matrix, v3->position);
+			vec3 intersection;
+
+			s32 edge_collides = collision_check_edge_collides_triangle(
+				gm_vec4_to_vec3(transformed_f1),
+				gm_vec4_to_vec3(transformed_f2),
+				gm_vec4_to_vec3(transformed_v1),
+				gm_vec4_to_vec3(transformed_v2),
+				gm_vec4_to_vec3(transformed_v3),
+				&intersection
+			);
+
+			// if the edge collides with the face, then there is a collision
+			if (edge_collides) array_push(edge1_collisions, &intersection);
+
+			edge_collides = collision_check_edge_collides_triangle(
+				gm_vec4_to_vec3(transformed_f2),
+				gm_vec4_to_vec3(transformed_f3),
+				gm_vec4_to_vec3(transformed_v1),
+				gm_vec4_to_vec3(transformed_v2),
+				gm_vec4_to_vec3(transformed_v3),
+				&intersection
+			);
+
+			// if the edge collides with the face, then there is a collision
+			if (edge_collides) array_push(edge2_collisions, &intersection);
+
+			edge_collides = collision_check_edge_collides_triangle(
+				gm_vec4_to_vec3(transformed_f3),
+				gm_vec4_to_vec3(transformed_f1),
+				gm_vec4_to_vec3(transformed_v1),
+				gm_vec4_to_vec3(transformed_v2),
+				gm_vec4_to_vec3(transformed_v3),
+				&intersection
+			);
+
+			// if the edge collides with the face, then there is a collision
+			if (edge_collides) array_push(edge3_collisions, &intersection);
+		}
+
+		if (array_get_length(edge1_collisions) > 0) {
+			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
+			for (u32 i = 0; i < array_get_length(edge1_collisions); ++i) {
+				average_point = gm_vec3_add(average_point, edge1_collisions[i]);
+			}
+			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge1_collisions), average_point);
+			array_push(collision_points, &average_point);
+		}
+		if (array_get_length(edge2_collisions) > 0) {
+			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
+			for (u32 i = 0; i < array_get_length(edge2_collisions); ++i) {
+				average_point = gm_vec3_add(average_point, edge2_collisions[i]);
+			}
+			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge2_collisions), average_point);
+			array_push(collision_points, &average_point);
+		}
+		if (array_get_length(edge3_collisions) > 0) {
+			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
+			for (u32 i = 0; i < array_get_length(edge3_collisions); ++i) {
+				average_point = gm_vec3_add(average_point, edge1_collisions[i]);
+			}
+			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge3_collisions), average_point);
+			array_push(collision_points, &average_point);
+		}
+
+		if (array_get_length(edge1_collisions) > 0 ||
+			array_get_length(edge2_collisions) > 0 ||
+			array_get_length(edge3_collisions) > 0) {
+			// collision!
+			found_edge_collision = 1;
+			break;
+		}
+	}
+
+	if (found_edge_collision) {
+		e1->diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
+	}
+
+	array_release(edge1_collisions);
+	array_release(edge2_collisions);
+	array_release(edge3_collisions);
+}
+
 void core_update(r32 delta_time)
 {
 	//physics_update(&e, forces, delta_time);
 	array_clear(forces);
+	array_clear(collision_points);
+	for (u32 i = 0; i < array_get_length(entities); ++i) {
+		entities[i].diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
+	}
 
 	for (u32 i = 0; i < array_get_length(entities); ++i) {	// for each entity
 		Entity* first_entity = &entities[i];
-		s32 outside_mesh = 0;
-
-		for (u32 j = 0; j < array_get_length(entities); ++j) { // for each other entity
-			if (i == j) continue;
-
+		for (u32 j = i + 1; j < array_get_length(entities); ++j) { // for each other entity
 			Entity* other_entity = &entities[j];
-
-			for (u32 v = 0; v < array_get_length(first_entity->mesh.vertices); ++v) { // for each vertex of the (first) entity
-				Vertex* point = &first_entity->mesh.vertices[v];
-				vec4 transformed_point = gm_mat4_multiply_vec4(&first_entity->model_matrix, point->position);
-				//vec4 transformed_point = gm_mat4_multiply_vec4(&first_entity->model_matrix, first_entity->world_position);
-
-				// for each vertex we need to check if it is inside the other mesh.
-				for (u32 t = 0; t < array_get_length(other_entity->mesh.indices); t += 3) {
-					Vertex* v1 = &other_entity->mesh.vertices[other_entity->mesh.indices[t + 0]];
-					Vertex* v2 = &other_entity->mesh.vertices[other_entity->mesh.indices[t + 1]];
-					Vertex* v3 = &other_entity->mesh.vertices[other_entity->mesh.indices[t + 2]];
-					vec4 transformed_v1 = gm_mat4_multiply_vec4(&other_entity->model_matrix, v1->position);
-					vec4 transformed_v2 = gm_mat4_multiply_vec4(&other_entity->model_matrix, v2->position);
-					vec4 transformed_v3 = gm_mat4_multiply_vec4(&other_entity->model_matrix, v3->position);
-
-					// 1 -> out
-					// 0 -> in
-					outside_mesh = collision_check_point_side_of_triangle(
-						gm_vec4_to_vec3(transformed_point),
-						gm_vec4_to_vec3(transformed_v1),
-						gm_vec4_to_vec3(transformed_v2),
-						gm_vec4_to_vec3(transformed_v3)
-					);
-
-					// if the vertex is outside the triangle, then we know that this vertex is NOT inside the mesh
-					if (outside_mesh) break;
-				}
-
-				// if !hit, then the vertex WAS inside the mesh, so there IS collision!
-				if (!outside_mesh) break;
-			}
-
-			// since we dont care with which entity the collision happend, we can just skip additional entities
-			if (!outside_mesh) break;
-		}
-
-		/* 
-		1 - implement edge checking
-		2 - render collision points
-		*/
-
-		// no need to proceed.
-		if (!outside_mesh) {
-			first_entity->diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
-			continue;
-		}
-
-		s32 edge_collides = 0;
-		for (u32 j = 0; j < array_get_length(entities); ++j) { // for each other entity
-			if (i == j) continue;
-
-			Entity* other_entity = &entities[j];
-
-			for (u32 v = 0; v < array_get_length(first_entity->mesh.indices); v += 3) { // for each edge of the (first) entity
-				Vertex* f1 = &first_entity->mesh.vertices[first_entity->mesh.indices[v]];
-				Vertex* f2 = &first_entity->mesh.vertices[first_entity->mesh.indices[v + 1]];
-				Vertex* f3 = &first_entity->mesh.vertices[first_entity->mesh.indices[v + 2]];
-				vec4 transformed_f1 = gm_mat4_multiply_vec4(&first_entity->model_matrix, f1->position);
-				vec4 transformed_f2 = gm_mat4_multiply_vec4(&first_entity->model_matrix, f2->position);
-				vec4 transformed_f3 = gm_mat4_multiply_vec4(&first_entity->model_matrix, f3->position);
-
-				// for each vertex we need to check if it is inside the other mesh.
-				for (u32 t = 0; t < array_get_length(other_entity->mesh.indices); t += 3) {
-					Vertex* v1 = &other_entity->mesh.vertices[other_entity->mesh.indices[t + 0]];
-					Vertex* v2 = &other_entity->mesh.vertices[other_entity->mesh.indices[t + 1]];
-					Vertex* v3 = &other_entity->mesh.vertices[other_entity->mesh.indices[t + 2]];
-					vec4 transformed_v1 = gm_mat4_multiply_vec4(&other_entity->model_matrix, v1->position);
-					vec4 transformed_v2 = gm_mat4_multiply_vec4(&other_entity->model_matrix, v2->position);
-					vec4 transformed_v3 = gm_mat4_multiply_vec4(&other_entity->model_matrix, v3->position);
-
-					edge_collides = collision_check_edge_collides_triangle(
-						gm_vec4_to_vec3(transformed_f1),
-						gm_vec4_to_vec3(transformed_f2),
-						gm_vec4_to_vec3(transformed_v1),
-						gm_vec4_to_vec3(transformed_v2),
-						gm_vec4_to_vec3(transformed_v3)
-					);
-
-					// if the edge collides with the face, then there is a collision
-					if (edge_collides) break;
-
-					edge_collides = collision_check_edge_collides_triangle(
-						gm_vec4_to_vec3(transformed_f2),
-						gm_vec4_to_vec3(transformed_f3),
-						gm_vec4_to_vec3(transformed_v1),
-						gm_vec4_to_vec3(transformed_v2),
-						gm_vec4_to_vec3(transformed_v3)
-					);
-
-					// if the edge collides with the face, then there is a collision
-					if (edge_collides) break;
-
-					edge_collides = collision_check_edge_collides_triangle(
-						gm_vec4_to_vec3(transformed_f3),
-						gm_vec4_to_vec3(transformed_f1),
-						gm_vec4_to_vec3(transformed_v1),
-						gm_vec4_to_vec3(transformed_v2),
-						gm_vec4_to_vec3(transformed_v3)
-					);
-
-					// if the edge collides with the face, then there is a collision
-					if (edge_collides) break;
-				}
-
-				// if edge_collides, then the edge collided with the face, so there IS collision!
-				if (edge_collides) break;
-			}
-
-			// since we dont care with which entity the collision happend, we can just skip additional entities
-			if (edge_collides) break;
-		}
-
-		if (edge_collides) {
-			first_entity->diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
-		} else {
-			first_entity->diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
+			check_entity_entity_collision(first_entity, other_entity);
 		}
 	}
 }
@@ -220,6 +408,8 @@ void core_render()
 	//glCullFace(GL_CCW);
 	for (u32 i = 0; i < array_get_length(entities); ++i)
 		graphics_entity_render_phong_shader(&camera, &entities[i], lights);
+	graphics_renderer_debug_points(&pctx, collision_points, array_get_length(collision_points), (vec4){0.0f, 0.0f, 1.0f, 1.0f});
+	graphics_renderer_primitives_flush(&pctx, &camera);
 
 	//vec3 p = (vec3){1.0f, -1.0f, 1.0f};
 	//vec3 f = gm_vec3_add(p, (vec3){0.0f, 0.0f, -1.0f});
