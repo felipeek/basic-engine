@@ -14,27 +14,26 @@
 
 static Perspective_Camera camera;
 static Light* lights;
-static Entity* entities;
 static Physics_Force* forces;
 static Render_Primitives_Context pctx;
 // Mouse binding to target positions
 static boolean is_mouse_bound_to_joint_target_position;
 static Entity* bound;
+static Entity face, fake_face;
+static Entity e_point;
 
-typedef struct {
-	vec3 position;
-	vec3 direction;
-} Vector;
-static Vector* normals;
+// frame f-1
+static vec4 old_frame_point_position;
+static mat4 old_frame_face_model_matrix;
+static vec4 old_frame_face_position;
+static Quaternion old_frame_face_rotation;
 
-typedef struct {
-	vec3 start_position;			// The collision position [at the start of the frame], in world space
-	vec3 collide_position;			// The collision position [at the time of collision], in world space
-	vec3 end_position;				// The collision position [at the end of the frame], in world space
-	vec3 normal;					// The normal to the collision impact, in world space
-	r32 frame_relative_time;		// The time, relative to the frame, that the collision happened (0 -> start of frame, 1 -> end of frame)
-} Collision_Point;
-static Collision_Point* all_collision_points;
+// frame f
+static vec4 new_frame_point_position;
+static vec4 new_frame_face_position;
+static Quaternion new_frame_face_rotation;
+
+static vec4 transformed_point;
 
 static Perspective_Camera create_camera()
 {
@@ -75,22 +74,50 @@ int core_init()
 	lights = create_lights();
 
 	forces = array_create(Physics_Force, 1);
-	entities = array_create(Entity, 1);
-	all_collision_points = array_create(Collision_Point, 1);
-	normals = array_create(Vector, 1);
 
 	Entity e;
-	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&e, m, (vec4){-1.2f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	Vertex triangle_vertices[3];
+	triangle_vertices[0].position = (vec4){0.0f, 0.0f, 0.0f, 1.0f};
+	triangle_vertices[1].position = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
+	triangle_vertices[2].position = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
+	triangle_vertices[0].normal = (vec4){0.0f, 0.0f, 1.0f, 0.0f};
+	triangle_vertices[1].normal = (vec4){0.0f, 0.0f, 1.0f, 0.0f};
+	triangle_vertices[2].normal = (vec4){0.0f, 0.0f, 1.0f, 0.0f};
+	triangle_vertices[0].texture_coordinates = (vec2){0.0f, 0.0f};
+	triangle_vertices[1].texture_coordinates = (vec2){1.0f, 0.0f};
+	triangle_vertices[2].texture_coordinates = (vec2){0.0f, 1.0f};
+	u32 triangle_indices[3];
+	triangle_indices[0] = 0;
+	triangle_indices[1] = 1;
+	triangle_indices[2] = 2;
+	Mesh m = graphics_mesh_create(
+		triangle_vertices,
+		sizeof(triangle_vertices) / sizeof(Vertex),
+		triangle_indices,
+		sizeof(triangle_indices) / sizeof(u32),
+		0);
+	graphics_entity_create_with_color(&face, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
-	array_push(entities, &e);
-	graphics_entity_create_with_color(&e, m, (vec4){1.2f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		//(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
-		(vec3){0.3f, 0.3f, 0.3f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
-	array_push(entities, &e);
+	graphics_entity_create_with_color(&fake_face, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){0.0f, 1.0f, 0.0f, 1.0f});
+	m = graphics_mesh_create_from_obj("res/sphere.obj", 0);
+	graphics_entity_create_with_color(&e_point, m, (vec4){1.2f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+		(vec3){0.03f, 0.03f, 0.03f}, (vec4){0.0f, 1.0f, 0.0f, 1.0f});
 
 	menu_register_dummy_callback(menu_dummy_callback);
 	graphics_renderer_primitives_init(&pctx);
+
+	old_frame_point_position = face.world_position;
+	old_frame_face_model_matrix = face.model_matrix;
+	old_frame_face_position = face.world_position;
+	old_frame_face_rotation = face.world_rotation;
+
+	// frame f
+	new_frame_point_position = e_point.world_position;
+	new_frame_face_position = face.world_position;
+	new_frame_face_rotation = face.world_rotation;
+
+	transformed_point = e_point.world_position;
 
 	return 0;
 }
@@ -100,393 +127,25 @@ void core_destroy()
 	array_release(lights);
 }
 
-// e1 -> entity that has the collided_vertex
-// e2 -> entity that we know the collided_vertex collided with
-// collided_vertex -> the vertex that collided, that is, it is assumed it is inside e2.
-static Collision_Point fetch_collision_point_information(Entity* e1, Entity* e2, Vertex* collided_vertex)
-{
-	vec4 vertex_in_this_frame = gm_mat4_multiply_vec4(&e1->model_matrix, collided_vertex->position);
-	vec4 vertex_in_last_frame = gm_mat4_multiply_vec4(&e1->lf_model_matrix, collided_vertex->position);
-
-	s32 found_collision = 0;
-	r32 nearest_collision;
-	vec3 normal_of_nearest_collision;
-	vec3 exact_collision_position;
-	for (u32 i = 0; i < array_get_length(e2->mesh.indices); i += 3) {
-		Vertex* v1 = &e2->mesh.vertices[e2->mesh.indices[i + 0]];
-		Vertex* v2 = &e2->mesh.vertices[e2->mesh.indices[i + 1]];
-		Vertex* v3 = &e2->mesh.vertices[e2->mesh.indices[i + 2]];
-		vec4 transformed_v1 = gm_mat4_multiply_vec4(&e2->model_matrix, v1->position);
-		vec4 transformed_v2 = gm_mat4_multiply_vec4(&e2->model_matrix, v2->position);
-		vec4 transformed_v3 = gm_mat4_multiply_vec4(&e2->model_matrix, v3->position);
-
-		vec3 intersection;
-		r32 d;
-		s32 collides = collision_check_edge_collides_triangle(
-			gm_vec4_to_vec3(vertex_in_this_frame),
-			gm_vec4_to_vec3(vertex_in_last_frame),
-			gm_vec4_to_vec3(transformed_v1),
-			gm_vec4_to_vec3(transformed_v2),
-			gm_vec4_to_vec3(transformed_v3),
-			&d,
-			&intersection
-		);
-
-		if (collides) {
-			// calculate normal
-			vec3 v2v1 = gm_vec4_to_vec3(gm_vec4_subtract(transformed_v2, transformed_v1));
-			vec3 v3v1 = gm_vec4_to_vec3(gm_vec4_subtract(transformed_v3, transformed_v1));
-			vec3 normal = gm_vec3_normalize(gm_vec3_cross(v2v1, v3v1));
-
-			if (!found_collision || d < nearest_collision) {
-				nearest_collision = d;
-				normal_of_nearest_collision = normal;
-				exact_collision_position = intersection;
-			}
-			found_collision = 1;
-		}
-	}
-
-	assert(found_collision);
-
-	Collision_Point cp;
-	cp.start_position = gm_vec4_to_vec3(vertex_in_last_frame);
-	cp.collide_position = exact_collision_position;
-	cp.end_position = gm_vec4_to_vec3(vertex_in_last_frame);
-	cp.normal = normal_of_nearest_collision;
-	cp.frame_relative_time = nearest_collision;
-	return cp;
-}
-
-static Collision_Point* check_entity_entity_collision(Entity* e1, Entity* e2)
-{
-	Collision_Point* collision_points = array_create(Collision_Point, 1);
-	s32 found_vertex_collision = 0;
-
-	// TEST e1 against e2
-	for (u32 v = 0; v < array_get_length(e1->mesh.vertices); ++v) { // for each vertex of e1
-		Vertex* point = &e1->mesh.vertices[v];
-		vec4 transformed_point = gm_mat4_multiply_vec4(&e1->model_matrix, point->position);
-		//vec4 transformed_point = gm_mat4_multiply_vec4(&e1->model_matrix, e1->world_position);
-
-		s32 is_vertex_outside_mesh = 0;
-		// for each vertex we need to check if it is inside the other mesh.
-		for (u32 t = 0; t < array_get_length(e2->mesh.indices); t += 3) {
-			Vertex* v1 = &e2->mesh.vertices[e2->mesh.indices[t + 0]];
-			Vertex* v2 = &e2->mesh.vertices[e2->mesh.indices[t + 1]];
-			Vertex* v3 = &e2->mesh.vertices[e2->mesh.indices[t + 2]];
-			vec4 transformed_v1 = gm_mat4_multiply_vec4(&e2->model_matrix, v1->position);
-			vec4 transformed_v2 = gm_mat4_multiply_vec4(&e2->model_matrix, v2->position);
-			vec4 transformed_v3 = gm_mat4_multiply_vec4(&e2->model_matrix, v3->position);
-
-			// 1 -> out
-			// 0 -> in
-			is_vertex_outside_mesh = collision_check_point_side_of_triangle(
-				gm_vec4_to_vec3(transformed_point),
-				gm_vec4_to_vec3(transformed_v1),
-				gm_vec4_to_vec3(transformed_v2),
-				gm_vec4_to_vec3(transformed_v3)
-			);
-
-			// if the vertex is outside the triangle, then we know that this vertex is NOT inside the mesh
-			if (is_vertex_outside_mesh)
-				break;
-		}
-
-		// if !is_vertex_outside_mesh, then the vertex WAS inside the mesh, so there IS collision!
-		if (!is_vertex_outside_mesh) {
-			Collision_Point cp = fetch_collision_point_information(e1, e2, point);
-			array_push(collision_points, &cp);
-			found_vertex_collision = 1;
-			// keep going to render all collision points
-			//break;
-		}
-	}
-
-	// TEST e2 against e1
-	for (u32 v = 0; v < array_get_length(e2->mesh.vertices); ++v) { // for each vertex of e2
-		Vertex* point = &e2->mesh.vertices[v];
-		vec4 transformed_point = gm_mat4_multiply_vec4(&e2->model_matrix, point->position);
-		//vec4 transformed_point = gm_mat4_multiply_vec4(&e2->model_matrix, e2->world_position);
-
-		s32 is_vertex_outside_mesh = 0;
-		// for each vertex we need to check if it is inside the other mesh.
-		for (u32 t = 0; t < array_get_length(e1->mesh.indices); t += 3) {
-			Vertex* v1 = &e1->mesh.vertices[e1->mesh.indices[t + 0]];
-			Vertex* v2 = &e1->mesh.vertices[e1->mesh.indices[t + 1]];
-			Vertex* v3 = &e1->mesh.vertices[e1->mesh.indices[t + 2]];
-			vec4 transformed_v1 = gm_mat4_multiply_vec4(&e1->model_matrix, v1->position);
-			vec4 transformed_v2 = gm_mat4_multiply_vec4(&e1->model_matrix, v2->position);
-			vec4 transformed_v3 = gm_mat4_multiply_vec4(&e1->model_matrix, v3->position);
-
-			// 1 -> out
-			// 0 -> in
-			is_vertex_outside_mesh = collision_check_point_side_of_triangle(
-				gm_vec4_to_vec3(transformed_point),
-				gm_vec4_to_vec3(transformed_v1),
-				gm_vec4_to_vec3(transformed_v2),
-				gm_vec4_to_vec3(transformed_v3)
-			);
-
-			// if the vertex is outside the triangle, then we know that this vertex is NOT inside the mesh
-			if (is_vertex_outside_mesh)
-				break;
-		}
-
-		// if !is_vertex_outside_mesh, then the vertex WAS inside the mesh, so there IS collision!
-		if (!is_vertex_outside_mesh) {
-			Collision_Point cp = fetch_collision_point_information(e2, e1, point);
-			array_push(collision_points, &cp);
-			found_vertex_collision = 1;
-			// keep going to render all collision points
-			//break;
-		}
-	}
-
-	// At this point, we analysed all vertices.
-	// We now analyze the edges
-	// However if we already found some vertices, we skip this part
-
-	if (found_vertex_collision) {
-		e1->diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
-		e2->diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
-		return collision_points;
-	}
-
-	/*
-		@TODO: improve edge-edge collision point detection
-		we are generating two distinct points in the most common scenario (when there are no vertices colliding)
-		i think we should generate a single one, just like with vertices?
-	*/
-
-	vec3* edge1_collisions = array_create(vec3, 1);
-	vec3* edge2_collisions = array_create(vec3, 1);
-	vec3* edge3_collisions = array_create(vec3, 1);
-
-	// TEST e1 against e2
-	s32 found_edge_collision = 0;
-	for (u32 v = 0; v < array_get_length(e1->mesh.indices); v += 3) { // for each edge of e1
-		Vertex* f1 = &e1->mesh.vertices[e1->mesh.indices[v]];
-		Vertex* f2 = &e1->mesh.vertices[e1->mesh.indices[v + 1]];
-		Vertex* f3 = &e1->mesh.vertices[e1->mesh.indices[v + 2]];
-		vec4 transformed_f1 = gm_mat4_multiply_vec4(&e1->model_matrix, f1->position);
-		vec4 transformed_f2 = gm_mat4_multiply_vec4(&e1->model_matrix, f2->position);
-		vec4 transformed_f3 = gm_mat4_multiply_vec4(&e1->model_matrix, f3->position);
-		array_clear(edge1_collisions);
-		array_clear(edge2_collisions);
-		array_clear(edge3_collisions);
-
-		// for each vertex we need to check if it is inside the other mesh.
-		for (u32 t = 0; t < array_get_length(e2->mesh.indices); t += 3) {
-			Vertex* v1 = &e2->mesh.vertices[e2->mesh.indices[t + 0]];
-			Vertex* v2 = &e2->mesh.vertices[e2->mesh.indices[t + 1]];
-			Vertex* v3 = &e2->mesh.vertices[e2->mesh.indices[t + 2]];
-			vec4 transformed_v1 = gm_mat4_multiply_vec4(&e2->model_matrix, v1->position);
-			vec4 transformed_v2 = gm_mat4_multiply_vec4(&e2->model_matrix, v2->position);
-			vec4 transformed_v3 = gm_mat4_multiply_vec4(&e2->model_matrix, v3->position);
-			vec3 intersection;
-
-			s32 edge_collides = collision_check_edge_collides_triangle(
-				gm_vec4_to_vec3(transformed_f1),
-				gm_vec4_to_vec3(transformed_f2),
-				gm_vec4_to_vec3(transformed_v1),
-				gm_vec4_to_vec3(transformed_v2),
-				gm_vec4_to_vec3(transformed_v3),
-				0,
-				&intersection
-			);
-
-			// if the edge collides with the face, then there is a collision
-			if (edge_collides) array_push(edge1_collisions, &intersection);
-
-			edge_collides = collision_check_edge_collides_triangle(
-				gm_vec4_to_vec3(transformed_f2),
-				gm_vec4_to_vec3(transformed_f3),
-				gm_vec4_to_vec3(transformed_v1),
-				gm_vec4_to_vec3(transformed_v2),
-				gm_vec4_to_vec3(transformed_v3),
-				0,
-				&intersection
-			);
-
-			// if the edge collides with the face, then there is a collision
-			if (edge_collides) array_push(edge2_collisions, &intersection);
-
-			edge_collides = collision_check_edge_collides_triangle(
-				gm_vec4_to_vec3(transformed_f3),
-				gm_vec4_to_vec3(transformed_f1),
-				gm_vec4_to_vec3(transformed_v1),
-				gm_vec4_to_vec3(transformed_v2),
-				gm_vec4_to_vec3(transformed_v3),
-				0,
-				&intersection
-			);
-
-			// if the edge collides with the face, then there is a collision
-			if (edge_collides) array_push(edge3_collisions, &intersection);
-		}
-
-		if (array_get_length(edge1_collisions) > 0) {
-			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
-			for (u32 i = 0; i < array_get_length(edge1_collisions); ++i) {
-				average_point = gm_vec3_add(average_point, edge1_collisions[i]);
-			}
-			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge1_collisions), average_point);
-			Collision_Point cp = {0};
-			cp.end_position = average_point;
-			array_push(collision_points, &cp);
-		}
-		if (array_get_length(edge2_collisions) > 0) {
-			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
-			for (u32 i = 0; i < array_get_length(edge2_collisions); ++i) {
-				average_point = gm_vec3_add(average_point, edge2_collisions[i]);
-			}
-			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge2_collisions), average_point);
-			Collision_Point cp = {0};
-			cp.end_position = average_point;
-			array_push(collision_points, &cp);
-		}
-		if (array_get_length(edge3_collisions) > 0) {
-			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
-			for (u32 i = 0; i < array_get_length(edge3_collisions); ++i) {
-				average_point = gm_vec3_add(average_point, edge3_collisions[i]);
-			}
-			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge3_collisions), average_point);
-			Collision_Point cp = {0};
-			cp.end_position = average_point;
-			array_push(collision_points, &cp);
-		}
-
-		if (array_get_length(edge1_collisions) > 0 ||
-			array_get_length(edge2_collisions) > 0 ||
-			array_get_length(edge3_collisions) > 0) {
-			// collision!
-			found_edge_collision = 1;
-			break;
-		}
-	}
-
-	// TEST e2 against e1
-	for (u32 v = 0; v < array_get_length(e2->mesh.indices); v += 3) { // for each edge of e2
-		Vertex* f1 = &e2->mesh.vertices[e2->mesh.indices[v]];
-		Vertex* f2 = &e2->mesh.vertices[e2->mesh.indices[v + 1]];
-		Vertex* f3 = &e2->mesh.vertices[e2->mesh.indices[v + 2]];
-		vec4 transformed_f1 = gm_mat4_multiply_vec4(&e2->model_matrix, f1->position);
-		vec4 transformed_f2 = gm_mat4_multiply_vec4(&e2->model_matrix, f2->position);
-		vec4 transformed_f3 = gm_mat4_multiply_vec4(&e2->model_matrix, f3->position);
-		array_clear(edge1_collisions);
-		array_clear(edge2_collisions);
-		array_clear(edge3_collisions);
-
-		// for each vertex we need to check if it is inside the other mesh.
-		for (u32 t = 0; t < array_get_length(e1->mesh.indices); t += 3) {
-			Vertex* v1 = &e1->mesh.vertices[e1->mesh.indices[t + 0]];
-			Vertex* v2 = &e1->mesh.vertices[e1->mesh.indices[t + 1]];
-			Vertex* v3 = &e1->mesh.vertices[e1->mesh.indices[t + 2]];
-			vec4 transformed_v1 = gm_mat4_multiply_vec4(&e1->model_matrix, v1->position);
-			vec4 transformed_v2 = gm_mat4_multiply_vec4(&e1->model_matrix, v2->position);
-			vec4 transformed_v3 = gm_mat4_multiply_vec4(&e1->model_matrix, v3->position);
-			vec3 intersection;
-
-			s32 edge_collides = collision_check_edge_collides_triangle(
-				gm_vec4_to_vec3(transformed_f1),
-				gm_vec4_to_vec3(transformed_f2),
-				gm_vec4_to_vec3(transformed_v1),
-				gm_vec4_to_vec3(transformed_v2),
-				gm_vec4_to_vec3(transformed_v3),
-				0,
-				&intersection
-			);
-
-			// if the edge collides with the face, then there is a collision
-			if (edge_collides) array_push(edge1_collisions, &intersection);
-
-			edge_collides = collision_check_edge_collides_triangle(
-				gm_vec4_to_vec3(transformed_f2),
-				gm_vec4_to_vec3(transformed_f3),
-				gm_vec4_to_vec3(transformed_v1),
-				gm_vec4_to_vec3(transformed_v2),
-				gm_vec4_to_vec3(transformed_v3),
-				0,
-				&intersection
-			);
-
-			// if the edge collides with the face, then there is a collision
-			if (edge_collides) array_push(edge2_collisions, &intersection);
-
-			edge_collides = collision_check_edge_collides_triangle(
-				gm_vec4_to_vec3(transformed_f3),
-				gm_vec4_to_vec3(transformed_f1),
-				gm_vec4_to_vec3(transformed_v1),
-				gm_vec4_to_vec3(transformed_v2),
-				gm_vec4_to_vec3(transformed_v3),
-				0,
-				&intersection
-			);
-
-			// if the edge collides with the face, then there is a collision
-			if (edge_collides) array_push(edge3_collisions, &intersection);
-		}
-
-		if (array_get_length(edge1_collisions) > 0) {
-			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
-			for (u32 i = 0; i < array_get_length(edge1_collisions); ++i) {
-				average_point = gm_vec3_add(average_point, edge1_collisions[i]);
-			}
-			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge1_collisions), average_point);
-			Collision_Point cp = {0};
-			cp.end_position = average_point;
-			array_push(collision_points, &cp);
-		}
-		if (array_get_length(edge2_collisions) > 0) {
-			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
-			for (u32 i = 0; i < array_get_length(edge2_collisions); ++i) {
-				average_point = gm_vec3_add(average_point, edge2_collisions[i]);
-			}
-			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge2_collisions), average_point);
-			Collision_Point cp = {0};
-			cp.end_position = average_point;
-			array_push(collision_points, &cp);
-		}
-		if (array_get_length(edge3_collisions) > 0) {
-			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
-			for (u32 i = 0; i < array_get_length(edge3_collisions); ++i) {
-				average_point = gm_vec3_add(average_point, edge1_collisions[i]);
-			}
-			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge3_collisions), average_point);
-			Collision_Point cp = {0};
-			cp.end_position = average_point;
-			array_push(collision_points, &cp);
-		}
-
-		if (array_get_length(edge1_collisions) > 0 ||
-			array_get_length(edge2_collisions) > 0 ||
-			array_get_length(edge3_collisions) > 0) {
-			// collision!
-			found_edge_collision = 1;
-			break;
-		}
-	}
-
-	if (found_edge_collision) {
-		e1->diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
-	}
-
-	array_release(edge1_collisions);
-	array_release(edge2_collisions);
-	array_release(edge3_collisions);
-	return collision_points;
-}
-
 void core_update(r32 delta_time)
 {
 	//physics_update(&e, forces, delta_time);
-	array_clear(forces);
-	array_clear(all_collision_points);
-	for (u32 i = 0; i < array_get_length(entities); ++i) {
-		entities[i].diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
-	}
 
+	mat4 inverse;
+	assert(gm_mat4_inverse(&old_frame_face_model_matrix, &inverse));
+	
+	vec4 point_in_local_coords = gm_mat4_multiply_vec4(&inverse, old_frame_point_position);
+	Quaternion inverse_new_frame_rot = quaternion_inverse(&new_frame_face_rotation);
+	Quaternion point_rotation = quaternion_product(&old_frame_face_rotation, &inverse_new_frame_rot);
+	point_rotation = quaternion_product(&point_rotation, &old_frame_face_rotation);
+	mat4 rot_matrix = quaternion_get_matrix(&point_rotation);
+
+	transformed_point = gm_mat4_multiply_vec4(&rot_matrix, point_in_local_coords);
+	transformed_point = gm_vec4_add(transformed_point, old_frame_face_position);
+	transformed_point = gm_vec4_add(transformed_point, gm_vec4_scalar_product(-1.0f, new_frame_face_position));
+	transformed_point = gm_vec4_add(transformed_point, old_frame_face_position);
+
+/*
 	for (u32 i = 0; i < array_get_length(entities); ++i) {	// for each entity
 		Entity* first_entity = &entities[i];
 		for (u32 j = i + 1; j < array_get_length(entities); ++j) { // for each other entity
@@ -497,17 +156,31 @@ void core_update(r32 delta_time)
 			}
 		}
 	}
+	*/
 }
 
 void core_render()
 {
 	//glEnable(GL_CULL_FACE);
 	//glCullFace(GL_CCW);
-	for (u32 i = 0; i < array_get_length(entities); ++i)
-		graphics_entity_render_phong_shader(&camera, &entities[i], lights);
+	graphics_entity_render_phong_shader(&camera, &face, lights);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	graphics_entity_render_phong_shader(&camera, &fake_face, lights);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	graphics_entity_render_phong_shader(&camera, &e_point, lights);
+
+	vec3 t1 = gm_vec4_to_vec3(old_frame_point_position);
+	vec3 t2 = gm_vec4_to_vec3(transformed_point);
+	graphics_renderer_debug_points(&pctx, &t1, 1, (vec4){0.0f, 0.0f, 1.0f, 1.0f});
+	graphics_renderer_debug_points(&pctx, &t2, 1, (vec4){0.0f, 0.0f, 1.0f, 1.0f});
+	graphics_renderer_debug_vector(&pctx, t1, t2, (vec4){0.0f, 0.0f, 1.0f, 1.0f});
+	graphics_renderer_primitives_flush(&pctx, &camera);
+
+	/*
 	for (u32 i = 0; i < array_get_length(all_collision_points); ++i)
 		graphics_renderer_debug_points(&pctx, &all_collision_points[i].end_position, 1, (vec4){0.0f, 0.0f, 1.0f, 1.0f});
 	graphics_renderer_primitives_flush(&pctx, &camera);
+	*/
 
 	//vec3 p = (vec3){1.0f, -1.0f, 1.0f};
 	//vec3 f = gm_vec3_add(p, (vec3){0.0f, 0.0f, -1.0f});
@@ -587,27 +260,33 @@ void core_input_process(boolean* key_state, r32 delta_time)
 	}
 	if (key_state[GLFW_KEY_M])
 	{
-		Physics_Force pf;
-		//pf.force = (vec4){0.0f, 0.0f, -0.1f, 0.0f};
-		//pf.position = (vec4){-1.0f, -1.0f, 1.0f, 1.0f};
-		//array_push(forces, &pf);
-		pf.force = (vec4){0.0f, 0.0f, -1000.0f, 0.0f};
-		pf.position = (vec4){1.0f, -1.0f, 1.0f, 1.0f};
-		array_push(forces, &pf);
+		new_frame_point_position = e_point.world_position;
+		new_frame_face_position = face.world_position;
+		new_frame_face_rotation = face.world_rotation;
 		key_state[GLFW_KEY_M] = false;
+	}
+	if (key_state[GLFW_KEY_N])
+	{
+		old_frame_point_position = e_point.world_position;
+		old_frame_face_position = face.world_position;
+		old_frame_face_rotation = face.world_rotation;
+		old_frame_face_model_matrix = face.model_matrix;
+		graphics_entity_set_position(&fake_face, old_frame_face_position);
+		graphics_entity_set_rotation(&fake_face, old_frame_face_rotation);
+		key_state[GLFW_KEY_N] = false;
 	}
 
 	is_mouse_bound_to_joint_target_position = false;
 	if (key_state[GLFW_KEY_1])
 	{
-		bound = &entities[0];
+		bound = &face;
 		is_mouse_bound_to_joint_target_position = true;
 	}
-	if (key_state[GLFW_KEY_2])
-	{
-		bound = &entities[1];
-		is_mouse_bound_to_joint_target_position = true;
-	}
+	//if (key_state[GLFW_KEY_2])
+	//{
+	//	bound = &entities[1];
+	//	is_mouse_bound_to_joint_target_position = true;
+	//}
 }
 
 void core_mouse_change_process(boolean reset, r64 x_pos, r64 y_pos)
