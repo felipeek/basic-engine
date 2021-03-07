@@ -37,6 +37,18 @@ static Quaternion new_frame_entity_rotation;
 
 static boolean collision_happening;
 
+/*
+typedef struct {
+	vec3 point_position;
+	vec3 face_position;
+	Quaternion face_rotation;
+	vec3 result_point_position;
+	s32 hit;
+} Sample;
+Sample* sampled_points;
+vec4 colors[256];
+*/
+
 static Perspective_Camera create_camera()
 {
 	Perspective_Camera camera;
@@ -93,6 +105,7 @@ int core_init()
 	lights = create_lights();
 
 	forces = array_create(Physics_Force, 1);
+	//sampled_points = array_create(Sample, 1);
 
 	Entity e;
 	Mesh m = graphics_mesh_create(
@@ -123,6 +136,10 @@ int core_init()
 	new_frame_entity_position = face.world_position;
 	new_frame_entity_rotation = face.world_rotation;
 
+	//for (u32 i = 0; i < 256; ++i) {
+	//	colors[i] = (vec4){rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, 1.0f};
+	//}
+
 	return 0;
 }
 
@@ -140,7 +157,7 @@ void core_update(r32 delta_time)
 		gm_vec4_to_vec3(old_frame_entity_position),
 		gm_vec4_to_vec3(new_frame_entity_position),
 		old_frame_entity_rotation,
-		old_frame_entity_rotation,
+		new_frame_entity_rotation,
 		face.world_scale,
 		gm_vec4_to_vec3(face.mesh.vertices[0].position),
 		gm_vec4_to_vec3(face.mesh.vertices[1].position),
@@ -152,6 +169,7 @@ void core_render()
 {
 	//glEnable(GL_CULL_FACE);
 	//glCullFace(GL_CCW);
+	#if 1
 	graphics_entity_render_phong_shader(&camera, &face, lights);
 	graphics_entity_render_phong_shader(&camera, &e_point, lights);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -169,6 +187,33 @@ void core_render()
 	graphics_entity_render_phong_shader(&camera, &fake_e_point, lights);
 	graphics_renderer_primitives_flush(&pctx, &camera);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	#else
+	graphics_entity_render_phong_shader(&camera, &face, lights);
+	graphics_entity_render_phong_shader(&camera, &e_point, lights);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	for (u32 i = 0; i < array_get_length(sampled_points); ++i) {
+		Sample* s = &sampled_points[i];
+		graphics_entity_set_position(&fake_face, (vec4){s->face_position.x, s->face_position.y, s->face_position.z, 1.0f});
+		graphics_entity_set_rotation(&fake_face, s->face_rotation);
+		graphics_entity_set_position(&fake_e_point, (vec4){s->point_position.x, s->point_position.y, s->point_position.z, 1.0f});
+		fake_face.diffuse_info.diffuse_color = colors[i];
+		if (s->hit)
+			fake_e_point.diffuse_info.diffuse_color = (vec4){1.0f, 1.0f, 1.0f, 1.0f};
+		else
+			fake_e_point.diffuse_info.diffuse_color = colors[i];
+		graphics_entity_render_phong_shader(&camera, &fake_face, lights);
+		graphics_entity_render_phong_shader(&camera, &fake_e_point, lights);
+		vec3 r = s->result_point_position;
+		graphics_renderer_debug_points(&pctx, &r, 1, colors[i]);
+		if (s->hit)
+			graphics_renderer_debug_vector(&pctx, s->point_position, r, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+		else
+			graphics_renderer_debug_vector(&pctx, s->point_position, r, colors[i]);
+	}
+	graphics_renderer_primitives_flush(&pctx, &camera);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	array_clear(sampled_points);
+	#endif
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)

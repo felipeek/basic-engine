@@ -1,4 +1,16 @@
 #include "collision.h"
+#include <dynamic_array.h>
+
+#if 0
+typedef struct {
+	vec3 point_position;
+	vec3 face_position;
+	Quaternion face_rotation;
+	vec3 result_point_position;
+	s32 hit;
+} Sample;
+extern Sample* sampled_points;
+#endif
 
 boolean collision_check_point_side_of_triangle(vec3 point, vec3 t1, vec3 t2, vec3 t3) {
 	vec3 v1 = gm_vec3_subtract(t2, t1);
@@ -132,6 +144,7 @@ boolean collision_check_dynamic_collision_between_point_and_entity_face(
 		vec3 t_p2 = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&frame_model_matrix, (vec4){face_point_local_coords_2.x, face_point_local_coords_2.y, face_point_local_coords_2.z, 1.0f}));
 		vec3 t_p3 = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&frame_model_matrix, (vec4){face_point_local_coords_3.x, face_point_local_coords_3.y, face_point_local_coords_3.z, 1.0f}));
 
+#if 1
 		r32 d;
 		vec3 intersection;
 		s32 collided = collision_check_edge_collides_triangle(
@@ -147,10 +160,35 @@ boolean collision_check_dynamic_collision_between_point_and_entity_face(
 		if (collided) {
 			return true;
 		}
+#else
+		Sample s;
+		s.point_position = this_iteration_interpolated_point_position;// the ray begins at the last_iteration point
+		s.face_position = last_iteration_interpolated_entity_position;  // the ray needs to pass through the last_iteration face
+		s.face_rotation = last_iteration_interpolated_entity_rotation;  // the ray needs to pass through the last_iteration face
+		s.result_point_position = result_point_position;
+		s.hit = 0;
+		vec3 intersection;
+		r32 d;
+		s.hit = collision_check_edge_collides_triangle(
+			this_iteration_interpolated_point_position,
+			result_point_position,
+			t_p1,
+			t_p2,
+			t_p3,
+			&d,
+			&intersection
+		);
+		array_push(sampled_points, &s);
 
-		last_iteration_interpolated_entity_position = this_iteration_interpolated_entity_position;
-		last_iteration_interpolated_entity_rotation = this_iteration_interpolated_entity_rotation;
-		last_iteration_interpolated_point_position = this_iteration_interpolated_point_position;
+		if (s.hit) {
+			return true;
+		}
+
+#endif
+
+	last_iteration_interpolated_entity_position = this_iteration_interpolated_entity_position;
+	last_iteration_interpolated_entity_rotation = this_iteration_interpolated_entity_rotation;
+	last_iteration_interpolated_point_position = this_iteration_interpolated_point_position;
 	}
 
 	return false;
