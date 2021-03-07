@@ -70,3 +70,59 @@ s32 collision_check_edge_collides_triangle(vec3 edge_p1, vec3 edge_p2, vec3 t1, 
 
 	return false;
 }
+
+s32 collision_vertex_face_test(
+	vec4 old_frame_point_position,
+	vec4 old_frame_entity_position,
+	Quaternion old_frame_entity_rotation,
+	vec4 new_frame_point_position,
+	vec4 new_frame_entity_position,
+	Quaternion new_frame_entity_rotation,
+	vec3 face_scale)
+{
+	const u32 NUM_SAMPLES = 5;
+
+	vec4 last_iteration_interpolated_point_position = old_frame_point_position;
+	vec4 last_iteration_interpolated_entity_position = old_frame_entity_position;
+	Quaternion last_iteration_interpolated_entity_rotation = old_frame_entity_rotation;
+
+	for (u32 i = 0; i < NUM_SAMPLES; ++i) {
+		vec4 this_iteration_interpolated_point_position = gm_vec4_add(
+			gm_vec4_scalar_product((r32)(i + 1) / NUM_SAMPLES, new_frame_point_position),
+			gm_vec4_scalar_product((r32)(NUM_SAMPLES - 1 - i) / NUM_SAMPLES, old_frame_point_position)
+		);
+
+		vec4 this_iteration_interpolated_entity_position = gm_vec4_add(
+			gm_vec4_scalar_product((r32)(i + 1) / NUM_SAMPLES, new_frame_entity_position),
+			gm_vec4_scalar_product((r32)(NUM_SAMPLES - 1 - i) / NUM_SAMPLES, old_frame_entity_position)
+		);
+
+		Quaternion this_iteration_interpolated_entity_rotation = quaternion_slerp(
+			&old_frame_entity_rotation,
+			&new_frame_entity_rotation,
+			(r32)(i + 1) / NUM_SAMPLES
+		);
+
+		mat4 frame_model_matrix = graphics_model_matrix(last_iteration_interpolated_entity_position,
+			last_iteration_interpolated_entity_rotation, face_scale);
+		mat4 inverse;
+		assert(gm_mat4_inverse(&frame_model_matrix, &inverse));
+
+		// effectively translating before the rotation (face rotation)
+		//vec4 point_in_local_coords = gm_mat4_multiply_vec4(&inverse, new_frame_point_position);
+		vec4 point_in_local_coords = gm_mat4_multiply_vec4(&inverse, this_iteration_interpolated_point_position);
+		Quaternion inverse_new_frame_rot = quaternion_inverse(&this_iteration_interpolated_entity_rotation);
+		Quaternion point_rotation = quaternion_product(&last_iteration_interpolated_entity_rotation, &inverse_new_frame_rot);
+		point_rotation = quaternion_product(&point_rotation, &last_iteration_interpolated_entity_rotation);
+		mat4 rot_matrix = quaternion_get_matrix(&point_rotation);
+
+		vec4 result_point_position = gm_mat4_multiply_vec4(&rot_matrix, point_in_local_coords);
+		result_point_position = gm_vec4_add(result_point_position, last_iteration_interpolated_entity_position);
+		result_point_position = gm_vec4_add(result_point_position, gm_vec4_scalar_product(-1.0f, this_iteration_interpolated_entity_position));
+		result_point_position = gm_vec4_add(result_point_position, last_iteration_interpolated_entity_position);
+
+		last_iteration_interpolated_entity_position = this_iteration_interpolated_entity_position;
+		last_iteration_interpolated_entity_rotation = this_iteration_interpolated_entity_rotation;
+		last_iteration_interpolated_point_position = this_iteration_interpolated_point_position;
+	}
+}

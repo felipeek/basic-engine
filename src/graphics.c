@@ -321,28 +321,32 @@ void graphics_entity_change_color(Entity* entity, vec4 color, boolean delete_dif
 	entity->diffuse_info.diffuse_color = color;
 }
 
-static void recalculate_model_matrix(Entity* entity)
+mat4 graphics_model_matrix(vec4 p, Quaternion r, vec3 s)
 {
-	r32 s, c;
-
 	mat4 scale_matrix = (mat4) {
-		entity->world_scale.x, 0.0f, 0.0f, 0.0f,
-			0.0f, entity->world_scale.y, 0.0f, 0.0f,
-			0.0f, 0.0f, entity->world_scale.z, 0.0f,
+		s.x, 0.0f, 0.0f, 0.0f,
+			0.0f, s.y, 0.0f, 0.0f,
+			0.0f, 0.0f, s.z, 0.0f,
 			0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	mat4 rotation_matrix = quaternion_get_matrix(&entity->world_rotation);
+	mat4 rotation_matrix = quaternion_get_matrix(&r);
 
 	mat4 translation_matrix = (mat4) {
-		1.0f, 0.0f, 0.0f, entity->world_position.x,
-			0.0f, 1.0f, 0.0f, entity->world_position.y,
-			0.0f, 0.0f, 1.0f, entity->world_position.z,
+		1.0f, 0.0f, 0.0f, p.x,
+			0.0f, 1.0f, 0.0f, p.y,
+			0.0f, 0.0f, 1.0f, p.z,
 			0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	entity->model_matrix = gm_mat4_multiply(&rotation_matrix, &scale_matrix);
-	entity->model_matrix = gm_mat4_multiply(&translation_matrix, &entity->model_matrix);
+	mat4 model_matrix = gm_mat4_multiply(&rotation_matrix, &scale_matrix);
+	model_matrix = gm_mat4_multiply(&translation_matrix, &model_matrix);
+	return model_matrix;
+}
+
+static void recalculate_model_matrix(Entity* entity)
+{
+	entity->model_matrix = graphics_model_matrix(entity->world_position, entity->world_rotation, entity->world_scale);
 }
 
 void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color)
