@@ -1,6 +1,6 @@
 #include "collision.h"
 
-s32 collision_check_point_side_of_triangle(vec3 point, vec3 t1, vec3 t2, vec3 t3) {
+boolean collision_check_point_side_of_triangle(vec3 point, vec3 t1, vec3 t2, vec3 t3) {
 	vec3 v1 = gm_vec3_subtract(t2, t1);
 	vec3 v2 = gm_vec3_subtract(t3, t1);
 	vec3 plane_normal = gm_vec3_cross(v1, v2);
@@ -11,7 +11,7 @@ s32 collision_check_point_side_of_triangle(vec3 point, vec3 t1, vec3 t2, vec3 t3
 	return point_applied_on_eq >= 0; // true -> "outside" | false -> "inside"
 }
 
-static s32 collision_intersection_ray_plane(vec3 ray_position, vec3 ray_direction, vec3 plane_point, vec3 plane_normal,
+static boolean collision_intersection_ray_plane(vec3 ray_position, vec3 ray_direction, vec3 plane_point, vec3 plane_normal,
 	r32* _d, vec3* _intersection)
 {
   ray_direction = gm_vec3_normalize(ray_direction);
@@ -30,7 +30,7 @@ static s32 collision_intersection_ray_plane(vec3 ray_position, vec3 ray_directio
   return true;
 }
 
-s32 collision_check_edge_collides_triangle(vec3 edge_p1, vec3 edge_p2, vec3 t1, vec3 t2, vec3 t3, r32* d, vec3* intersection) {
+boolean collision_check_edge_collides_triangle(vec3 edge_p1, vec3 edge_p2, vec3 t1, vec3 t2, vec3 t3, r32* d, vec3* intersection) {
 	vec3 v1 = gm_vec3_subtract(t2, t1);
 	vec3 v2 = gm_vec3_subtract(t3, t1);
 	vec3 plane_normal = gm_vec3_cross(v1, v2);
@@ -66,6 +66,91 @@ s32 collision_check_edge_collides_triangle(vec3 edge_p1, vec3 edge_p2, vec3 t1, 
 			(0.0f <= gamma && gamma <= 1.0f);
 		
 		return inside;
+	}
+
+	return false;
+}
+
+boolean collision_check_dynamic_collision_between_point_and_entity_face(
+	vec3 initial_point_position,
+	vec3 final_point_position,
+	vec3 initial_entity_position,
+	vec3 final_entity_position,
+	Quaternion initial_entity_rotation,
+	Quaternion final_entity_rotation,
+	vec3 entity_scale,
+	vec3 face_point_local_coords_1,
+	vec3 face_point_local_coords_2,
+	vec3 face_point_local_coords_3)
+{
+	const u32 NUM_SAMPLES = 5;
+
+	vec3 last_iteration_interpolated_point_position = initial_point_position;
+	vec3 last_iteration_interpolated_entity_position = initial_entity_position;
+	Quaternion last_iteration_interpolated_entity_rotation = initial_entity_rotation;
+
+	for (u32 i = 0; i < NUM_SAMPLES; ++i) {
+		vec3 this_iteration_interpolated_point_position = gm_vec3_add(
+			gm_vec3_scalar_product((r32)(i + 1) / NUM_SAMPLES, final_point_position),
+			gm_vec3_scalar_product((r32)(NUM_SAMPLES - 1 - i) / NUM_SAMPLES, initial_point_position)
+		);
+
+		vec3 this_iteration_interpolated_entity_position = gm_vec3_add(
+			gm_vec3_scalar_product((r32)(i + 1) / NUM_SAMPLES, final_entity_position),
+			gm_vec3_scalar_product((r32)(NUM_SAMPLES - 1 - i) / NUM_SAMPLES, initial_entity_position)
+		);
+
+		Quaternion this_iteration_interpolated_entity_rotation = quaternion_slerp(
+			&initial_entity_rotation,
+			&final_entity_rotation,
+			(r32)(i + 1) / NUM_SAMPLES
+		);
+
+		mat4 frame_model_matrix = graphics_model_matrix(
+			(vec4){last_iteration_interpolated_entity_position.x, last_iteration_interpolated_entity_position.y, last_iteration_interpolated_entity_position.z, 1.0f},
+			last_iteration_interpolated_entity_rotation, entity_scale
+		);
+		mat4 inverse;
+		assert(gm_mat4_inverse(&frame_model_matrix, &inverse));
+
+		vec4 point_in_local_coords = gm_mat4_multiply_vec4(
+			&inverse,
+			(vec4){this_iteration_interpolated_point_position.x, this_iteration_interpolated_point_position.y, this_iteration_interpolated_point_position.z, 1.0f}
+		);
+
+		Quaternion inverse_new_frame_rot = quaternion_inverse(&this_iteration_interpolated_entity_rotation);
+		Quaternion point_rotation = quaternion_product(&last_iteration_interpolated_entity_rotation, &inverse_new_frame_rot);
+		point_rotation = quaternion_product(&point_rotation, &last_iteration_interpolated_entity_rotation);
+		mat4 rot_matrix = quaternion_get_matrix(&point_rotation);
+
+		vec3 result_point_position = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&rot_matrix, point_in_local_coords));
+		result_point_position = gm_vec3_add(result_point_position, last_iteration_interpolated_entity_position);
+		result_point_position = gm_vec3_add(result_point_position, gm_vec3_scalar_product(-1.0f, this_iteration_interpolated_entity_position));
+		result_point_position = gm_vec3_add(result_point_position, last_iteration_interpolated_entity_position);
+
+		vec3 t_p1 = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&frame_model_matrix, (vec4){face_point_local_coords_1.x, face_point_local_coords_1.y, face_point_local_coords_1.z, 1.0f}));
+		vec3 t_p2 = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&frame_model_matrix, (vec4){face_point_local_coords_2.x, face_point_local_coords_2.y, face_point_local_coords_2.z, 1.0f}));
+		vec3 t_p3 = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&frame_model_matrix, (vec4){face_point_local_coords_3.x, face_point_local_coords_3.y, face_point_local_coords_3.z, 1.0f}));
+
+		r32 d;
+		vec3 intersection;
+		s32 collided = collision_check_edge_collides_triangle(
+			this_iteration_interpolated_point_position,
+			result_point_position,
+			t_p1,
+			t_p2,
+			t_p3,
+			&d,
+			&intersection
+		);
+
+		if (collided) {
+			return true;
+		}
+
+		last_iteration_interpolated_entity_position = this_iteration_interpolated_entity_position;
+		last_iteration_interpolated_entity_rotation = this_iteration_interpolated_entity_rotation;
+		last_iteration_interpolated_point_position = this_iteration_interpolated_point_position;
 	}
 
 	return false;
