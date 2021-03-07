@@ -20,7 +20,7 @@ static Render_Primitives_Context pctx;
 static boolean is_mouse_bound_to_joint_target_position;
 static Entity* bound;
 static Entity face, fake_face;
-static Entity e_point;
+static Entity e_point, fake_e_point;
 
 // frame f-1
 static vec4 old_frame_point_position;
@@ -33,7 +33,14 @@ static vec4 new_frame_point_position;
 static vec4 new_frame_face_position;
 static Quaternion new_frame_face_rotation;
 
-static vec4 transformed_point;
+typedef struct {
+	vec4 point_position;
+	vec4 face_position;
+	Quaternion face_rotation;
+	vec4 result_point_position;
+} Sample;
+static Sample* sampled_points;
+vec4 colors[256];
 
 static Perspective_Camera create_camera()
 {
@@ -74,6 +81,7 @@ int core_init()
 	lights = create_lights();
 
 	forces = array_create(Physics_Force, 1);
+	sampled_points = array_create(Sample, 1);
 
 	Entity e;
 	Vertex triangle_vertices[3];
@@ -102,7 +110,9 @@ int core_init()
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){0.0f, 1.0f, 0.0f, 1.0f});
 	m = graphics_mesh_create_from_obj("res/sphere.obj", 0);
 	graphics_entity_create_with_color(&e_point, m, (vec4){1.2f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){0.03f, 0.03f, 0.03f}, (vec4){0.0f, 1.0f, 0.0f, 1.0f});
+		(vec3){0.01f, 0.01f, 0.01f}, (vec4){0.0f, 0.0f, 1.0f, 1.0f});
+	graphics_entity_create_with_color(&fake_e_point, m, (vec4){1.2f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+		(vec3){0.01f, 0.01f, 0.01f}, (vec4){0.0f, 1.0f, 0.0f, 1.0f});
 
 	menu_register_dummy_callback(menu_dummy_callback);
 	graphics_renderer_primitives_init(&pctx);
@@ -117,8 +127,9 @@ int core_init()
 	new_frame_face_position = face.world_position;
 	new_frame_face_rotation = face.world_rotation;
 
-	transformed_point = e_point.world_position;
-
+	for (u32 i = 0; i < 256; ++i) {
+		colors[i] = (vec4){rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, 1.0f};
+	}
 	return 0;
 }
 
@@ -130,11 +141,63 @@ void core_destroy()
 void core_update(r32 delta_time)
 {
 	//physics_update(&e, forces, delta_time);
+	array_clear(sampled_points);
 
-	mat4 inverse;
-	assert(gm_mat4_inverse(&old_frame_face_model_matrix, &inverse));
-	
-	vec4 point_in_local_coords = gm_mat4_multiply_vec4(&inverse, old_frame_point_position);
+	const u32 NUM_SAMPLES = 5;
+
+	vec4 last_iteration_interpolated_point_position = old_frame_point_position;
+	vec4 last_iteration_interpolated_face_position = old_frame_face_position;
+	Quaternion last_iteration_interpolated_face_rotation = old_frame_face_rotation;
+	for (u32 i = 0; i < NUM_SAMPLES; ++i) {
+		vec4 this_iteration_interpolated_point_position = gm_vec4_add(
+			gm_vec4_scalar_product((r32)(i + 1) / NUM_SAMPLES, new_frame_point_position),
+			gm_vec4_scalar_product((r32)(NUM_SAMPLES - 1 - i) / NUM_SAMPLES, old_frame_point_position)
+		);
+
+		vec4 this_iteration_interpolated_face_position = gm_vec4_add(
+			gm_vec4_scalar_product((r32)(i + 1) / NUM_SAMPLES, new_frame_face_position),
+			gm_vec4_scalar_product((r32)(NUM_SAMPLES - 1 - i) / NUM_SAMPLES, old_frame_face_position)
+		);
+
+		Quaternion this_iteration_interpolated_face_rotation = quaternion_slerp(
+			&old_frame_face_rotation,
+			&new_frame_face_rotation,
+			(r32)(i + 1) / NUM_SAMPLES
+		);
+
+		mat4 frame_model_matrix = graphics_model_matrix(last_iteration_interpolated_face_position,
+			last_iteration_interpolated_face_rotation, face.world_scale);
+		mat4 inverse;
+		assert(gm_mat4_inverse(&frame_model_matrix, &inverse));
+
+		// effectively translating before the rotation (face rotation)
+		//vec4 point_in_local_coords = gm_mat4_multiply_vec4(&inverse, new_frame_point_position);
+		vec4 point_in_local_coords = gm_mat4_multiply_vec4(&inverse, this_iteration_interpolated_point_position);
+		Quaternion inverse_new_frame_rot = quaternion_inverse(&this_iteration_interpolated_face_rotation);
+		Quaternion point_rotation = quaternion_product(&last_iteration_interpolated_face_rotation, &inverse_new_frame_rot);
+		point_rotation = quaternion_product(&point_rotation, &last_iteration_interpolated_face_rotation);
+		mat4 rot_matrix = quaternion_get_matrix(&point_rotation);
+
+		vec4 result_point_position = gm_mat4_multiply_vec4(&rot_matrix, point_in_local_coords);
+		result_point_position = gm_vec4_add(result_point_position, last_iteration_interpolated_face_position);
+		result_point_position = gm_vec4_add(result_point_position, gm_vec4_scalar_product(-1.0f, this_iteration_interpolated_face_position));
+		result_point_position = gm_vec4_add(result_point_position, last_iteration_interpolated_face_position);
+
+		Sample s;
+		s.point_position = this_iteration_interpolated_point_position;// the ray begins at the last_iteration point
+		s.face_position = last_iteration_interpolated_face_position;  // the ray needs to pass through the last_iteration face
+		s.face_rotation = last_iteration_interpolated_face_rotation;  // the ray needs to pass through the last_iteration face
+		s.result_point_position = result_point_position;
+		array_push(sampled_points, &s);
+
+		last_iteration_interpolated_face_position = this_iteration_interpolated_face_position;
+		last_iteration_interpolated_face_rotation = this_iteration_interpolated_face_rotation;
+		last_iteration_interpolated_point_position = this_iteration_interpolated_point_position;
+	}
+
+#if 0
+	// effectively translating before the rotation (face rotation)
+	//vec4 point_in_local_coords = gm_mat4_multiply_vec4(&inverse, new_frame_point_position);
 	Quaternion inverse_new_frame_rot = quaternion_inverse(&new_frame_face_rotation);
 	Quaternion point_rotation = quaternion_product(&old_frame_face_rotation, &inverse_new_frame_rot);
 	point_rotation = quaternion_product(&point_rotation, &old_frame_face_rotation);
@@ -144,19 +207,7 @@ void core_update(r32 delta_time)
 	transformed_point = gm_vec4_add(transformed_point, old_frame_face_position);
 	transformed_point = gm_vec4_add(transformed_point, gm_vec4_scalar_product(-1.0f, new_frame_face_position));
 	transformed_point = gm_vec4_add(transformed_point, old_frame_face_position);
-
-/*
-	for (u32 i = 0; i < array_get_length(entities); ++i) {	// for each entity
-		Entity* first_entity = &entities[i];
-		for (u32 j = i + 1; j < array_get_length(entities); ++j) { // for each other entity
-			Entity* other_entity = &entities[j];
-			Collision_Point* got = check_entity_entity_collision(first_entity, other_entity);
-			for (u32 k = 0; k < array_get_length(got); ++k) {
-				array_push(all_collision_points, &got[k]);
-			}
-		}
-	}
-	*/
+#endif
 }
 
 void core_render()
@@ -164,17 +215,23 @@ void core_render()
 	//glEnable(GL_CULL_FACE);
 	//glCullFace(GL_CCW);
 	graphics_entity_render_phong_shader(&camera, &face, lights);
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	graphics_entity_render_phong_shader(&camera, &fake_face, lights);
-	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	graphics_entity_render_phong_shader(&camera, &e_point, lights);
-
-	vec3 t1 = gm_vec4_to_vec3(old_frame_point_position);
-	vec3 t2 = gm_vec4_to_vec3(transformed_point);
-	graphics_renderer_debug_points(&pctx, &t1, 1, (vec4){0.0f, 0.0f, 1.0f, 1.0f});
-	graphics_renderer_debug_points(&pctx, &t2, 1, (vec4){0.0f, 0.0f, 1.0f, 1.0f});
-	graphics_renderer_debug_vector(&pctx, t1, t2, (vec4){0.0f, 0.0f, 1.0f, 1.0f});
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	for (u32 i = 0; i < array_get_length(sampled_points); ++i) {
+		Sample* s = &sampled_points[i];
+		graphics_entity_set_position(&fake_face, s->face_position);
+		graphics_entity_set_rotation(&fake_face, s->face_rotation);
+		graphics_entity_set_position(&fake_e_point, s->point_position);
+		fake_face.diffuse_info.diffuse_color = colors[i];
+		fake_e_point.diffuse_info.diffuse_color = colors[i];
+		graphics_entity_render_phong_shader(&camera, &fake_face, lights);
+		graphics_entity_render_phong_shader(&camera, &fake_e_point, lights);
+		vec3 r = gm_vec4_to_vec3(s->result_point_position);
+		graphics_renderer_debug_points(&pctx, &r, 1, colors[i]);
+		graphics_renderer_debug_vector(&pctx, gm_vec4_to_vec3(s->point_position), r, colors[i]);
+	}
 	graphics_renderer_primitives_flush(&pctx, &camera);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 	/*
 	for (u32 i = 0; i < array_get_length(all_collision_points); ++i)
@@ -271,8 +328,6 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		old_frame_face_position = face.world_position;
 		old_frame_face_rotation = face.world_rotation;
 		old_frame_face_model_matrix = face.model_matrix;
-		graphics_entity_set_position(&fake_face, old_frame_face_position);
-		graphics_entity_set_rotation(&fake_face, old_frame_face_rotation);
 		key_state[GLFW_KEY_N] = false;
 	}
 
@@ -282,11 +337,11 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		bound = &face;
 		is_mouse_bound_to_joint_target_position = true;
 	}
-	//if (key_state[GLFW_KEY_2])
-	//{
-	//	bound = &entities[1];
-	//	is_mouse_bound_to_joint_target_position = true;
-	//}
+	if (key_state[GLFW_KEY_2])
+	{
+		bound = &e_point;
+		is_mouse_bound_to_joint_target_position = true;
+	}
 }
 
 void core_mouse_change_process(boolean reset, r64 x_pos, r64 y_pos)
