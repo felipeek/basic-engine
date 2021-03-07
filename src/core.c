@@ -37,7 +37,6 @@ static Quaternion new_frame_entity_rotation;
 
 static boolean collision_happening;
 
-/*
 typedef struct {
 	vec3 point_position;
 	vec3 face_position;
@@ -47,7 +46,6 @@ typedef struct {
 } Sample;
 Sample* sampled_points;
 vec4 colors[256];
-*/
 
 static Perspective_Camera create_camera()
 {
@@ -105,7 +103,7 @@ int core_init()
 	lights = create_lights();
 
 	forces = array_create(Physics_Force, 1);
-	//sampled_points = array_create(Sample, 1);
+	sampled_points = array_create(Sample, 1);
 
 	Entity e;
 	Mesh m = graphics_mesh_create(
@@ -136,9 +134,9 @@ int core_init()
 	new_frame_entity_position = face.world_position;
 	new_frame_entity_rotation = face.world_rotation;
 
-	//for (u32 i = 0; i < 256; ++i) {
-	//	colors[i] = (vec4){rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, 1.0f};
-	//}
+	for (u32 i = 0; i < 256; ++i) {
+		colors[i] = (vec4){rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, 1.0f};
+	}
 
 	return 0;
 }
@@ -169,7 +167,7 @@ void core_render()
 {
 	//glEnable(GL_CULL_FACE);
 	//glCullFace(GL_CCW);
-	#if 1
+	#if 0
 	graphics_entity_render_phong_shader(&camera, &face, lights);
 	graphics_entity_render_phong_shader(&camera, &e_point, lights);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
