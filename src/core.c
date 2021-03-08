@@ -35,7 +35,10 @@ static vec4 new_frame_point_position;
 static vec4 new_frame_entity_position;
 static Quaternion new_frame_entity_rotation;
 
+// collision
 static boolean collision_happening;
+static vec3 collision_point;
+static vec3 collision_surface_normal;
 
 typedef struct {
 	vec3 point_position;
@@ -112,6 +115,7 @@ int core_init()
 		triangle_indices,
 		sizeof(triangle_indices) / sizeof(u32),
 		0);
+	//m = graphics_mesh_create_from_obj("res/cube.obj", 0);
 	graphics_entity_create_with_color(&face, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 	graphics_entity_create_with_color(&fake_face, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
@@ -149,25 +153,51 @@ void core_destroy()
 void core_update(r32 delta_time)
 {
 	//physics_update(&e, forces, delta_time);
-	collision_happening = collision_check_dynamic_collision_between_point_and_entity_face(
-		gm_vec4_to_vec3(old_frame_point_position),
-		gm_vec4_to_vec3(new_frame_point_position),
-		gm_vec4_to_vec3(old_frame_entity_position),
-		gm_vec4_to_vec3(new_frame_entity_position),
-		old_frame_entity_rotation,
-		new_frame_entity_rotation,
-		face.world_scale,
-		gm_vec4_to_vec3(face.mesh.vertices[0].position),
-		gm_vec4_to_vec3(face.mesh.vertices[1].position),
-		gm_vec4_to_vec3(face.mesh.vertices[2].position)
-	);
+
+	collision_happening = false;
+	for (u32 i = 0; i < face.mesh.indexes_size; i += 3) {
+		u32 i1 = face.mesh.indices[i];
+		u32 i2 = face.mesh.indices[i + 1];
+		u32 i3 = face.mesh.indices[i + 2];
+
+		r32 time;
+		vec3 surface_normal;
+		boolean found_collision = collision_check_dynamic_collision_between_point_and_entity_face(
+			gm_vec4_to_vec3(old_frame_point_position),
+			gm_vec4_to_vec3(new_frame_point_position),
+			gm_vec4_to_vec3(old_frame_entity_position),
+			gm_vec4_to_vec3(new_frame_entity_position),
+			old_frame_entity_rotation,
+			new_frame_entity_rotation,
+			face.world_scale,
+			gm_vec4_to_vec3(face.mesh.vertices[i1].position),
+			gm_vec4_to_vec3(face.mesh.vertices[i2].position),
+			gm_vec4_to_vec3(face.mesh.vertices[i3].position),
+			&time,
+			&surface_normal
+		);
+
+		// temporary
+		vec3 v1_wc = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&face.model_matrix, face.mesh.vertices[i1].position));
+		vec3 v2_wc = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&face.model_matrix, face.mesh.vertices[i2].position));
+		vec3 v3_wc = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&face.model_matrix, face.mesh.vertices[i3].position));
+		vec3 middle_of_face = gm_vec3_scalar_product(1.0f / 3.0f, gm_vec3_add(v1_wc, gm_vec3_add(v2_wc, v3_wc)));
+
+		if (found_collision) {
+			collision_happening = true;
+			collision_surface_normal = surface_normal;
+			collision_point = middle_of_face;
+			printf("in-frame time of collision: %.3f\n", time);
+			break;
+		}
+	}
 }
 
 void core_render()
 {
 	//glEnable(GL_CULL_FACE);
 	//glCullFace(GL_CCW);
-	#if 0
+	#if 1
 	graphics_entity_render_phong_shader(&camera, &face, lights);
 	graphics_entity_render_phong_shader(&camera, &e_point, lights);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -183,6 +213,11 @@ void core_render()
 	}
 	graphics_entity_render_phong_shader(&camera, &fake_face, lights);
 	graphics_entity_render_phong_shader(&camera, &fake_e_point, lights);
+	if (collision_happening) {
+		vec3 collision_point_plus_normal = gm_vec3_add(collision_point, collision_surface_normal);
+		graphics_renderer_debug_vector(&pctx, collision_point, collision_point_plus_normal, (vec4){0.0f, 1.0f, 1.0f, 1.0f});
+		graphics_renderer_debug_points(&pctx, &collision_point_plus_normal, 1, (vec4){0.0f, 1.0f, 1.0f, 1.0f});
+	}
 	graphics_renderer_primitives_flush(&pctx, &camera);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	#else

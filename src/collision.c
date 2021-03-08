@@ -24,7 +24,7 @@ boolean collision_check_point_side_of_triangle(vec3 point, vec3 t1, vec3 t2, vec
 }
 
 static boolean collision_intersection_ray_plane(vec3 ray_position, vec3 ray_direction, vec3 plane_point, vec3 plane_normal,
-	r32* _d, vec3* _intersection)
+	vec3* _intersection)
 {
   ray_direction = gm_vec3_normalize(ray_direction);
   plane_normal = gm_vec3_normalize(plane_normal);
@@ -36,13 +36,12 @@ static boolean collision_intersection_ray_plane(vec3 ray_position, vec3 ray_dire
 
   r32 d = gm_vec3_dot(gm_vec3_subtract(plane_point, ray_position), plane_normal) / ray_plane_dot;
   vec3 intersection = gm_vec3_add(gm_vec3_scalar_product(d, ray_direction), ray_position);
-  if (_d) *_d = d;
   if (_intersection) *_intersection = intersection;
 
   return true;
 }
 
-boolean collision_check_edge_collides_triangle(vec3 edge_p1, vec3 edge_p2, vec3 t1, vec3 t2, vec3 t3, r32* d, vec3* intersection) {
+boolean collision_check_edge_collides_triangle(vec3 edge_p1, vec3 edge_p2, vec3 t1, vec3 t2, vec3 t3, vec3* intersection) {
 	vec3 v1 = gm_vec3_subtract(t2, t1);
 	vec3 v2 = gm_vec3_subtract(t3, t1);
 	vec3 plane_normal = gm_vec3_cross(v1, v2);
@@ -58,7 +57,7 @@ boolean collision_check_edge_collides_triangle(vec3 edge_p1, vec3 edge_p2, vec3 
 		// edge intersects triangle plane
 		// find intersection point
 
-		assert(collision_intersection_ray_plane(edge_p1, gm_vec3_subtract(edge_p2, edge_p1), t1, plane_normal, d, intersection));
+		assert(collision_intersection_ray_plane(edge_p1, gm_vec3_subtract(edge_p2, edge_p1), t1, plane_normal, intersection));
 
 		// now we need to check its 2D containment inside the face (using barycentric coords)
 		vec3 v3 = gm_vec3_subtract(*intersection, t1);
@@ -93,7 +92,9 @@ boolean collision_check_dynamic_collision_between_point_and_entity_face(
 	vec3 entity_scale,
 	vec3 face_point_local_coords_1,
 	vec3 face_point_local_coords_2,
-	vec3 face_point_local_coords_3)
+	vec3 face_point_local_coords_3,
+	r32* time,
+	vec3* normal)
 {
 	const u32 NUM_SAMPLES = 5;
 
@@ -150,7 +151,7 @@ boolean collision_check_dynamic_collision_between_point_and_entity_face(
 		r32 d;
 		vec3 intersection;
 		s32 collided = collision_check_edge_collides_triangle(
-			this_iteration_interpolated_point_position,
+			last_iteration_interpolated_point_position,
 			result_point_position,
 			t_p1,
 			t_p2,
@@ -170,27 +171,37 @@ boolean collision_check_dynamic_collision_between_point_and_entity_face(
 		s.result_point_position = result_point_position;
 		s.hit = 0;
 		vec3 intersection;
-		r32 d;
 		s.hit = collision_check_edge_collides_triangle(
 			last_iteration_interpolated_point_position,
 			result_point_position,
 			t_p1,
 			t_p2,
 			t_p3,
-			&d,
 			&intersection
 		);
 		array_push(sampled_points, &s);
 
+		// to calculate the time of intersection we leverage the fact that the intersection is between
+		// 'result_point_position' and 'last_iteration_interpolated_point_position', thus
+		// d * vec(result_point_position - last_iteration_interpolated_point_position) = (intersection - last_iteration_interpolated_point_position)
+		// therefore if we call the above equation d * A = B, then we know that d = B.x/A.x , d = B.y/A.y , d = B.z/A.z ... we chose 'x' in the impl
+		vec3 point_to_point_vec = gm_vec3_subtract(result_point_position, last_iteration_interpolated_point_position);
+		vec3 intersection_in_vec = gm_vec3_subtract(intersection, last_iteration_interpolated_point_position);
+		r32 relative_edge_position_in_intersection = intersection_in_vec.x / point_to_point_vec.x;
+
 		if (s.hit) {
+			vec3 p2p1 = gm_vec3_subtract(t_p2, t_p1);
+			vec3 p3p1 = gm_vec3_subtract(t_p3, t_p1);
+			*normal = gm_vec3_normalize(gm_vec3_cross(p2p1, p3p1));
+			*time = (r32)i / NUM_SAMPLES + relative_edge_position_in_intersection / NUM_SAMPLES;
 			return true;
 		}
 
 #endif
 
-	last_iteration_interpolated_entity_position = this_iteration_interpolated_entity_position;
-	last_iteration_interpolated_entity_rotation = this_iteration_interpolated_entity_rotation;
-	last_iteration_interpolated_point_position = this_iteration_interpolated_point_position;
+		last_iteration_interpolated_entity_position = this_iteration_interpolated_entity_position;
+		last_iteration_interpolated_entity_rotation = this_iteration_interpolated_entity_rotation;
+		last_iteration_interpolated_point_position = this_iteration_interpolated_point_position;
 	}
 
 	return false;
