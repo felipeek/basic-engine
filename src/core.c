@@ -176,8 +176,8 @@ void core_update(r32 delta_time)
 		mat4 inverse;
 		assert(gm_mat4_inverse(&frame_model_matrix, &inverse));
 
-		// effectively translating before the rotation (face rotation)
-		//vec4 point_in_local_coords = gm_mat4_multiply_vec4(&inverse, new_frame_point_position);
+		// we use the point position in this iteration, which means that we are effectively moving the point before rotating
+		// (one way of doing it)
 		vec4 point_in_local_coords = gm_mat4_multiply_vec4(&inverse, this_iteration_interpolated_point_position);
 		Quaternion inverse_new_frame_rot = quaternion_inverse(&this_iteration_interpolated_entity_rotation);
 		Quaternion point_rotation = quaternion_product(&last_iteration_interpolated_entity_rotation, &inverse_new_frame_rot);
@@ -198,7 +198,7 @@ void core_update(r32 delta_time)
 		vec4 t_p3 = gm_mat4_multiply_vec4(&frame_model_matrix, p3);
 
 		Sample s;
-		s.point_position = this_iteration_interpolated_point_position;// the ray begins at the last_iteration point
+		s.point_position = last_iteration_interpolated_point_position;// the ray begins at the last_iteration point
 		s.face_position = last_iteration_interpolated_entity_position;  // the ray needs to pass through the last_iteration face
 		s.face_rotation = last_iteration_interpolated_entity_rotation;  // the ray needs to pass through the last_iteration face
 		s.result_point_position = result_point_position;
@@ -206,7 +206,7 @@ void core_update(r32 delta_time)
 		vec3 intersection;
 		r32 d;
 		s.hit = collision_check_edge_collides_triangle(
-			gm_vec4_to_vec3(this_iteration_interpolated_point_position),
+			gm_vec4_to_vec3(last_iteration_interpolated_point_position),
 			gm_vec4_to_vec3(result_point_position),
 			gm_vec4_to_vec3(t_p1),
 			gm_vec4_to_vec3(t_p2),
