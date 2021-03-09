@@ -49,9 +49,8 @@ typedef struct
 	Diffuse_Info diffuse_info;
 
 	// Last frame information
-	mat4 lf_model_matrix;
-	vec4 lf_linear_momentum;
-	vec4 lf_angular_momentum;
+	vec4 last_frame_world_position;
+	Quaternion last_frame_world_rotation;
 } Entity;
 
 typedef struct

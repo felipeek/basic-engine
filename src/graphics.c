@@ -357,12 +357,11 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_pos
 	entity->world_scale = world_scale;
 	entity->linear_momentum = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
 	entity->angular_momentum = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
-	entity->lf_linear_momentum = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
-	entity->lf_angular_momentum = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
+	entity->last_frame_world_position = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
+	entity->last_frame_world_rotation = (Quaternion){1.0f, 0.0f, 0.0f, 0.0f};
 	entity->diffuse_info.diffuse_color = color;
 	entity->diffuse_info.use_diffuse_map = false;
 	recalculate_model_matrix(entity);
-	entity->lf_model_matrix = entity->model_matrix;
 }
 
 void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture)
@@ -373,12 +372,11 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_p
 	entity->world_scale = world_scale;
 	entity->linear_momentum = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
 	entity->angular_momentum = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
-	entity->lf_linear_momentum = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
-	entity->lf_angular_momentum = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
+	entity->last_frame_world_position = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
+	entity->last_frame_world_rotation = (Quaternion){1.0f, 0.0f, 0.0f, 0.0f};
 	entity->diffuse_info.diffuse_map = texture;
 	entity->diffuse_info.use_diffuse_map = true;
 	recalculate_model_matrix(entity);
-	entity->lf_model_matrix = entity->model_matrix;
 }
 
 void graphics_entity_destroy(Entity* entity)

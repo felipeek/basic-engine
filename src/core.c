@@ -21,6 +21,8 @@ static Render_Primitives_Context pctx;
 static boolean is_mouse_bound_to_joint_target_position;
 static Entity* bound;
 
+static boolean stop;
+
 typedef struct {
 	vec3 position;
 	vec3 direction;
@@ -29,7 +31,7 @@ static Vector* normals;
 
 typedef struct {
 	vec3 start_position;			// The collision position [at the start of the frame], in world space
-	vec3 collide_position;			// The collision position [at the time of collision], in world space
+	//vec3 collide_position;			// The collision position [at the time of collision], in world space
 	vec3 end_position;				// The collision position [at the end of the frame], in world space
 	vec3 normal;					// The normal to the collision impact, in world space
 	r32 frame_relative_time;		// The time, relative to the frame, that the collision happened (0 -> start of frame, 1 -> end of frame)
@@ -106,53 +108,54 @@ void core_destroy()
 static Collision_Point fetch_collision_point_information(Entity* e1, Entity* e2, Vertex* collided_vertex)
 {
 	vec4 vertex_in_this_frame = gm_mat4_multiply_vec4(&e1->model_matrix, collided_vertex->position);
-	vec4 vertex_in_last_frame = gm_mat4_multiply_vec4(&e1->lf_model_matrix, collided_vertex->position);
+	mat4 lf_mm = graphics_model_matrix(e1->last_frame_world_position, e1->last_frame_world_rotation, e1->world_scale);
+	vec4 vertex_in_last_frame = gm_mat4_multiply_vec4(&lf_mm, collided_vertex->position);
 
 	s32 found_collision = 0;
 	r32 nearest_collision;
 	vec3 normal_of_nearest_collision;
-	vec3 exact_collision_position;
 	for (u32 i = 0; i < array_get_length(e2->mesh.indices); i += 3) {
 		Vertex* v1 = &e2->mesh.vertices[e2->mesh.indices[i + 0]];
 		Vertex* v2 = &e2->mesh.vertices[e2->mesh.indices[i + 1]];
 		Vertex* v3 = &e2->mesh.vertices[e2->mesh.indices[i + 2]];
-		vec4 transformed_v1 = gm_mat4_multiply_vec4(&e2->model_matrix, v1->position);
-		vec4 transformed_v2 = gm_mat4_multiply_vec4(&e2->model_matrix, v2->position);
-		vec4 transformed_v3 = gm_mat4_multiply_vec4(&e2->model_matrix, v3->position);
 
-		vec3 intersection;
-		r32 d;
-		s32 collides = collision_check_edge_collides_triangle(
-			gm_vec4_to_vec3(vertex_in_this_frame),
+		vec3 normal;
+		r32 time;
+		s32 collides = collision_check_dynamic_collision_between_point_and_entity_face(
 			gm_vec4_to_vec3(vertex_in_last_frame),
-			gm_vec4_to_vec3(transformed_v1),
-			gm_vec4_to_vec3(transformed_v2),
-			gm_vec4_to_vec3(transformed_v3),
-			&d,
-			&intersection
+			gm_vec4_to_vec3(vertex_in_this_frame),
+			gm_vec4_to_vec3(e2->last_frame_world_position),
+			gm_vec4_to_vec3(e2->world_position),
+			e2->last_frame_world_rotation,
+			e2->world_rotation,
+			e2->world_scale,
+			gm_vec4_to_vec3(v1->position),
+			gm_vec4_to_vec3(v2->position),
+			gm_vec4_to_vec3(v3->position),
+			&time,
+			&normal
 		);
 
 		if (collides) {
-			// calculate normal
-			vec3 v2v1 = gm_vec4_to_vec3(gm_vec4_subtract(transformed_v2, transformed_v1));
-			vec3 v3v1 = gm_vec4_to_vec3(gm_vec4_subtract(transformed_v3, transformed_v1));
-			vec3 normal = gm_vec3_normalize(gm_vec3_cross(v2v1, v3v1));
-
-			if (!found_collision || d < nearest_collision) {
-				nearest_collision = d;
+			if (!found_collision || time < nearest_collision) {
+				nearest_collision = time;
 				normal_of_nearest_collision = normal;
-				exact_collision_position = intersection;
 			}
 			found_collision = 1;
 		}
 	}
 
-	assert(found_collision);
+	if (!found_collision) {
+		Collision_Point cp = {0};
+		cp.start_position = gm_vec4_to_vec3(vertex_in_last_frame);
+		cp.end_position = gm_vec4_to_vec3(vertex_in_this_frame);
+		printf("didnt find collision\n");
+	}
+	//assert(found_collision);
 
 	Collision_Point cp;
 	cp.start_position = gm_vec4_to_vec3(vertex_in_last_frame);
-	cp.collide_position = exact_collision_position;
-	cp.end_position = gm_vec4_to_vec3(vertex_in_last_frame);
+	cp.end_position = gm_vec4_to_vec3(vertex_in_this_frame);
 	cp.normal = normal_of_nearest_collision;
 	cp.frame_relative_time = nearest_collision;
 	return cp;
@@ -292,7 +295,6 @@ static Collision_Point* check_entity_entity_collision(Entity* e1, Entity* e2)
 				gm_vec4_to_vec3(transformed_v1),
 				gm_vec4_to_vec3(transformed_v2),
 				gm_vec4_to_vec3(transformed_v3),
-				0,
 				&intersection
 			);
 
@@ -305,7 +307,6 @@ static Collision_Point* check_entity_entity_collision(Entity* e1, Entity* e2)
 				gm_vec4_to_vec3(transformed_v1),
 				gm_vec4_to_vec3(transformed_v2),
 				gm_vec4_to_vec3(transformed_v3),
-				0,
 				&intersection
 			);
 
@@ -318,7 +319,6 @@ static Collision_Point* check_entity_entity_collision(Entity* e1, Entity* e2)
 				gm_vec4_to_vec3(transformed_v1),
 				gm_vec4_to_vec3(transformed_v2),
 				gm_vec4_to_vec3(transformed_v3),
-				0,
 				&intersection
 			);
 
@@ -394,7 +394,6 @@ static Collision_Point* check_entity_entity_collision(Entity* e1, Entity* e2)
 				gm_vec4_to_vec3(transformed_v1),
 				gm_vec4_to_vec3(transformed_v2),
 				gm_vec4_to_vec3(transformed_v3),
-				0,
 				&intersection
 			);
 
@@ -407,7 +406,6 @@ static Collision_Point* check_entity_entity_collision(Entity* e1, Entity* e2)
 				gm_vec4_to_vec3(transformed_v1),
 				gm_vec4_to_vec3(transformed_v2),
 				gm_vec4_to_vec3(transformed_v3),
-				0,
 				&intersection
 			);
 
@@ -420,7 +418,6 @@ static Collision_Point* check_entity_entity_collision(Entity* e1, Entity* e2)
 				gm_vec4_to_vec3(transformed_v1),
 				gm_vec4_to_vec3(transformed_v2),
 				gm_vec4_to_vec3(transformed_v3),
-				0,
 				&intersection
 			);
 
@@ -480,6 +477,8 @@ static Collision_Point* check_entity_entity_collision(Entity* e1, Entity* e2)
 
 void core_update(r32 delta_time)
 {
+	if (stop) return;
+
 	//physics_update(&e, forces, delta_time);
 	array_clear(forces);
 	array_clear(all_collision_points);
@@ -497,6 +496,16 @@ void core_update(r32 delta_time)
 			}
 		}
 	}
+
+	if (array_get_length(all_collision_points)) {
+		stop = 1;
+	}
+
+	for (u32 i = 0; i < array_get_length(entities); ++i) {	// for each entity
+		Entity* e = &entities[i];
+		e->last_frame_world_position = e->world_position;
+		e->last_frame_world_rotation = e->world_rotation;
+	}
 }
 
 void core_render()
@@ -505,8 +514,12 @@ void core_render()
 	//glCullFace(GL_CCW);
 	for (u32 i = 0; i < array_get_length(entities); ++i)
 		graphics_entity_render_phong_shader(&camera, &entities[i], lights);
-	for (u32 i = 0; i < array_get_length(all_collision_points); ++i)
+	for (u32 i = 0; i < array_get_length(all_collision_points); ++i) {
 		graphics_renderer_debug_points(&pctx, &all_collision_points[i].end_position, 1, (vec4){0.0f, 0.0f, 1.0f, 1.0f});
+		vec3 v = gm_vec3_add(all_collision_points[i].end_position, all_collision_points[i].normal);
+		graphics_renderer_debug_vector(&pctx, all_collision_points[i].end_position, v, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+		graphics_renderer_debug_points(&pctx, &v, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+	}
 	graphics_renderer_primitives_flush(&pctx, &camera);
 
 	//vec3 p = (vec3){1.0f, -1.0f, 1.0f};
@@ -622,7 +635,7 @@ void core_mouse_change_process(boolean reset, r64 x_pos, r64 y_pos)
 
 	if (reset) return;
 
-	if (is_mouse_bound_to_joint_target_position && bound != NULL)
+	if (is_mouse_bound_to_joint_target_position && bound != NULL && !stop)
 	{
 		// MOVE TARGET POSITIONS!
 		vec3 camera_y = camera_get_y_axis(&camera);
