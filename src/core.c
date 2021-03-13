@@ -104,12 +104,12 @@ void core_destroy()
 
 // e1 -> entity that has the collided_vertex
 // e2 -> entity that we know the collided_vertex collided with
-// collided_vertex -> the vertex that collided, that is, it is assumed it is inside e2.
-static Collision_Point fetch_collision_point_information(Entity* e1, Entity* e2, Vertex* collided_vertex)
+// collided_vertex -> the vertex that collided, that is, it is assumed it is inside e1.
+static Collision_Point fetch_collision_point_information(Entity* e1, Entity* e2, vec4 collision_point_local_coords)
 {
-	vec4 vertex_in_this_frame = gm_mat4_multiply_vec4(&e1->model_matrix, collided_vertex->position);
+	vec4 vertex_in_this_frame = gm_mat4_multiply_vec4(&e1->model_matrix, collision_point_local_coords);
 	mat4 lf_mm = graphics_model_matrix(e1->last_frame_world_position, e1->last_frame_world_rotation, e1->world_scale);
-	vec4 vertex_in_last_frame = gm_mat4_multiply_vec4(&lf_mm, collided_vertex->position);
+	vec4 vertex_in_last_frame = gm_mat4_multiply_vec4(&lf_mm, collision_point_local_coords);
 
 	s32 found_collision = 0;
 	r32 nearest_collision;
@@ -198,7 +198,7 @@ static Collision_Point* check_entity_entity_collision(Entity* e1, Entity* e2)
 
 		// if !is_vertex_outside_mesh, then the vertex WAS inside the mesh, so there IS collision!
 		if (!is_vertex_outside_mesh) {
-			Collision_Point cp = fetch_collision_point_information(e1, e2, point);
+			Collision_Point cp = fetch_collision_point_information(e1, e2, point->position);
 			array_push(collision_points, &cp);
 			found_vertex_collision = 1;
 			// keep going to render all collision points
@@ -238,7 +238,7 @@ static Collision_Point* check_entity_entity_collision(Entity* e1, Entity* e2)
 
 		// if !is_vertex_outside_mesh, then the vertex WAS inside the mesh, so there IS collision!
 		if (!is_vertex_outside_mesh) {
-			Collision_Point cp = fetch_collision_point_information(e2, e1, point);
+			Collision_Point cp = fetch_collision_point_information(e2, e1, point->position);
 			array_push(collision_points, &cp);
 			found_vertex_collision = 1;
 			// keep going to render all collision points
@@ -327,33 +327,48 @@ static Collision_Point* check_entity_entity_collision(Entity* e1, Entity* e2)
 		}
 
 		if (array_get_length(edge1_collisions) > 0) {
+			printf("there were stuff in edge1 [1]\n");
 			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
 			for (u32 i = 0; i < array_get_length(edge1_collisions); ++i) {
 				average_point = gm_vec3_add(average_point, edge1_collisions[i]);
 			}
 			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge1_collisions), average_point);
-			Collision_Point cp = {0};
-			cp.end_position = average_point;
+			// transform the average_point to entity local coords
+			// Pwc = M * Plc  <->   Plc = M^-1 * Pwc
+			mat4 inverse;
+			assert(gm_mat4_inverse(&e1->model_matrix, &inverse));
+			vec4 average_point_local_coords = gm_mat4_multiply_vec4(&inverse, (vec4){average_point.x, average_point.y, average_point.z, 1.0f});
+			Collision_Point cp = fetch_collision_point_information(e1, e2, average_point_local_coords);
 			array_push(collision_points, &cp);
 		}
 		if (array_get_length(edge2_collisions) > 0) {
+			printf("there were stuff in edge2 [1]\n");
 			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
 			for (u32 i = 0; i < array_get_length(edge2_collisions); ++i) {
 				average_point = gm_vec3_add(average_point, edge2_collisions[i]);
 			}
 			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge2_collisions), average_point);
-			Collision_Point cp = {0};
-			cp.end_position = average_point;
+			// transform the average_point to entity local coords
+			// Pwc = M * Plc  <->   Plc = M^-1 * Pwc
+			mat4 inverse;
+			assert(gm_mat4_inverse(&e1->model_matrix, &inverse));
+			vec4 average_point_local_coords = gm_mat4_multiply_vec4(&inverse, (vec4){average_point.x, average_point.y, average_point.z, 1.0f});
+			Collision_Point cp = fetch_collision_point_information(e1, e2, average_point_local_coords);
 			array_push(collision_points, &cp);
 		}
 		if (array_get_length(edge3_collisions) > 0) {
+			printf("there were stuff in edge3 [1]\n");
 			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
 			for (u32 i = 0; i < array_get_length(edge3_collisions); ++i) {
 				average_point = gm_vec3_add(average_point, edge3_collisions[i]);
 			}
 			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge3_collisions), average_point);
-			Collision_Point cp = {0};
-			cp.end_position = average_point;
+			// transform the average_point to entity local coords
+			// Pwc = M * Plc  <->   Plc = M^-1 * Pwc
+			mat4 inverse;
+			assert(gm_mat4_inverse(&e1->model_matrix, &inverse));
+			vec4 average_point_local_coords = gm_mat4_multiply_vec4(&inverse, (vec4){average_point.x, average_point.y, average_point.z, 1.0f});
+			Collision_Point cp = fetch_collision_point_information(e1, e2, average_point_local_coords);
 			array_push(collision_points, &cp);
 		}
 
@@ -362,7 +377,7 @@ static Collision_Point* check_entity_entity_collision(Entity* e1, Entity* e2)
 			array_get_length(edge3_collisions) > 0) {
 			// collision!
 			found_edge_collision = 1;
-			break;
+			//break;
 		}
 	}
 
@@ -426,33 +441,44 @@ static Collision_Point* check_entity_entity_collision(Entity* e1, Entity* e2)
 		}
 
 		if (array_get_length(edge1_collisions) > 0) {
+			printf("there were stuff in edge1 [2]\n");
 			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
 			for (u32 i = 0; i < array_get_length(edge1_collisions); ++i) {
 				average_point = gm_vec3_add(average_point, edge1_collisions[i]);
 			}
 			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge1_collisions), average_point);
-			Collision_Point cp = {0};
-			cp.end_position = average_point;
+			// transform the average_point to entity local coords
+			// Pwc = M * Plc  <->   Plc = M^-1 * Pwc
+			mat4 inverse;
+			assert(gm_mat4_inverse(&e2->model_matrix, &inverse));
+			vec4 average_point_local_coords = gm_mat4_multiply_vec4(&inverse, (vec4){average_point.x, average_point.y, average_point.z, 1.0f});
+			Collision_Point cp = fetch_collision_point_information(e2, e1, average_point_local_coords);
 			array_push(collision_points, &cp);
 		}
 		if (array_get_length(edge2_collisions) > 0) {
+			printf("there were stuff in edge2 [2]\n");
 			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
 			for (u32 i = 0; i < array_get_length(edge2_collisions); ++i) {
 				average_point = gm_vec3_add(average_point, edge2_collisions[i]);
 			}
 			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge2_collisions), average_point);
-			Collision_Point cp = {0};
-			cp.end_position = average_point;
+			mat4 inverse;
+			assert(gm_mat4_inverse(&e2->model_matrix, &inverse));
+			vec4 average_point_local_coords = gm_mat4_multiply_vec4(&inverse, (vec4){average_point.x, average_point.y, average_point.z, 1.0f});
+			Collision_Point cp = fetch_collision_point_information(e2, e1, average_point_local_coords);
 			array_push(collision_points, &cp);
 		}
 		if (array_get_length(edge3_collisions) > 0) {
+			printf("there were stuff in edge3 [2]\n");
 			vec3 average_point = (vec3){0.0f, 0.0f, 0.0f};
 			for (u32 i = 0; i < array_get_length(edge3_collisions); ++i) {
-				average_point = gm_vec3_add(average_point, edge1_collisions[i]);
+				average_point = gm_vec3_add(average_point, edge3_collisions[i]);
 			}
 			average_point = gm_vec3_scalar_product(1.0f / array_get_length(edge3_collisions), average_point);
-			Collision_Point cp = {0};
-			cp.end_position = average_point;
+			mat4 inverse;
+			assert(gm_mat4_inverse(&e2->model_matrix, &inverse));
+			vec4 average_point_local_coords = gm_mat4_multiply_vec4(&inverse, (vec4){average_point.x, average_point.y, average_point.z, 1.0f});
+			Collision_Point cp = fetch_collision_point_information(e2, e1, average_point_local_coords);
 			array_push(collision_points, &cp);
 		}
 
@@ -461,7 +487,7 @@ static Collision_Point* check_entity_entity_collision(Entity* e1, Entity* e2)
 			array_get_length(edge3_collisions) > 0) {
 			// collision!
 			found_edge_collision = 1;
-			break;
+			//break;
 		}
 	}
 
@@ -620,6 +646,19 @@ void core_input_process(boolean* key_state, r32 delta_time)
 	{
 		bound = &entities[1];
 		is_mouse_bound_to_joint_target_position = true;
+	}
+	if (key_state[GLFW_KEY_R])
+	{
+		graphics_entity_set_position(&entities[0], (vec4){-1.2f, 0.0f, 0.0f, 1.0f});
+		graphics_entity_set_rotation(&entities[0], quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f));
+		graphics_entity_set_position(&entities[1], (vec4){1.2f, 0.0f, 0.0f, 1.0f});
+		graphics_entity_set_rotation(&entities[1], quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f));
+		entities[0].last_frame_world_position = entities[0].world_position;
+		entities[0].last_frame_world_rotation = entities[0].world_rotation;
+		entities[1].last_frame_world_position = entities[1].world_position;
+		entities[1].last_frame_world_rotation = entities[1].world_rotation;
+		stop = 0;
+		key_state[GLFW_KEY_R] = false;
 	}
 }
 
