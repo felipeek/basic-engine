@@ -18,6 +18,7 @@ boolean collision_check_dynamic_collision_between_point_and_entity_face(
 	vec3 face_point_local_coords_2,
 	vec3 face_point_local_coords_3,
 	r32* time,
-	vec3* normal);
+	vec3* normal,
+	vec3* intersection);
 
 #endif

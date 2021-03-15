@@ -47,10 +47,14 @@ typedef struct
 	vec4 linear_momentum;
 	vec4 angular_momentum;
 	Diffuse_Info diffuse_info;
+	r32 mass;
+	mat3 inertia_tensor;
 
 	// Last frame information
 	vec4 last_frame_world_position;
 	Quaternion last_frame_world_rotation;
+
+	boolean static_body;
 } Entity;
 
 typedef struct
@@ -102,8 +106,8 @@ Mesh graphics_quad_create();
 Mesh graphics_mesh_create(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info);
 Mesh graphics_mesh_create_from_obj(const s8* obj_path, Normal_Mapping_Info* normal_info);
 void graphics_mesh_render(Shader shader, Mesh mesh);
-void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color);
-void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture);
+void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass);
+void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass);
 void graphics_entity_destroy(Entity* entity);
 // If entity already has a diffuse map, the older diffuse map will be deleted if delete_diffuse_map is true.
 // If entity has a color instead of a diffuse map, the mesh will lose the color and be set to use the diffuse map.

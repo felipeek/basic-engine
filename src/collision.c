@@ -82,7 +82,8 @@ boolean collision_check_dynamic_collision_between_point_and_entity_face(
 	vec3 face_point_local_coords_2,
 	vec3 face_point_local_coords_3,
 	r32* time,
-	vec3* normal)
+	vec3* normal,
+	vec3* intersection)
 {
 	const u32 NUM_SAMPLES = 5;
 
@@ -135,14 +136,13 @@ boolean collision_check_dynamic_collision_between_point_and_entity_face(
 		vec3 t_p2 = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&frame_model_matrix, (vec4){face_point_local_coords_2.x, face_point_local_coords_2.y, face_point_local_coords_2.z, 1.0f}));
 		vec3 t_p3 = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&frame_model_matrix, (vec4){face_point_local_coords_3.x, face_point_local_coords_3.y, face_point_local_coords_3.z, 1.0f}));
 
-		vec3 intersection;
 		s32 collided = collision_check_edge_collides_triangle(
 			last_iteration_interpolated_point_position,
 			result_point_position,
 			t_p1,
 			t_p2,
 			t_p3,
-			&intersection
+			intersection
 		);
 
 		// to calculate the time of intersection we leverage the fact that the intersection is between
@@ -150,8 +150,18 @@ boolean collision_check_dynamic_collision_between_point_and_entity_face(
 		// d * vec(result_point_position - last_iteration_interpolated_point_position) = (intersection - last_iteration_interpolated_point_position)
 		// therefore if we call the above equation d * A = B, then we know that d = B.x/A.x , d = B.y/A.y , d = B.z/A.z ... we chose 'x' in the impl
 		vec3 point_to_point_vec = gm_vec3_subtract(result_point_position, last_iteration_interpolated_point_position);
-		vec3 intersection_in_vec = gm_vec3_subtract(intersection, last_iteration_interpolated_point_position);
-		r32 relative_edge_position_in_intersection = intersection_in_vec.x / point_to_point_vec.x;
+		vec3 intersection_in_vec = gm_vec3_subtract(*intersection, last_iteration_interpolated_point_position);
+		r32 relative_edge_position_in_intersection;
+		if (point_to_point_vec.x != 0) { 
+			relative_edge_position_in_intersection = intersection_in_vec.x / point_to_point_vec.x;
+		} else if (point_to_point_vec.y != 0) {
+			relative_edge_position_in_intersection = intersection_in_vec.y / point_to_point_vec.y;
+		} else if (point_to_point_vec.z != 0) {
+			relative_edge_position_in_intersection = intersection_in_vec.z / point_to_point_vec.z;
+		} else {
+			//relative_edge_position_in_intersection = 0.0f;
+			assert(0);
+		}
 
 		if (collided) {
 			vec3 p2p1 = gm_vec3_subtract(t_p2, t_p1);

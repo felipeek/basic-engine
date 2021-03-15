@@ -349,7 +349,25 @@ static void recalculate_model_matrix(Entity* entity)
 	entity->model_matrix = graphics_model_matrix(entity->world_position, entity->world_rotation, entity->world_scale);
 }
 
-void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color)
+static mat3 get_symmetric_inertia_tensor_for_object(Vertex* vertices, r32 mass) {
+    r32 mass_per_vertex = mass / array_get_length(vertices);
+    mat3 result = {0};
+    for (u32 i = 0; i < array_get_length(vertices); ++i) {
+        vec4 v = vertices[i].position;
+        result.data[0][0] += mass_per_vertex * (v.y * v.y + v.z * v.z);
+        result.data[0][1] += mass_per_vertex * v.x * v.y;
+        result.data[0][2] += mass_per_vertex * v.x * v.z;
+        result.data[1][0] += mass_per_vertex * v.x * v.y;
+        result.data[1][1] += mass_per_vertex * (v.x * v.x + v.z * v.z);
+        result.data[1][2] += mass_per_vertex * v.y * v.z;
+        result.data[2][0] += mass_per_vertex * v.x * v.z;
+        result.data[2][1] += mass_per_vertex * v.y * v.z;
+        result.data[2][2] += mass_per_vertex * (v.x * v.x + v.y * v.y);
+    }
+    return result;
+}
+
+void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass)
 {
 	entity->mesh = mesh;
 	entity->world_position = world_position;
@@ -361,10 +379,13 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_pos
 	entity->last_frame_world_rotation = (Quaternion){1.0f, 0.0f, 0.0f, 0.0f};
 	entity->diffuse_info.diffuse_color = color;
 	entity->diffuse_info.use_diffuse_map = false;
+	entity->static_body = false;
+	entity->mass = mass;
+	entity->inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, entity->mass);
 	recalculate_model_matrix(entity);
 }
 
-void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture)
+void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass)
 {
 	entity->mesh = mesh;
 	entity->world_position = world_position;
@@ -376,6 +397,9 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_p
 	entity->last_frame_world_rotation = (Quaternion){1.0f, 0.0f, 0.0f, 0.0f};
 	entity->diffuse_info.diffuse_map = texture;
 	entity->diffuse_info.use_diffuse_map = true;
+	entity->static_body = false;
+	entity->mass = mass;
+	entity->inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, entity->mass);
 	recalculate_model_matrix(entity);
 }
 
