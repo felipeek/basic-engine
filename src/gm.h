@@ -393,9 +393,9 @@ vec3 gm_mat4_multiply_vec3(const mat4* m, vec3 v) {
 
 vec3 gm_mat3_multiply_vec3(const mat3* m, vec3 v) {
 	vec3 result;
-	result.x = m->data[0][0] * v.x + m->data[0][1] * v.y + m->data[0][2] * v.z + m->data[0][3] * 1.0f;
-	result.y = m->data[1][0] * v.x + m->data[1][1] * v.y + m->data[1][2] * v.z + m->data[1][3] * 1.0f;
-	result.z = m->data[2][0] * v.x + m->data[2][1] * v.y + m->data[2][2] * v.z + m->data[2][3] * 1.0f;
+	result.x = m->data[0][0] * v.x + m->data[0][1] * v.y + m->data[0][2] * v.z;
+	result.y = m->data[1][0] * v.x + m->data[1][1] * v.y + m->data[1][2] * v.z;
+	result.z = m->data[2][0] * v.x + m->data[2][1] * v.y + m->data[2][2] * v.z;
 	return result;
 }
 
