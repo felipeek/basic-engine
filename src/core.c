@@ -85,7 +85,7 @@ int core_init()
 
 	Entity e;
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&e, m, (vec4){-1.2f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.5f, 0.5f, 0.0f}, 45.0f),
+	graphics_entity_create_with_color(&e, m, (vec4){-1.2f, 2.0f, 0.0f, 1.0f}, quaternion_new((vec3){1.0f, 1.5f, 1.0f}, 45.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 100.0f);
 	array_push(entities, &e);
 	m = graphics_mesh_create_from_obj("./res/plane.obj", 0);
@@ -515,9 +515,9 @@ static Collision_Point* check_entity_entity_collision(Entity* e1, Entity* e2)
 	return collision_points;
 }
 
-static void apply_impulse(Collision_Point* cp)
+#if 0
+static boolean is_resting_contact(Collision_Point* cp)
 {
-	printf("applying impuse...\n");
 	cp->normal = gm_vec3_normalize(cp->normal);
 
 	// @TODO: copied from physics
@@ -548,7 +548,7 @@ static void apply_impulse(Collision_Point* cp)
 	vec3 wB = e2_angular_velocity;
 	vec3 rA = gm_vec3_subtract(cp->collide_position, gm_vec4_to_vec3(cp->e1->world_position));
 	vec3 rB = gm_vec3_subtract(cp->collide_position, gm_vec4_to_vec3(cp->e2->world_position));
-	const r32 epsilon = 0.5f;
+	const r32 epsilon = 0.0f;
 	vec3 N = gm_vec3_normalize(cp->normal);
 	r32 mA = cp->e1->mass;
 	r32 mB = cp->e2->mass;
@@ -559,6 +559,64 @@ static void apply_impulse(Collision_Point* cp)
     vec3 vP1 = gm_vec3_add(vA, gm_vec3_cross(wA, rA));
     vec3 vP2 = gm_vec3_add(vB, gm_vec3_cross(wB, rB));
     vec3 vR = gm_vec3_subtract(vP2, vP1);
+
+	r32 fact = gm_vec3_dot(N, gm_vec3_subtract(vP1, vP2));
+	if (fact > -0.01f) {
+		printf("Resting contact...\n");
+		return true;
+	}
+
+	return false;
+}
+#endif
+
+static void apply_impulse(Collision_Point* cp)
+{
+	printf("applying impuse...\n");
+	cp->normal = gm_vec3_normalize(cp->normal);
+
+	vec4 ajisfs = gm_mat4_multiply_vec4(&cp->e1->model_matrix, cp->e1->mesh.vertices[4].position);
+
+	// @TODO: copied from physics
+	mat4 e1_rotation_matrix = quaternion_get_matrix(&cp->e1->world_rotation);
+	mat3 e1_object_inertia_tensor = cp->e1->inertia_tensor;
+	mat3 e1_rotation_matrix_m3 = gm_mat4_to_mat3(&e1_rotation_matrix);
+	mat3 e1_transposed_rotation_matrix = gm_mat3_transpose(&e1_rotation_matrix_m3);
+	mat3 e1_aux = gm_mat3_multiply(&e1_rotation_matrix_m3, &e1_object_inertia_tensor);
+	mat3 e1_dynamic_inertia_tensor = gm_mat3_multiply(&e1_aux, &e1_transposed_rotation_matrix);
+	mat3 e1_dynamic_inertia_tensor_inverse;
+	assert(gm_mat3_inverse(&e1_dynamic_inertia_tensor, &e1_dynamic_inertia_tensor_inverse));
+	vec3 e1_angular_velocity = gm_mat3_multiply_vec3(&e1_dynamic_inertia_tensor_inverse, gm_vec4_to_vec3(cp->e1->angular_momentum));
+	vec4 e1_linear_velocity = gm_vec4_scalar_product(1.0f / cp->e1->mass, cp->e1->linear_momentum);
+	mat4 e2_rotation_matrix = quaternion_get_matrix(&cp->e2->world_rotation);
+	mat3 e2_object_inertia_tensor = cp->e2->inertia_tensor;
+	mat3 e2_rotation_matrix_m3 = gm_mat4_to_mat3(&e2_rotation_matrix);
+	mat3 e2_transposed_rotation_matrix = gm_mat3_transpose(&e2_rotation_matrix_m3);
+	mat3 e2_aux = gm_mat3_multiply(&e2_rotation_matrix_m3, &e2_object_inertia_tensor);
+	mat3 e2_dynamic_inertia_tensor = gm_mat3_multiply(&e2_aux, &e2_transposed_rotation_matrix);
+	mat3 e2_dynamic_inertia_tensor_inverse;
+	assert(gm_mat3_inverse(&e2_dynamic_inertia_tensor, &e2_dynamic_inertia_tensor_inverse));
+	vec3 e2_angular_velocity = gm_mat3_multiply_vec3(&e2_dynamic_inertia_tensor_inverse, gm_vec4_to_vec3(cp->e2->angular_momentum));
+	vec4 e2_linear_velocity = gm_vec4_scalar_product(1.0f / cp->e2->mass, cp->e2->linear_momentum);
+
+	vec3 vA = gm_vec4_to_vec3(e1_linear_velocity);
+	vec3 vB = gm_vec4_to_vec3(e2_linear_velocity);
+	vec3 wA = e1_angular_velocity;
+	vec3 wB = e2_angular_velocity;
+	vec3 rA = gm_vec3_subtract(cp->collide_position, gm_vec4_to_vec3(cp->e1->world_position));
+	vec3 rB = gm_vec3_subtract(cp->collide_position, gm_vec4_to_vec3(cp->e2->world_position));
+	const r32 epsilon = 1.0f;
+	vec3 N = gm_vec3_normalize(cp->normal);
+	r32 mA = cp->e1->mass;
+	r32 mB = cp->e2->mass;
+
+    // WIKIPEDIA
+
+    // algorithm
+    vec3 vP1 = gm_vec3_add(vA, gm_vec3_cross(wA, rA));
+    vec3 vP2 = gm_vec3_add(vB, gm_vec3_cross(wB, rB));
+    vec3 vR = gm_vec3_subtract(vP2, vP1);
+
     r32 numerator = gm_vec3_dot(gm_vec3_scalar_product(-(1.0f + epsilon), vR), N);
     vec3 rA_cross_N = gm_vec3_cross(rA, N);
     vec3 rB_cross_N = gm_vec3_cross(rB, N);
@@ -599,8 +657,33 @@ static void apply_impulse(Collision_Point* cp)
 	cp->e2->angular_momentum = (vec4){e2_angular_momentum_v3.x, e2_angular_momentum_v3.y, e2_angular_momentum_v3.z, 0.0f};
 }
 
+static r32 force_cube_y(const Entity* e)
+{
+	assert(e->world_scale.x == 1.0f && e->world_scale.y == 1.0f && e->world_scale.z == 1.0f);
+	r32 y = 0.0f;
+	for (u32 i = 0; i < array_get_length(e->mesh.vertices); ++i) {
+		Vertex* v = &e->mesh.vertices[i];
+		vec4 wc_pos = gm_mat4_multiply_vec4(&e->model_matrix, v->position);
+		r32 y_diff = -wc_pos.y - 2.0f;
+		if (y_diff > 0.0f && y_diff > y) {
+			y = y_diff;
+		}
+	}
+
+	return y > 0.0f ? y + 0.001f : 0.0f;
+}
+
 void simulate(r32 delta_time)
 {
+	vec4 aux1 = entities[0].world_position;
+	Quaternion aux2 = entities[0].world_rotation;
+
+	r32 y_diff = force_cube_y(&entities[0]);
+	vec4 new_pos = entities[0].world_position;
+	new_pos.y += y_diff;
+	graphics_entity_set_position(&entities[0], new_pos);
+	//printf("y_diff: %f\n", y_diff);
+
 	// Store the current state in the last_frame_* attributes
 	for (u32 i = 0; i < array_get_length(entities); ++i) {
 		Entity* e = &entities[i];
@@ -651,8 +734,17 @@ void simulate(r32 delta_time)
 	//	return;
 	//}
 
+	// check if collision are resting contacts
+	//boolean all_resting_contacts = true;
+	//for (u32 i = 0; i < array_get_length(all_collision_points); ++i) {
+	//	if (!is_resting_contact(&all_collision_points[i])) {
+	//		all_resting_contacts = false;
+	//		break;
+	//	}
+	//}
+
 	// Now we check if there are collision points.
-	if (array_get_length(all_collision_points) > 0) {
+	if (/*!all_resting_contacts && */array_get_length(all_collision_points) > 0) {
 		//stop = 1;
 
 		// @TEMPORARY: If all collision points happened at time 0 we ignore
@@ -663,14 +755,20 @@ void simulate(r32 delta_time)
 				yes = true;
 				break;
 			}
+
+			if (collision_point->frame_relative_time == 0.0f) {
+				return;
+			}
 		}
 		if (!yes) {
+			printf("ojadoas");
 			return;
 		}
 		// -----------------
 
 		// We found collision points, so we need to find the first one that ocurred and rewind the simulation
 		Collision_Point* first_collision_that_ocurred = &all_collision_points[0];
+		//printf("Collision found at time [%f]\n", first_collision_that_ocurred->frame_relative_time);
 
 		for (u32 i = 0; i < array_get_length(all_collision_points); ++i) {
 			Collision_Point* collision_point = &all_collision_points[i];
@@ -681,18 +779,28 @@ void simulate(r32 delta_time)
 
 		// Ok, we found the target collision. Now, we need to re-run the simulation, but only until that point.
 		
+		vec4 ajisfs = gm_mat4_multiply_vec4(&entities[0].model_matrix, entities[0].mesh.vertices[4].position);
+
 		// Restore position and rotation of all entities
 		for (u32 i = 0; i < array_get_length(entities); ++i) {
 			Entity* e = &entities[i];
-			e->world_position = e->last_frame_world_position;
-			e->world_rotation = e->last_frame_world_rotation;
+			graphics_entity_set_position(e, e->last_frame_world_position);
+			graphics_entity_set_rotation(e, e->last_frame_world_rotation);
 		}
+
+		r32 little_less_time = first_collision_that_ocurred->frame_relative_time * delta_time;
+		//r32 little_less_time = (first_collision_that_ocurred->frame_relative_time * delta_time) - 0.01f;
+		//little_less_time = little_less_time < 0.0f ? 0.0f : little_less_time;
+
+		ajisfs = gm_mat4_multiply_vec4(&entities[0].model_matrix, entities[0].mesh.vertices[4].position);
 
 		// Update physics, but only until the collision time
 		for (u32 i = 0; i < array_get_length(entities); ++i) {
 			Entity* e = &entities[i];
-			physics_update(e, forces, first_collision_that_ocurred->frame_relative_time * delta_time);
+			physics_update(e, forces, little_less_time);
 		}
+
+		ajisfs = gm_mat4_multiply_vec4(&entities[0].model_matrix, entities[0].mesh.vertices[4].position);
 
 		// Apply impulse
 		apply_impulse(first_collision_that_ocurred);
@@ -700,13 +808,12 @@ void simulate(r32 delta_time)
 		// Simulate what is left
 		simulate(delta_time - first_collision_that_ocurred->frame_relative_time * delta_time);
 	}
-
 }
 
 void core_update(r32 delta_time)
 {
 	Physics_Force pf;
-	pf.force = (vec4){0.0f, -10.0f, 0.0f, 0.0f};
+	pf.force = (vec4){0.0f, -100.0f, 0.0f, 0.0f};
 	pf.position = (vec4){0.0f, 0.0f, 0.0f, 1.0f};
 	array_push(forces, &pf);
 	//if (!stop)
