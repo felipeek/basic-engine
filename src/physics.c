@@ -37,7 +37,7 @@ static void apply_impulse(Entity* cube, Entity* plane, Collision_Point* cp) {
 	vec3 wB = plane_angular_velocity;
 	vec3 rA = gm_vec3_subtract(cp->collision_point, gm_vec4_to_vec3(cube->world_position));
 	vec3 rB = gm_vec3_subtract(cp->collision_point, gm_vec4_to_vec3(plane->world_position));
-	const r32 epsilon = 0.0f;
+	const r32 epsilon = 0.5f;
 	vec3 N = gm_vec3_normalize(cp->normal);
 	r32 mA = cube->mass;
 	r32 mB = plane->mass;
@@ -55,7 +55,7 @@ static void apply_impulse(Entity* cube, Entity* plane, Collision_Point* cp) {
     r32 denominator = 1.0f / mA + 1.0f / mB + denominator_last_factor;
     r32 j = numerator / denominator;
 
-#if 0
+#if 1
     // check
     vec3 vA_plus = gm_vec3_subtract(vA, gm_vec3_scalar_product(j / mA, N));
     vec3 vB_plus = gm_vec3_add(vB, gm_vec3_scalar_product(j / mB, N));
@@ -105,7 +105,7 @@ static void physics_update(Entity* cube, r32 dt, Physics_Force* forces) {
 	vec3 angular_velocity = gm_mat3_multiply_vec3(&dynamic_inertia_tensor_inverse, cube->angular_momentum);
 	vec3 linear_velocity = gm_vec3_scalar_product(1.0f / cube->mass, cube->linear_momentum);
 
-	#if 1
+	#if 0
 	Quaternion av = (Quaternion){angular_velocity.x, angular_velocity.y, angular_velocity.z, 0.0f};
 	Quaternion delta = quaternion_product(&cube->world_rotation, &av);
 	delta.x *= 0.5f * dt; delta.y *= 0.5f * dt; delta.z *= 0.5f * dt; delta.w *= 0.5f * dt;
@@ -119,12 +119,12 @@ static void physics_update(Entity* cube, r32 dt, Physics_Force* forces) {
 	#endif
 
 	// Calculate orientation change
-	//r32 angular_velocity_length = dt * gm_vec3_length(angular_velocity) * 360.0f;
-	//Quaternion orientation_change = quaternion_new(gm_vec3_normalize(angular_velocity), angular_velocity_length);
+	r32 angular_velocity_length = dt * gm_vec3_length(angular_velocity) * 23.0f;
+	Quaternion orientation_change = quaternion_new(gm_vec3_normalize(angular_velocity), angular_velocity_length);
 	vec3 position_change = gm_vec3_scalar_product(dt, linear_velocity);
 
 	graphics_entity_set_position(cube, gm_vec4_add(cube->world_position, (vec4){position_change.x, position_change.y, position_change.z, 0.0f}));
-	//graphics_entity_set_rotation(e, quaternion_product(&e->world_rotation, &orientation_change));
+	graphics_entity_set_rotation(cube, quaternion_product(&cube->world_rotation, &orientation_change));
 }
 
 static r32 force_cube_y(const Entity* cube, r32 plane_y)
@@ -139,7 +139,7 @@ static r32 force_cube_y(const Entity* cube, r32 plane_y)
 		}
 	}
 
-	return y > 0.0f ? y + 0.00001f : 0.0f;
+	return y > 0.0f ? y + 0.01f : 0.0f;
 }
 
 void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_Force* forces) {
@@ -156,10 +156,16 @@ void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_
 		physics_update(cube, dt_frac, forces);
 		Collision_Point* collision_points = collision_get_plane_cube_points(cube, plane_y);
 		if (array_get_length(collision_points) > 0) {
-			//for (u32 i = 0; i < array_get_length(collision_points); ++i) {
-				Collision_Point* cp = &collision_points[0];
-				apply_impulse(cube, plane, cp);
-			//}
+			// deduce first collision point
+			Collision_Point* cp = &collision_points[0];
+			for (u32 i = 1; i < array_get_length(collision_points); ++i) {
+				Collision_Point* collision_point = &collision_points[i];
+				if (collision_point->collision_point.y < cp->collision_point.y) {
+					cp = collision_point;
+				}
+			}
+
+			apply_impulse(cube, plane, cp);
 		}
 	}
 }
