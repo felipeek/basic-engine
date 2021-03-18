@@ -1,5 +1,20 @@
 #include "quaternion.h"
 
+Quaternion quaternion_new_radians(vec3 axis, r32 angle)
+{
+	if (gm_vec3_length(axis) != 0.0f)
+		axis = gm_vec3_normalize(axis);
+	r32 sang = sinf(angle / 2.0f);
+
+	Quaternion quat;
+	quat.w = cosf(angle / 2.0f);
+	quat.x = axis.x * sang;
+	quat.y = axis.y * sang;
+	quat.z = axis.z * sang;
+
+	return quat;
+}
+
 Quaternion quaternion_new(vec3 axis, r32 angle)
 {
 	if (gm_vec3_length(axis) != 0.0f)
@@ -7,7 +22,7 @@ Quaternion quaternion_new(vec3 axis, r32 angle)
 	r32 sang = sinf(gm_radians(angle) / 2.0f);
 
 	Quaternion quat;
-	quat.w = cosf(gm_radians(angle / 2.0f));
+	quat.w = cosf(gm_radians(angle) / 2.0f);
 	quat.x = axis.x * sang;
 	quat.y = axis.y * sang;
 	quat.z = axis.z * sang;

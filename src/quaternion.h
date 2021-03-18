@@ -7,6 +7,7 @@ typedef struct {
   r32 x, y, z, w;
 } Quaternion;
 
+Quaternion quaternion_new_radians(vec3 axis, r32 angle);
 Quaternion quaternion_new(vec3 axis, r32 angle);
 Quaternion quaternion_product(const Quaternion* q1, const Quaternion* q2);
 Quaternion quaternion_nlerp(const Quaternion* q1, const Quaternion* q2, r32 t);
