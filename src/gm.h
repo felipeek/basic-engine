@@ -122,6 +122,7 @@ mat3  gm_mat3_transpose(const mat3* m);
 mat3  gm_mat3_scalar_product(r32 scalar, const mat3* m);
 mat3  gm_mat3_identity(void);
 char* gm_mat3_to_string(char* buffer, const mat3* m);
+mat4 gm_mat3_to_mat4(const mat3* m);
 
 // mat2
 mat2  gm_mat2_multiply(const mat2* m1, const mat2* m2);
@@ -422,6 +423,28 @@ vec3 gm_mat3_multiply_vec3(const mat3* m, vec3 v) {
 	result.x = m->data[0][0] * v.x + m->data[0][1] * v.y + m->data[0][2] * v.z;
 	result.y = m->data[1][0] * v.x + m->data[1][1] * v.y + m->data[1][2] * v.z;
 	result.z = m->data[2][0] * v.x + m->data[2][1] * v.y + m->data[2][2] * v.z;
+	return result;
+}
+
+mat4 gm_mat3_to_mat4(const mat3* m) {
+	mat4 result;
+	result.data[0][0] = m->data[0][0];
+	result.data[0][1] = m->data[0][1];
+	result.data[0][2] = m->data[0][2];
+	result.data[1][0] = m->data[1][0];
+	result.data[1][1] = m->data[1][1];
+	result.data[1][2] = m->data[1][2];
+	result.data[2][0] = m->data[2][0];
+	result.data[2][1] = m->data[2][1];
+	result.data[2][2] = m->data[2][2];
+
+	result.data[0][3] = 0.0f;
+	result.data[1][3] = 0.0f;
+	result.data[2][3] = 0.0f;
+	result.data[3][0] = 0.0f;
+	result.data[3][1] = 0.0f;
+	result.data[3][2] = 0.0f;
+	result.data[3][3] = 0.0f;
 	return result;
 }
 

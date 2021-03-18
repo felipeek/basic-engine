@@ -64,7 +64,7 @@ int core_init()
 
 	Mesh m = graphics_mesh_create_from_obj("./res/real_plane.obj", 0);
 	graphics_entity_create_with_color(&plane, m, (vec4){0.0f, PLANE_Y, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){1000.0f, 1000.0f, 1000.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1000000000.0f);
+		(vec3){1000.0f, 1000.0f, 1000.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
 	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&cube, m, (vec4){0.0f, 5.0f, 0.0f, 1.0f}, quaternion_new((vec3){3.0f, 1.0f, 0.5f}, 45.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
@@ -73,7 +73,7 @@ int core_init()
 
 	forces = array_create(Physics_Force, 1);
 	Physics_Force gravity_force;
-	gravity_force.force = (vec3){0.0f, -10.0f, 0.0f};
+	gravity_force.force = (vec3){0.0f, -100.0f, 0.0f};
 	gravity_force.position = (vec3) {0.0f, 0.0f, 0.0f};
 	array_push(forces, &gravity_force);
 
@@ -88,6 +88,7 @@ void core_destroy()
 void core_update(r32 delta_time)
 {
 	physics_simulate(&cube, &plane, PLANE_Y, delta_time, forces);
+	//array_clear(forces);
 }
 
 void core_render()
@@ -125,6 +126,14 @@ void core_input_process(boolean* key_state, r32 delta_time)
 
 		wireframe = !wireframe;
 		key_state[GLFW_KEY_L] = false;
+	}
+	if (key_state[GLFW_KEY_M])
+	{
+		Physics_Force gravity_force;
+		gravity_force.force = (vec3){0.0f, -100.0f, 0.0f};
+		gravity_force.position = (vec3) {0.0f, 0.0f, 0.0f};
+		array_push(forces, &gravity_force);
+		key_state[GLFW_KEY_M] = false;
 	}
 }
 
