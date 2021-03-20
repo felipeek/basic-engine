@@ -1,48 +1,49 @@
 #include "physics.h"
 #include "collision.h"
 #include <dynamic_array.h>
-#define TIME_TOLERANCE (0.0000001f)
-#define PENETRATION_TOLERANCE (0.01f)
 
-mat3 rotation_matrix_from_axis_and_angle(vec3 axis, r32 angle) {
-    mat3 m;
-    m.data[0][0] = cosf(angle) + axis.x * axis.x * (1.0f - cosf(angle));
-    m.data[0][1] = axis.x * axis.y * (1.0f - cosf(angle)) - axis.z * sinf(angle);
-    m.data[0][2] = axis.x * axis.z * (1.0f - cosf(angle)) + axis.y * sinf(angle);
-    m.data[1][0] = axis.y * axis.x * (1.0f - cosf(angle)) + axis.z * sinf(angle);
-    m.data[1][1] = cosf(angle) + axis.y * axis.y * (1.0f - cosf(angle));
-    m.data[1][2] = axis.y * axis.z * (1.0f - cosf(angle)) - axis.x * sinf(angle);
-    m.data[2][0] = axis.z * axis.x * (1.0f - cosf(angle)) - axis.y * sinf(angle);
-    m.data[2][1] = axis.z * axis.y * (1.0f - cosf(angle)) + axis.x * sinf(angle);
-    m.data[2][2] = cosf(angle) + axis.z * axis.z * (1.0f - cosf(angle));
-    return m;
+static mat3 physics_get_dynamic_inertia_tensor_inverse(Entity* e) {
+    mat4 rotation_matrix = quaternion_get_matrix(&e->world_rotation);
+    mat3 rotation_matrix_m3 = gm_mat4_to_mat3(&rotation_matrix);
+    mat3 transposed_rotation_matrix = gm_mat3_transpose(&rotation_matrix_m3);
+    mat3 aux = gm_mat3_multiply(&rotation_matrix_m3, &e->inverse_inertia_tensor);
+    return gm_mat3_multiply(&aux, &transposed_rotation_matrix);
+}
+
+static vec3 physics_get_linear_velocity(Entity* e) {
+    return gm_vec3_scalar_product(1.0f / e->mass, e->linear_momentum);
+}
+
+static vec3 physics_get_angular_velocity(Entity* e, mat3* dynamic_inertia_tensor_inverse) {
+    return gm_mat3_multiply_vec3(dynamic_inertia_tensor_inverse, e->angular_momentum);
+}
+
+static void physics_update_momenta_based_on_forces(Entity* e, r32 dt, Physics_Force* forces) {
+    // Calculate total force and torque
+    const vec3 center_of_mass = (vec3){0.0f, 0.0f, 0.0f};
+    vec3 total_force = (vec3){0.0f, 0.0f, 0.0f};
+    vec3 total_torque = (vec3){0.0f, 0.0f, 0.0f};
+    for (u32 i = 0; forces && i < array_get_length(forces); ++i) {
+        vec3 distance = gm_vec3_subtract(forces[i].position, center_of_mass);
+        total_force = gm_vec3_add(total_force, forces[i].force);
+        total_torque = gm_vec3_add(total_torque, gm_vec3_cross(distance, forces[i].force));
+    }
+    vec3 angular_momentum_change = gm_vec3_scalar_product(dt, total_torque);
+    vec3 linear_momentum_change = gm_vec3_scalar_product(dt, total_force);
+    e->linear_momentum = gm_vec3_add(e->linear_momentum, linear_momentum_change);
+    e->angular_momentum = gm_vec3_add(e->angular_momentum, angular_momentum_change);
 }
 
 static void apply_impulse(Entity* cube, Entity* plane, Collision_Point* cp, Physics_Force* forces, r32 restitution) {
     cp->normal = gm_vec3_normalize(cp->normal);
 
-    // @TODO: copied from physics
-    mat4 cube_rotation_matrix = quaternion_get_matrix(&cube->world_rotation);
-    mat3 cube_object_inertia_tensor = cube->inertia_tensor;
-    mat3 cube_rotation_matrix_m3 = gm_mat4_to_mat3(&cube_rotation_matrix);
-    mat3 cube_transposed_rotation_matrix = gm_mat3_transpose(&cube_rotation_matrix_m3);
-    mat3 cube_aux = gm_mat3_multiply(&cube_rotation_matrix_m3, &cube_object_inertia_tensor);
-    mat3 cube_dynamic_inertia_tensor = gm_mat3_multiply(&cube_aux, &cube_transposed_rotation_matrix);
-    mat3 cube_dynamic_inertia_tensor_inverse;
-    assert(gm_mat3_inverse(&cube_dynamic_inertia_tensor, &cube_dynamic_inertia_tensor_inverse));
-    vec3 cube_angular_velocity = gm_mat3_multiply_vec3(&cube_dynamic_inertia_tensor_inverse, cube->angular_momentum);
-    vec3 cube_linear_velocity = gm_vec3_scalar_product(1.0f / cube->mass, cube->linear_momentum);
+	mat3 cube_dynamic_inertia_tensor_inverse = physics_get_dynamic_inertia_tensor_inverse(cube);
+	vec3 cube_angular_velocity = physics_get_angular_velocity(cube, &cube_dynamic_inertia_tensor_inverse);
+	vec3 cube_linear_velocity = physics_get_linear_velocity(cube);
 
-    mat4 plane_rotation_matrix = quaternion_get_matrix(&plane->world_rotation);
-    mat3 plane_object_inertia_tensor = plane->inertia_tensor;
-    mat3 plane_rotation_matrix_m3 = gm_mat4_to_mat3(&plane_rotation_matrix);
-    mat3 plane_transposed_rotation_matrix = gm_mat3_transpose(&plane_rotation_matrix_m3);
-    mat3 plane_aux = gm_mat3_multiply(&plane_rotation_matrix_m3, &plane_object_inertia_tensor);
-    mat3 plane_dynamic_inertia_tensor = gm_mat3_multiply(&plane_aux, &plane_transposed_rotation_matrix);
-    mat3 plane_dynamic_inertia_tensor_inverse;
-    assert(gm_mat3_inverse(&plane_dynamic_inertia_tensor, &plane_dynamic_inertia_tensor_inverse));
-    vec3 plane_angular_velocity = gm_mat3_multiply_vec3(&plane_dynamic_inertia_tensor_inverse, plane->angular_momentum);
-    vec3 plane_linear_velocity = gm_vec3_scalar_product(1.0f / plane->mass, plane->linear_momentum);
+	mat3 plane_dynamic_inertia_tensor_inverse = physics_get_dynamic_inertia_tensor_inverse(plane);
+	vec3 plane_angular_velocity = physics_get_angular_velocity(plane, &plane_dynamic_inertia_tensor_inverse);
+	vec3 plane_linear_velocity = physics_get_linear_velocity(plane);
 
     /* inputs */
     vec3 vA = cube_linear_velocity;
@@ -59,9 +60,9 @@ static void apply_impulse(Entity* cube, Entity* plane, Collision_Point* cp, Phys
     vec3 vP1 = gm_vec3_add(vA, gm_vec3_cross(wA, rA));
     vec3 vP2 = gm_vec3_add(vB, gm_vec3_cross(wB, rB));
     r32 fact = gm_vec3_dot(cp->normal, gm_vec3_subtract(vP2, vP1));
-    if (fact < 0) {
-        // cube already moving away from plane
-        //return;
+    if (fact < -0.01f) {
+        // resting contact
+        return;
     }
     vec3 vR = gm_vec3_subtract(vP2, vP1);
     r32 numerator = gm_vec3_dot(gm_vec3_scalar_product(-(1.0f + restitution), vR), N);
@@ -139,64 +140,118 @@ static void apply_impulse(Entity* cube, Entity* plane, Collision_Point* cp, Phys
 #endif
 }
 
-static void physics_update_momenta_based_on_forces(Entity* cube, r32 dt, Physics_Force* forces) {
-    // Calculate total force and torque
-    const vec3 center_of_mass = (vec3){0.0f, 0.0f, 0.0f};
-    vec3 total_force = (vec3){0.0f, 0.0f, 0.0f};
-    vec3 total_torque = (vec3){0.0f, 0.0f, 0.0f};
-    for (u32 i = 0; forces && i < array_get_length(forces); ++i) {
-        vec3 distance = gm_vec3_subtract(forces[i].position, center_of_mass);
-        total_force = gm_vec3_add(total_force, forces[i].force);
-        total_torque = gm_vec3_add(total_torque, gm_vec3_cross(distance, forces[i].force));
-    }
-    vec3 angular_momentum_change = gm_vec3_scalar_product(dt, total_torque);
-    vec3 linear_momentum_change = gm_vec3_scalar_product(dt, total_force);
-    cube->linear_momentum = gm_vec3_add(cube->linear_momentum, linear_momentum_change);
-    cube->angular_momentum = gm_vec3_add(cube->angular_momentum, angular_momentum_change);
-}
-
 static void physics_update(Entity* cube, r32 dt) {
-
-    vec4 old_vx_wc = gm_mat4_multiply_vec4(&cube->model_matrix, cube->mesh.vertices[2].position);
-
-    mat4 rotation_matrix = quaternion_get_matrix(&cube->world_rotation);
-    mat3 object_inertia_tensor = cube->inertia_tensor;
-    mat3 object_inertia_tensor_inverse;
-    assert(gm_mat3_inverse(&object_inertia_tensor, &object_inertia_tensor_inverse));
-    mat3 rotation_matrix_m3 = gm_mat4_to_mat3(&rotation_matrix);
-    mat3 transposed_rotation_matrix = gm_mat3_transpose(&rotation_matrix_m3);
-    mat3 aux = gm_mat3_multiply(&rotation_matrix_m3, &object_inertia_tensor_inverse);
-    mat3 dynamic_inertia_tensor = gm_mat3_multiply(&aux, &transposed_rotation_matrix);
-
-    vec3 angular_velocity = gm_mat3_multiply_vec3(&dynamic_inertia_tensor, cube->angular_momentum);
-    vec3 linear_velocity = gm_vec3_scalar_product(1.0f / cube->mass, cube->linear_momentum);
-    //printf("Angular velocity: <%f, %f, %f>\n", angular_velocity.x, angular_velocity.y, angular_velocity.z);
-    //printf("Linear velocity: <%f, %f, %f>\n", linear_velocity.x, linear_velocity.y, linear_velocity.z);
-
-    vec3 rA = gm_vec4_to_vec3(gm_vec4_subtract(old_vx_wc, cube->world_position));
-    vec3 vP1 = gm_vec3_add(linear_velocity, gm_vec3_cross(angular_velocity, rA));
-    //printf("Vertex 2 velocity: <%f, %f, %f>\n", vP1_plus.x, vP1_plus.y, vP1_plus.z);
-    printf("Point velocity before update: <%f, %f, %f>\n", vP1.x, vP1.y, vP1.z);
+	mat3 dynamic_inertia_tensor_inverse = physics_get_dynamic_inertia_tensor_inverse(cube);
+	vec3 angular_velocity = physics_get_angular_velocity(cube, &dynamic_inertia_tensor_inverse);
+	vec3 linear_velocity = physics_get_linear_velocity(cube);
 
     // Calculate orientation change
-    r32 _angle = gm_vec3_length(angular_velocity) * dt;
-    vec3 _axis = gm_vec3_normalize(angular_velocity);
-    Quaternion orientation_change = quaternion_new_radians(_axis, _angle);
+    r32 rotation_angle = gm_vec3_length(angular_velocity) * dt;
+    vec3 rotation_axis = gm_vec3_normalize(angular_velocity);
+    Quaternion orientation_change = quaternion_new_radians(rotation_axis, rotation_angle);
     graphics_entity_set_rotation(cube, quaternion_product(&orientation_change, &cube->world_rotation));
 
+    // Calculate position change
     vec3 position_change = gm_vec3_scalar_product(dt, linear_velocity);
     graphics_entity_set_position(cube, gm_vec4_add(cube->world_position, (vec4){position_change.x, position_change.y, position_change.z, 0.0f}));
-
-    vec4 vx_wc = gm_mat4_multiply_vec4(&cube->model_matrix, cube->mesh.vertices[2].position);
-    vec4 vx_diff = gm_vec4_subtract(vx_wc, old_vx_wc);
-    printf("Vertex 2 position difference: <%f, %f, %f>\n", vx_diff.x, vx_diff.y, vx_diff.z);
-
-    vec3 rA_after_update = gm_vec4_to_vec3(gm_vec4_subtract(vx_wc, cube->world_position));
-    vec3 vP1_after_update = gm_vec3_add(linear_velocity, gm_vec3_cross(angular_velocity, rA_after_update));
-    printf("Point velocity after update: <%f, %f, %f>\n", vP1_after_update.x, vP1_after_update.y, vP1_after_update.z);
-    printf("----------------------------------\n");
 }
 
+#if 1
+// nonconvex rigid bodies with stacking by Guendelman et al.
+void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_Force* forces) {
+	vec4 old_position = cube->world_position;
+	Quaternion old_rotation = cube->world_rotation;
+
+	boolean has_collision = true;
+	for (u32 i = 0; i < 5 && has_collision; ++i) {
+		has_collision = false;
+        physics_update(cube, dt);
+
+        Collision_Point* collision_points = collision_get_plane_cube_points(cube, plane_y);
+        if (array_get_length(collision_points) > 0) {
+			for (u32 j = 0; j < array_get_length(collision_points); ++j) {
+				vec4 new_pos = gm_mat4_multiply_vec4(&cube->model_matrix, cube->mesh.vertices[collision_points[j].vertex_index].position);
+				collision_points[j].collision_point = gm_vec4_to_vec3(new_pos);
+				apply_impulse(cube, plane, &collision_points[j], forces, 0.8f);
+			}
+
+			has_collision = true;
+		}
+
+		graphics_entity_set_position(cube, old_position);
+		graphics_entity_set_rotation(cube, old_rotation);
+	}
+
+    physics_update_momenta_based_on_forces(cube, dt, forces);
+
+	has_collision = true;
+	for (u32 i = 0; i < 10 && has_collision; ++i) {
+		has_collision = false;
+		r32 restitution = -0.9f;
+        physics_update(cube, dt);
+
+        Collision_Point* collision_points = collision_get_plane_cube_points(cube, plane_y);
+        if (array_get_length(collision_points) > 0) {
+			for (u32 j = 0; j < array_get_length(collision_points); ++j) {
+				vec4 new_pos = gm_mat4_multiply_vec4(&cube->model_matrix, cube->mesh.vertices[collision_points[j].vertex_index].position);
+				collision_points[j].collision_point = gm_vec4_to_vec3(new_pos);
+				apply_impulse(cube, plane, &collision_points[j], forces, 0.0f);
+			}
+
+			has_collision = true;
+			restitution += 0.1f;
+		}
+
+		graphics_entity_set_position(cube, old_position);
+		graphics_entity_set_rotation(cube, old_rotation);
+	}
+	
+	physics_update(cube, dt);
+}
+#endif
+
+#if 0
+void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_Force* forces) {
+    r32 dt_f = dt;
+
+	vec4 old_position = cube->world_position;
+	Quaternion old_rotation = cube->world_rotation;
+
+    physics_update_momenta_based_on_forces(cube, dt, forces);
+	boolean has_collision = true;
+	for (u32 i = 0; i < 10 && has_collision; ++i) {
+		has_collision = false;
+        physics_update(cube, dt_f);
+
+        Collision_Point* collision_points = collision_get_plane_cube_points(cube, plane_y);
+        if (array_get_length(collision_points) > 0) {
+			r32 max_penetration = 0.0f;
+			for (u32 i = 0; i < array_get_length(collision_points); ++i) {
+				if (collision_points[i].penetration > max_penetration) {
+					max_penetration = collision_points[i].penetration;
+				}
+			}
+
+			if (max_penetration > 0.001f && i < 9) {
+				dt_f = dt_f / 2.0f;
+				graphics_entity_set_position(cube, old_position);
+				graphics_entity_set_rotation(cube, old_rotation);
+				has_collision = true;
+			} else {
+				for (u32 j = 0; j < array_get_length(collision_points); ++j) {
+					vec4 new_pos = gm_mat4_multiply_vec4(&cube->model_matrix, cube->mesh.vertices[collision_points[j].vertex_index].position);
+					collision_points[j].collision_point = gm_vec4_to_vec3(new_pos);
+					apply_impulse(cube, plane, &collision_points[j], forces, 0.8f);
+				}
+
+				physics_update(cube, dt - dt_f);
+			}
+        }
+	}
+}
+#endif
+
+#if 0
 void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_Force* forces) {
     physics_update_momenta_based_on_forces(cube, dt, forces);
 
@@ -208,22 +263,19 @@ void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_
 
         Collision_Point* collision_points = collision_get_plane_cube_points(cube, plane_y);
         if (array_get_length(collision_points) > 0) {
-            if (array_get_length(collision_points) > 1) {
-                printf("double stuff\n");
-            }
             graphics_entity_set_position(cube, old_position);
             graphics_entity_set_rotation(cube, old_rotation);
             for (u32 j = 0; j < array_get_length(collision_points); ++j) {
                 vec4 new_pos = gm_mat4_multiply_vec4(&cube->model_matrix, cube->mesh.vertices[collision_points[j].vertex_index].position);
                 collision_points[j].collision_point = gm_vec4_to_vec3(new_pos);
-                apply_impulse(cube, plane, &collision_points[j], 0, 0.5f);
+                apply_impulse(cube, plane, &collision_points[j], forces, 0.8f);
             }
 
-            printf("Update because of collision...\n");
             physics_update(cube, dt_f);
         }
     }
 }
+#endif
 
 #if 0
 static r32 force_cube_y(const Entity* cube, r32 plane_y)

@@ -370,7 +370,8 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_pos
 	entity->diffuse_info.diffuse_color = color;
 	entity->diffuse_info.use_diffuse_map = false;
 	entity->mass = mass;
-	entity->inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);
+	mat3 inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);
+	assert(gm_mat3_inverse(&inertia_tensor, &entity->inverse_inertia_tensor));
 	entity->angular_momentum = (vec3){0.0f, 0.0f, 0.0f};
 	entity->linear_momentum = (vec3){0.0f, 0.0f, 0.0f};
 	recalculate_model_matrix(entity);
@@ -385,7 +386,8 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_p
 	entity->diffuse_info.diffuse_map = texture;
 	entity->diffuse_info.use_diffuse_map = true;
 	entity->mass = mass;
-	entity->inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);
+	mat3 inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);
+	assert(gm_mat3_inverse(&inertia_tensor, &entity->inverse_inertia_tensor));
 	entity->angular_momentum = (vec3){0.0f, 0.0f, 0.0f};
 	entity->linear_momentum = (vec3){0.0f, 0.0f, 0.0f};
 	recalculate_model_matrix(entity);

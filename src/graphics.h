@@ -48,7 +48,7 @@ typedef struct
 	
 	vec3 linear_momentum;
 	vec3 angular_momentum;
-	mat3 inertia_tensor;
+	mat3 inverse_inertia_tensor;
 	r32 mass;
 } Entity;
 
