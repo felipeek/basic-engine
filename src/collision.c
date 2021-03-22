@@ -87,10 +87,10 @@ gjk_simplex(GJK_Support_List* support_list, vec3* direction)
 
   if (num_entries == 2)
   {
-	vec3 A = support_list->simplex[1].v;
-	vec3 B = support_list->simplex[0].v;
-	vec3 AO = gm_vec3_negative(A);      //(0,0,0) - A
-	vec3 AB = gm_vec3_subtract(B, A);
+	Support_Point A = support_list->simplex[1];
+	Support_Point B = support_list->simplex[0];
+	vec3 AO = gm_vec3_negative(A.v);      //(0,0,0) - A
+	vec3 AB = gm_vec3_subtract(B.v, A.v);
 	if (gm_vec3_dot(AB, AO) > 0)
 	{
 	  *direction = gm_vec3_cross(gm_vec3_cross(AB, AO), AB);
@@ -104,14 +104,14 @@ gjk_simplex(GJK_Support_List* support_list, vec3* direction)
   }
   else if (num_entries == 3)
   {
-	vec3 B = support_list->simplex[0].v;
-	vec3 C = support_list->simplex[1].v;
-	vec3 A = support_list->simplex[2].v;
+	Support_Point B = support_list->simplex[0];
+	Support_Point C = support_list->simplex[1];
+	Support_Point A = support_list->simplex[2];
 
-	vec3 AB = gm_vec3_subtract(B, A);
-	vec3 AC = gm_vec3_subtract(C, A);
+	vec3 AB = gm_vec3_subtract(B.v, A.v);
+	vec3 AC = gm_vec3_subtract(C.v, A.v);
 	vec3 ABC = gm_vec3_cross(AB, AC);   // normal to the triangle
-	vec3 AO = gm_vec3_negative(A);
+	vec3 AO = gm_vec3_negative(A.v);
 
 	vec3 edge4 = gm_vec3_cross(AB, ABC);
 	vec3 edge1 = gm_vec3_cross(ABC, AC);
@@ -122,7 +122,7 @@ gjk_simplex(GJK_Support_List* support_list, vec3* direction)
 	  {
 		// simplex is A, C
 
-		support_list->simplex[0].v = A;
+		support_list->simplex[0] = A;
 		support_list->current_index--;
 		*direction = gm_vec3_cross(gm_vec3_cross(AC, AO), AC);
 	  }
@@ -132,8 +132,8 @@ gjk_simplex(GJK_Support_List* support_list, vec3* direction)
 		{
 		  // simplex is A, B
 
-		  support_list->simplex[0].v = A;
-		  support_list->simplex[1].v = B;
+		  support_list->simplex[0] = A;
+		  support_list->simplex[1] = B;
 		  support_list->current_index--;
 		  *direction = gm_vec3_cross(gm_vec3_cross(AB, AO), AB);
 		}
@@ -141,7 +141,7 @@ gjk_simplex(GJK_Support_List* support_list, vec3* direction)
 		{
 		  // simplex is A
 
-		  support_list->simplex[0].v = A;
+		  support_list->simplex[0] = A;
 		  support_list->current_index -= 2;
 		  *direction = AO;
 		}
@@ -155,8 +155,8 @@ gjk_simplex(GJK_Support_List* support_list, vec3* direction)
 		{
 		  // simplex is A, B
 
-		  support_list->simplex[0].v = A;
-		  support_list->simplex[1].v = B;
+		  support_list->simplex[0] = A;
+		  support_list->simplex[1] = B;
 		  support_list->current_index--;
 		  *direction = gm_vec3_cross(gm_vec3_cross(AB, AO), AB);
 		}
@@ -164,7 +164,7 @@ gjk_simplex(GJK_Support_List* support_list, vec3* direction)
 		{
 		  // simplex is A
 
-		  support_list->simplex[0].v = A;
+		  support_list->simplex[0] = A;
 		  support_list->current_index -= 2;
 		  *direction = AO;
 		}
@@ -178,23 +178,19 @@ gjk_simplex(GJK_Support_List* support_list, vec3* direction)
 		if (gm_vec3_dot(ABC, AO) > 0)
 		{
 		  // simplex is A, B, C
-		  //vec3 temp_first = support_list->simplex[1];
-		  //vec3 temp_second = support_list->simplex[1];
 
-		  support_list->simplex[0].v = A;
-		  support_list->simplex[1].v = B;
-		  support_list->simplex[2].v = C;
+		  support_list->simplex[0] = A;
+		  support_list->simplex[1] = B;
+		  support_list->simplex[2] = C;
 		  *direction = ABC;
 		}
 		else
 		{
 		  // simplex is A, C, B
-		  //vec3 temp_first = support_list->simplex[0];
-		  //vec3 temp_second = support_list->simplex[0];
 
-		  support_list->simplex[0].v = A;
-		  support_list->simplex[1].v = C;
-		  support_list->simplex[2].v = B;
+		  support_list->simplex[0] = A;
+		  support_list->simplex[1] = C;
+		  support_list->simplex[2] = B;
 		  *direction = gm_vec3_negative(ABC);
 		}
 #endif
@@ -204,15 +200,15 @@ gjk_simplex(GJK_Support_List* support_list, vec3* direction)
 #ifdef GJK_3D
   else if (num_entries == 4)
   {
-	vec3 A = support_list->simplex[3].v;
-	vec3 B = support_list->simplex[2].v;
-	vec3 C = support_list->simplex[1].v;
-	vec3 D = support_list->simplex[0].v;
+	Support_Point A = support_list->simplex[3];
+	Support_Point B = support_list->simplex[2];
+	Support_Point C = support_list->simplex[1];
+	Support_Point D = support_list->simplex[0];
 
-	vec3 AO = gm_vec3_negative(A);
-	vec3 AB = gm_vec3_subtract(B, A);
-	vec3 AC = gm_vec3_subtract(C, A);
-	vec3 AD = gm_vec3_subtract(D, A);
+	vec3 AO = gm_vec3_negative(A.v);
+	vec3 AB = gm_vec3_subtract(B.v, A.v);
+	vec3 AC = gm_vec3_subtract(C.v, A.v);
+	vec3 AD = gm_vec3_subtract(D.v, A.v);
 
 	vec3 ABC = gm_vec3_cross(AB, AC);
 
@@ -220,9 +216,9 @@ gjk_simplex(GJK_Support_List* support_list, vec3* direction)
 	{
 	  // in front of ABC
 
-	  support_list->simplex[0].v = C;
-	  support_list->simplex[1].v = B;
-	  support_list->simplex[2].v = A;
+	  support_list->simplex[0] = C;
+	  support_list->simplex[1] = B;
+	  support_list->simplex[2] = A;
 	  support_list->current_index--;
 	  *direction = ABC;
 	  return false;
@@ -233,9 +229,9 @@ gjk_simplex(GJK_Support_List* support_list, vec3* direction)
 	{
 	  // in front of ADB
 
-	  support_list->simplex[0].v = B;
-	  support_list->simplex[1].v = D;
-	  support_list->simplex[2].v = A;
+	  support_list->simplex[0] = B;
+	  support_list->simplex[1] = D;
+	  support_list->simplex[2] = A;
 	  support_list->current_index--;
 	  *direction = ADB;
 	  return false;
@@ -246,9 +242,9 @@ gjk_simplex(GJK_Support_List* support_list, vec3* direction)
 	{
 	  // in front of ACD
 
-	  support_list->simplex[0].v = D;
-	  support_list->simplex[1].v = C;
-	  support_list->simplex[2].v = A;
+	  support_list->simplex[0] = D;
+	  support_list->simplex[1] = C;
+	  support_list->simplex[2] = A;
 	  support_list->current_index--;
 	  *direction = ACD;
 	  return false;
@@ -426,7 +422,7 @@ barycentric(vec3 p, vec3 a, vec3 b, vec3 c, r32 *u, r32 *v, r32 *w)
 }
 
 vec3
-collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
+collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, vec3* penetration)
 {
   int index = -1;
   Face *faces = array_new_len(Face, 4);
@@ -470,7 +466,7 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
 		  gm_vec3_scalar_product(bary_w, faces[index].c.sup)
 		);
 
-	  vec3 penetration = gm_vec3_scalar_product(faces[index].distance, gm_vec3_normalize(faces[index].normal));
+	  *penetration = gm_vec3_scalar_product(faces[index].distance, gm_vec3_normalize(faces[index].normal));
 	  array_free(faces);
 	  //return penetration;
 	  return wcolpoint;

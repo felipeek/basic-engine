@@ -103,6 +103,7 @@ void core_destroy()
 
 static vec3 col_point;
 static boolean collision;
+static vec3 penetration;
 
 void core_update(r32 delta_time)
 {
@@ -117,7 +118,7 @@ void core_update(r32 delta_time)
 	if (collision_gjk_collides(&simplex, &cube_bs, &plane_bs)) {
 		cube.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
 		plane.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
-		col_point = collision_epa(simplex.simplex, &cube_bs, &plane_bs);
+		col_point = collision_epa(simplex.simplex, &cube_bs, &plane_bs, &penetration);
 		collision = true;
 	} else {
 		cube.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
@@ -136,6 +137,8 @@ void core_render()
 
 	if (collision) {
 		graphics_renderer_debug_points(&r_ctx, &col_point, 1, (vec4){1.0f, 1.0f, 1.0f});
+		graphics_renderer_debug_vector(&r_ctx, col_point, gm_vec3_add(col_point, gm_vec3_scalar_product(-1.0f, penetration)),
+			(vec4){1.0f, 1.0f, 1.0f, 1.0f});
 		graphics_renderer_primitives_flush(&r_ctx, &camera);
 	}
 }
