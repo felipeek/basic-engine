@@ -33,6 +33,8 @@ typedef struct
 	u32 VAO, VBO, EBO;
 	s32 indexes_size;
 	Normal_Mapping_Info normal_info;
+	Vertex* vertices;
+	u32* indices;
 } Mesh;
 
 typedef struct
@@ -43,6 +45,9 @@ typedef struct
 	vec3 world_scale;
 	mat4 model_matrix;
 	Diffuse_Info diffuse_info;
+
+	vec4 last_position;
+	Quaternion last_rotation;
 } Entity;
 
 typedef struct

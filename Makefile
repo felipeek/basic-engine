@@ -1,7 +1,7 @@
 IDIR=include
 CC=gcc
 CCXX=g++
-CFLAGS=-I$(IDIR) -g
+CFLAGS=-I$(IDIR) -g -I/usr/include/eigen3/
 
 SRCDIR=src
 OUTDIR=bin
@@ -16,10 +16,10 @@ else
 	LIBS=-lm -lglfw -lGLEW -lGL -lpng -lz
 endif
 
-_DEPS = camera.h common.h core.h gm.h graphics.h menu.h obj.h quaternion.h util.h
+_DEPS = camera.h collision.h common.h core.h gm.h graphics.h menu.h obj.h quaternion.h root_finder_wrapper.h util.h
 DEPS = $(patsubst %,$(SRCDIR)/%,$(_DEPS))
 
-_OBJ = camera.o core.o graphics.o main.o menu.o obj.o quaternion.o util.o
+_OBJ = camera.o collision.o core.o graphics.o main.o menu.o obj.o quaternion.o root_finder_wrapper.o util.o
 OBJ = $(patsubst %,$(OBJDIR)/%,$(_OBJ))
 
 _VENDOR = imgui.o imgui_demo.o imgui_draw.o imgui_impl_glfw.o imgui_impl_opengl3.o imgui_widgets.o

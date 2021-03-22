@@ -1,8 +1,8 @@
-#define DYNAMIC_ARRAY_IMPLEMENT
+#define LIGHT_ARRAY_IMPLEMENT
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define GRAPHICS_MATH_IMPLEMENT
-#include <dynamic_array.h>
+#include <light_array.h>
 #include <stb_image.h>
 #include <stb_image_write.h>
 

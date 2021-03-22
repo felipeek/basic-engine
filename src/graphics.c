@@ -4,7 +4,7 @@
 #include <GL/glew.h>
 #include <stb_image.h>
 #include <stb_image_write.h>
-#include <dynamic_array.h>
+#include <light_array.h>
 #include <math.h>
 
 #define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
@@ -236,7 +236,7 @@ static s8* build_light_uniform_name(s8* buffer, s32 index, const s8* property)
 
 static void light_update_uniforms(const Light* lights, Shader shader)
 {
-	s32 number_of_lights = array_get_length(lights);
+	s32 number_of_lights = array_length(lights);
 	s8 buffer[64];
 	glUseProgram(shader);
 
@@ -351,6 +351,8 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_pos
 	entity->world_scale = world_scale;
 	entity->diffuse_info.diffuse_color = color;
 	entity->diffuse_info.use_diffuse_map = false;
+	entity->last_position = (vec4){0};
+	entity->last_rotation = (Quaternion){0};
 	recalculate_model_matrix(entity);
 }
 
@@ -581,8 +583,8 @@ Mesh graphics_mesh_create_from_obj(const s8* obj_path, Normal_Mapping_Info* norm
 	Vertex* vertices;
 	u32* indexes;
 	obj_parse(obj_path, &vertices, &indexes);
-	Mesh m = graphics_mesh_create(vertices, array_get_length(vertices), indexes, array_get_length(indexes), normal_info);
-	array_release(vertices);
-	array_release(indexes);
+	Mesh m = graphics_mesh_create(vertices, array_length(vertices), indexes, array_length(indexes), normal_info);
+	m.vertices = vertices;
+	m.indices = indexes;
 	return m;
 }

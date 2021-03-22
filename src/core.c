@@ -1,11 +1,13 @@
 #include <GLFW/glfw3.h>
-#include <dynamic_array.h>
+#include <light_array.h>
 #include <stdio.h>
 #include <math.h>
 #include "core.h"
 #include "graphics.h"
 #include "obj.h"
 #include "menu.h"
+#include "collision.h"
+#include "root_finder_wrapper.h"
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
@@ -27,14 +29,14 @@ static Perspective_Camera create_camera()
 static Light* create_lights()
 {
 	Light light;
-	Light* lights = array_create(Light, 1);
+	Light* lights = array_new(Light);
 
 	vec4 light_position = (vec4) {0.0f, 0.0f, 15.0f, 1.0f};
 	vec4 ambient_color = (vec4) {0.1f, 0.1f, 0.1f, 1.0f};
 	vec4 diffuse_color = (vec4) {0.8, 0.8, 0.8, 1.0f};
 	vec4 specular_color = (vec4) {0.5f, 0.5f, 0.5f, 1.0f};
 	graphics_light_create(&light, light_position, ambient_color, diffuse_color, specular_color);
-	array_push(lights, &light);
+	array_push(lights, light);
 
 	return lights;
 }
@@ -51,18 +53,38 @@ int core_init()
 	// Create light
 	lights = create_lights();
 
-	Mesh m = graphics_mesh_create_from_obj("./res/cow.obj", 0);
+	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 
+	m = graphics_mesh_create_from_obj("./res/plane.obj", 0);
+	Entity se;
+	graphics_entity_create_with_color(&se, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+
 	menu_register_dummy_callback(menu_dummy_callback);
+
+	r32* q = array_new(r32);
+	//x^3 + 2x^2 - x - 1
+	array_push(q, 1.0f);
+	array_push(q, 2.0f);
+	array_push(q, -1.0f);
+	array_push(q, -1.0f);
+
+	r32* res = find_roots(q);
+
+	for (u32 i = 0; i < array_length(res); ++i) {
+		printf("root: %f\n", res[i]);
+	}
+
+	collision_get(&se, &e);
 
 	return 0;
 }
 
 void core_destroy()
 {
-	array_release(lights);
+	array_free(lights);
 }
 
 void core_update(r32 delta_time)
