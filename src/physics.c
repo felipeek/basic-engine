@@ -1,6 +1,6 @@
 #include "physics.h"
 #include "collision.h"
-#include <dynamic_array.h>
+#include <light_array.h>
 
 static mat3 physics_get_dynamic_inertia_tensor_inverse(Entity* e) {
     mat4 rotation_matrix = quaternion_get_matrix(&e->world_rotation);
@@ -23,7 +23,7 @@ static void physics_update_momenta_based_on_forces(Entity* e, r32 dt, Physics_Fo
     const vec3 center_of_mass = (vec3){0.0f, 0.0f, 0.0f};
     vec3 total_force = (vec3){0.0f, 0.0f, 0.0f};
     vec3 total_torque = (vec3){0.0f, 0.0f, 0.0f};
-    for (u32 i = 0; forces && i < array_get_length(forces); ++i) {
+    for (u32 i = 0; forces && i < array_length(forces); ++i) {
         vec3 distance = gm_vec3_subtract(forces[i].position, center_of_mass);
         total_force = gm_vec3_add(total_force, forces[i].force);
         total_torque = gm_vec3_add(total_torque, gm_vec3_cross(distance, forces[i].force));
@@ -99,7 +99,7 @@ static void apply_impulse(Entity* cube, Entity* plane, Collision_Point* cp, Phys
 #if 0
     // Tangential component
     vec3 fe = {0};
-    for (u32 i = 0; i < array_get_length(forces); ++i) {
+    for (u32 i = 0; i < array_length(forces); ++i) {
         fe = gm_vec3_add(fe, forces[i].force);
     }
     r32 vR_dot_N = gm_vec3_dot(vR, cp->normal);
@@ -168,8 +168,8 @@ void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_
         physics_update(cube, dt);
 
         Collision_Point* collision_points = collision_get_plane_cube_points(cube, plane_y);
-        if (array_get_length(collision_points) > 0) {
-			for (u32 j = 0; j < array_get_length(collision_points); ++j) {
+        if (array_length(collision_points) > 0) {
+			for (u32 j = 0; j < array_length(collision_points); ++j) {
 				vec4 new_pos = gm_mat4_multiply_vec4(&cube->model_matrix, cube->mesh.vertices[collision_points[j].vertex_index].position);
 				collision_points[j].collision_point = gm_vec4_to_vec3(new_pos);
 				apply_impulse(cube, plane, &collision_points[j], forces, 0.8f);
@@ -191,8 +191,8 @@ void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_
         physics_update(cube, dt);
 
         Collision_Point* collision_points = collision_get_plane_cube_points(cube, plane_y);
-        if (array_get_length(collision_points) > 0) {
-			for (u32 j = 0; j < array_get_length(collision_points); ++j) {
+        if (array_length(collision_points) > 0) {
+			for (u32 j = 0; j < array_length(collision_points); ++j) {
 				vec4 new_pos = gm_mat4_multiply_vec4(&cube->model_matrix, cube->mesh.vertices[collision_points[j].vertex_index].position);
 				collision_points[j].collision_point = gm_vec4_to_vec3(new_pos);
 				apply_impulse(cube, plane, &collision_points[j], forces, 0.0f);
@@ -224,9 +224,9 @@ void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_
         physics_update(cube, dt_f);
 
         Collision_Point* collision_points = collision_get_plane_cube_points(cube, plane_y);
-        if (array_get_length(collision_points) > 0) {
+        if (array_length(collision_points) > 0) {
 			r32 max_penetration = 0.0f;
-			for (u32 i = 0; i < array_get_length(collision_points); ++i) {
+			for (u32 i = 0; i < array_length(collision_points); ++i) {
 				if (collision_points[i].penetration > max_penetration) {
 					max_penetration = collision_points[i].penetration;
 				}
@@ -238,7 +238,7 @@ void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_
 				graphics_entity_set_rotation(cube, old_rotation);
 				has_collision = true;
 			} else {
-				for (u32 j = 0; j < array_get_length(collision_points); ++j) {
+				for (u32 j = 0; j < array_length(collision_points); ++j) {
 					vec4 new_pos = gm_mat4_multiply_vec4(&cube->model_matrix, cube->mesh.vertices[collision_points[j].vertex_index].position);
 					collision_points[j].collision_point = gm_vec4_to_vec3(new_pos);
 					apply_impulse(cube, plane, &collision_points[j], forces, 0.8f);
@@ -262,10 +262,10 @@ void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_
         physics_update(cube, dt_f);
 
         Collision_Point* collision_points = collision_get_plane_cube_points(cube, plane_y);
-        if (array_get_length(collision_points) > 0) {
+        if (array_length(collision_points) > 0) {
             graphics_entity_set_position(cube, old_position);
             graphics_entity_set_rotation(cube, old_rotation);
-            for (u32 j = 0; j < array_get_length(collision_points); ++j) {
+            for (u32 j = 0; j < array_length(collision_points); ++j) {
                 vec4 new_pos = gm_mat4_multiply_vec4(&cube->model_matrix, cube->mesh.vertices[collision_points[j].vertex_index].position);
                 collision_points[j].collision_point = gm_vec4_to_vec3(new_pos);
                 apply_impulse(cube, plane, &collision_points[j], forces, 0.8f);
@@ -281,7 +281,7 @@ void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_
 static r32 force_cube_y(const Entity* cube, r32 plane_y)
 {
     r32 y = 0.0f;
-    for (u32 i = 0; i < array_get_length(cube->mesh.vertices); ++i) {
+    for (u32 i = 0; i < array_length(cube->mesh.vertices); ++i) {
         Vertex* v = &cube->mesh.vertices[i];
         vec4 wc_pos = gm_mat4_multiply_vec4(&cube->model_matrix, v->position);
         r32 y_diff = -wc_pos.y + plane_y;

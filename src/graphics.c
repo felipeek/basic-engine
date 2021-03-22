@@ -4,7 +4,7 @@
 #include <GL/glew.h>
 #include <stb_image.h>
 #include <stb_image_write.h>
-#include <dynamic_array.h>
+#include <light_array.h>
 #include <math.h>
 
 #define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
@@ -236,7 +236,7 @@ static s8* build_light_uniform_name(s8* buffer, s32 index, const s8* property)
 
 static void light_update_uniforms(const Light* lights, Shader shader)
 {
-	s32 number_of_lights = array_get_length(lights);
+	s32 number_of_lights = array_length(lights);
 	s8 buffer[64];
 	glUseProgram(shader);
 
@@ -344,9 +344,9 @@ static void recalculate_model_matrix(Entity* entity)
 }
 
 static mat3 get_symmetric_inertia_tensor_for_object(Vertex* vertices, r32 mass) {
-    r32 mass_per_vertex = mass / array_get_length(vertices);
+    r32 mass_per_vertex = mass / array_length(vertices);
     mat3 result = {0};
-    for (u32 i = 0; i < array_get_length(vertices); ++i) {
+    for (u32 i = 0; i < array_length(vertices); ++i) {
         vec4 v = vertices[i].position;
         result.data[0][0] += mass_per_vertex * (v.y * v.y + v.z * v.z);
         result.data[0][1] += mass_per_vertex * v.x * v.y;
@@ -609,8 +609,139 @@ Mesh graphics_mesh_create_from_obj(const s8* obj_path, Normal_Mapping_Info* norm
 	Vertex* vertices;
 	u32* indexes;
 	obj_parse(obj_path, &vertices, &indexes);
-	Mesh m = graphics_mesh_create(vertices, array_get_length(vertices), indexes, array_get_length(indexes), normal_info);
+	Mesh m = graphics_mesh_create(vertices, array_length(vertices), indexes, array_length(indexes), normal_info);
 	m.vertices = vertices;
 	m.indices = indexes;
 	return m;
+}
+
+// Render primitives
+
+typedef struct {
+	vec3 position;
+	vec4 color;
+} Primitive_3D_Vertex;
+
+void graphics_renderer_primitives_init(Render_Primitives_Context* primitives_ctx)
+{
+	int batch_size = 1024 * 1024;
+
+	primitives_ctx->shader = graphics_shader_create("shaders/debug.vs", "shaders/debug.fs");
+	glUseProgram(primitives_ctx->shader);
+
+	glGenVertexArrays(1, &primitives_ctx->vector_vao);
+	glBindVertexArray(primitives_ctx->vector_vao);
+	glGenBuffers(1, &primitives_ctx->vector_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, primitives_ctx->vector_vbo);
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(Primitive_3D_Vertex) * batch_size * 2, 0, GL_DYNAMIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Primitive_3D_Vertex), &((Primitive_3D_Vertex *) 0)->position);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Primitive_3D_Vertex), &((Primitive_3D_Vertex *) 0)->color);
+
+	glGenVertexArrays(1, &primitives_ctx->point_vao);
+	glBindVertexArray(primitives_ctx->point_vao);
+	glGenBuffers(1, &primitives_ctx->point_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, primitives_ctx->point_vbo);
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(Primitive_3D_Vertex) * batch_size, 0, GL_DYNAMIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Primitive_3D_Vertex), &((Primitive_3D_Vertex *) 0)->position);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Primitive_3D_Vertex), &((Primitive_3D_Vertex *) 0)->color);
+
+	glUseProgram(0);
+}
+
+void graphics_renderer_primitives_flush(Render_Primitives_Context* primitives_ctx, const Perspective_Camera* camera)
+{
+	glUseProgram(primitives_ctx->shader);
+
+	// Vector
+	glDisable(GL_DEPTH_TEST);
+	glBindVertexArray(primitives_ctx->vector_vao);
+	glBindBuffer(GL_ARRAY_BUFFER, primitives_ctx->vector_vbo);
+	glUnmapBuffer(GL_ARRAY_BUFFER);
+
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+
+	GLint view_matrix_location = glGetUniformLocation(primitives_ctx->shader, "view_matrix");
+	GLint projection_matrix_location = glGetUniformLocation(primitives_ctx->shader, "projection_matrix");
+
+	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat *) camera->view_matrix.data);
+	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat *) camera->projection_matrix.data);
+
+	glDrawArrays(GL_LINES, 0, primitives_ctx->vertex_count);
+	primitives_ctx->vertex_count = 0;
+	primitives_ctx->data_ptr = 0;
+	glEnable(GL_DEPTH_TEST);
+
+	// Points
+	glDisable(GL_DEPTH_TEST);
+	glBindVertexArray(primitives_ctx->point_vao);
+	glBindBuffer(GL_ARRAY_BUFFER, primitives_ctx->point_vbo);
+	glUnmapBuffer(GL_ARRAY_BUFFER);
+
+	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat *) camera->view_matrix.data);
+	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat *) camera->projection_matrix.data);
+
+	glPointSize(5.0f);
+	glDrawArrays(GL_POINTS, 0, primitives_ctx->point_count);
+	primitives_ctx->point_count = 0;
+	primitives_ctx->point_data_ptr = 0;
+	glEnable(GL_DEPTH_TEST);
+
+	glUseProgram(0);
+
+}
+
+static void setup_primitives_render(Render_Primitives_Context* primitives_ctx)
+{
+	if (primitives_ctx->data_ptr == 0)
+	{
+		glBindVertexArray(primitives_ctx->vector_vao);
+		glBindBuffer(GL_ARRAY_BUFFER, primitives_ctx->vector_vbo);
+		primitives_ctx->data_ptr = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+	}
+}
+
+static void setup_primitives_point_render(Render_Primitives_Context* primitives_ctx)
+{
+	if (primitives_ctx->point_data_ptr == 0)
+	{
+		glBindVertexArray(primitives_ctx->point_vao);
+		glBindBuffer(GL_ARRAY_BUFFER, primitives_ctx->point_vbo);
+		primitives_ctx->point_data_ptr = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+	}
+}
+
+void graphics_renderer_debug_points(Render_Primitives_Context* primitives_ctx, vec3* points, int point_count, vec4 color)
+{
+	setup_primitives_point_render(primitives_ctx);
+	Primitive_3D_Vertex *verts = (Primitive_3D_Vertex *)primitives_ctx->point_data_ptr + primitives_ctx->point_count;
+
+	for (s32 i = 0; i < point_count; ++i)
+	{
+		verts[i].position = points[i];
+		verts[i].color = color;
+	}
+
+	primitives_ctx->point_count += point_count;
+}
+
+void graphics_renderer_debug_vector(Render_Primitives_Context* primitives_ctx, vec3 position, vec3 v, vec4 color)
+{
+	setup_primitives_render(primitives_ctx);
+
+	Primitive_3D_Vertex *verts = (Primitive_3D_Vertex *)primitives_ctx->data_ptr + primitives_ctx->vertex_count;
+
+	verts[0].position = position;
+	verts[0].color = color;
+
+	verts[1].position = v;
+	verts[1].color = color;
+
+	primitives_ctx->vertex_count += 2;
 }

@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 #include <dirent.h>
-#include <dynamic_array.h>
+#include <light_array.h>
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>

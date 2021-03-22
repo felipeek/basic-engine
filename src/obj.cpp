@@ -2,7 +2,7 @@
 #include <tiny_obj_loader.h>
 #include <iostream>
 #include "graphics.h"
-#include <dynamic_array.h>
+#include <light_array.h>
 
 extern "C" int obj_parse(const char* obj_path, Vertex** vertices, u32** indexes)
 {
@@ -25,8 +25,8 @@ extern "C" int obj_parse(const char* obj_path, Vertex** vertices, u32** indexes)
 		exit(1);
 	}
 
-	*vertices = array_create(Vertex, 1);
-	*indexes = array_create(u32, 1);
+	*vertices = array_new(Vertex);
+	*indexes = array_new(u32);
 
 	bool generate_normals = attrib.normals.size() == 0;
 
@@ -45,11 +45,11 @@ extern "C" int obj_parse(const char* obj_path, Vertex** vertices, u32** indexes)
 	s32 index_counter = 0;
 	for (size_t s = 0; s < shapes.size(); s++) {
 		for (size_t f = 0; f < shapes[s].mesh.indices.size() / 3; f++) {
-			array_push(*indexes, &index_counter);
+			array_push(*indexes, index_counter);
 			++index_counter;
-			array_push(*indexes, &index_counter);
+			array_push(*indexes, index_counter);
 			++index_counter;
-			array_push(*indexes, &index_counter);
+			array_push(*indexes, index_counter);
 			++index_counter;
 
 			tinyobj::index_t idx0 = shapes[s].mesh.indices[3 * f + 0];
@@ -109,16 +109,16 @@ extern "C" int obj_parse(const char* obj_path, Vertex** vertices, u32** indexes)
 				v[2].normal = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
 			}
 
-			array_push(*vertices, &v[0]);
-			array_push(*vertices, &v[1]);
-			array_push(*vertices, &v[2]);
+			array_push(*vertices, v[0]);
+			array_push(*vertices, v[1]);
+			array_push(*vertices, v[2]);
 		}
 	}
 
 	if (generate_normals)
 	{
 		// Calculate normals
-		size_t indexes_length = array_get_length(*indexes);
+		size_t indexes_length = array_length(*indexes);
 
 		for (size_t i = 0; i < indexes_length; i += 3)
 		{
