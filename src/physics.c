@@ -92,9 +92,9 @@ static void apply_impulse(Entity* e1, Entity* e2, Collision_Point* cp, Physics_F
     vec3 J_r = gm_vec3_scalar_product(j_r, cp->normal);
     
     e1->linear_momentum = gm_vec3_add(e1->linear_momentum, gm_vec3_scalar_product(-1.0f, J_r));
-    e2->linear_momentum = gm_vec3_add(e2->linear_momentum, J_r);
+    //e2->linear_momentum = gm_vec3_add(e2->linear_momentum, J_r);
     e1->angular_momentum = gm_vec3_add(e1->angular_momentum, gm_vec3_scalar_product(-1.0f, gm_vec3_cross(rA, J_r)));
-    e2->angular_momentum = gm_vec3_add(e2->angular_momentum, gm_vec3_cross(rB, J_r));
+	//e2->angular_momentum = gm_vec3_add(e2->angular_momentum, gm_vec3_cross(rB, J_r));
 
 #if 0
     // Tangential component
@@ -193,6 +193,21 @@ void physics_simulate(Entity* entities, r32 dt, Physics_Force* forces) {
 				if (has_collision) {
 					Collision_Point cp = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs);
 					apply_impulse(e1, e2, &cp, forces, 0.1f);
+
+					// Unfortunately we need to run GJK/EPA again to get the collision point wrt the other entity.
+					// The problem is that the impulse algorithm expects that the impulse is applied at the time of collision,
+					// i.e. the collision point is exact the same for both entities.
+					// Unfortunately, this will not be true, since there will be an overlap between the entities.
+					// For this reason, we run GJK/EPA again so we can correctly estimate the collision point of each one
+					// If we don't do this, an error will be introduced and the error might grow as the time passes
+					// @TODO 1: Investigate if we can tweak GJK/EPA to get both points at the same time
+					// @TODO 2: Modify main loop to use dt_frac scheme, and see if by rewinding the time we can disregard the error
+					// @TODO 3: When one of the rigid bodies is static, we can avoid the second run.
+					gjk_sl = (GJK_Support_List){0};
+					assert(collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs));
+					cp = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
+					apply_impulse(e2, e1, &cp, forces, 0.1f);
+
 					any_collision_found = true;
 				}
 			}
@@ -247,6 +262,21 @@ void physics_simulate(Entity* entities, r32 dt, Physics_Force* forces) {
 				if (has_collision) {
 					Collision_Point cp = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs);
 					apply_impulse(e1, e2, &cp, forces, 0.0f);
+
+					// Unfortunately we need to run GJK/EPA again to get the collision point wrt the other entity.
+					// The problem is that the impulse algorithm expects that the impulse is applied at the time of collision,
+					// i.e. the collision point is exact the same for both entities.
+					// Unfortunately, this will not be true, since there will be an overlap between the entities.
+					// For this reason, we run GJK/EPA again so we can correctly estimate the collision point of each one
+					// If we don't do this, an error will be introduced and the error might grow as the time passes
+					// @TODO 1: Investigate if we can tweak GJK/EPA to get both points at the same time
+					// @TODO 2: Modify main loop to use dt_frac scheme, and see if by rewinding the time we can disregard the error
+					// @TODO 3: When one of the rigid bodies is static, we can avoid the second run.
+					gjk_sl = (GJK_Support_List){0};
+					assert(collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs));
+					cp = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
+					apply_impulse(e2, e1, &cp, forces, 0.0f);
+
 					any_collision_found = true;
 				}
 			}
