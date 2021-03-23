@@ -2,6 +2,18 @@
 #include "collision.h"
 #include <light_array.h>
 
+static void update_bounding_shapes(Entity* cube, Entity* plane)
+{
+	for (u32 i = 0; i < array_length(cube->mesh.vertices); ++i) {
+		cube->bs.vertices[i] = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&cube->model_matrix, cube->mesh.vertices[i].position));
+	}
+
+	for (u32 i = 0; i < array_length(plane->mesh.vertices); ++i) {
+		plane->bs.vertices[i] = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&plane->model_matrix, plane->mesh.vertices[i].position));
+	}
+}
+
+
 static mat3 physics_get_dynamic_inertia_tensor_inverse(Entity* e) {
     mat4 rotation_matrix = quaternion_get_matrix(&e->world_rotation);
     mat3 rotation_matrix_m3 = gm_mat4_to_mat3(&rotation_matrix);
@@ -172,6 +184,7 @@ void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_
 	for (u32 i = 0; i < 5 && has_collision; ++i) {
 		has_collision = false;
         physics_update(cube, dt);
+		update_bounding_shapes(cube, plane);
 
 		GJK_Support_List gjk_sl = {0};
 		has_collision = collision_gjk_collides(&gjk_sl, &cube->bs, &plane->bs);
@@ -180,7 +193,8 @@ void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_
 			Collision_Point cp = collision_epa(gjk_sl.simplex, &cube->bs, &plane->bs);
 			col_point = cp.collision_point;
 			penetration = cp.normal;
-			apply_impulse(cube, plane, &cp, forces, 0.8f);
+
+			apply_impulse(cube, plane, &cp, forces, 0.1f);
 
 			collision = true;
 		}
@@ -196,12 +210,14 @@ void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_
 		has_collision = false;
 		r32 restitution = -0.9f;
         physics_update(cube, dt);
+		update_bounding_shapes(cube, plane);
 
 		GJK_Support_List gjk_sl = {0};
 		has_collision = collision_gjk_collides(&gjk_sl, &cube->bs, &plane->bs);
 
 		if (has_collision) {
 			Collision_Point cp = collision_epa(gjk_sl.simplex, &cube->bs, &plane->bs);
+
 			apply_impulse(cube, plane, &cp, forces, 0.0f);
 			restitution += 0.1f;
 		}
@@ -211,6 +227,7 @@ void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_
 	}
 	
 	physics_update(cube, dt);
+	update_bounding_shapes(cube, plane);
 }
 #endif
 

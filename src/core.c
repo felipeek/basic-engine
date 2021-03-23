@@ -70,7 +70,7 @@ int core_init()
 	lights = create_lights();
 
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&plane, m, (vec4){0.0f, PLANE_Y, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	graphics_entity_create_with_color(&plane, m, (vec4){0.0f, PLANE_Y - 1.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1000.0f, 1.0f, 1000.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
 	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&cube, m, (vec4){0.0f, 5.0f, 0.0f, 1.0f}, quaternion_new((vec3){3.0f, 1.0f, 0.5f}, 45.0f),

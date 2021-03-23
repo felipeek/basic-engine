@@ -441,8 +441,14 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
 	if (faces[index].distance == 0.0f)
 	{
 	  array_free(faces);
-	  assert(0);
+	  //assert(0);
 	  //return (vec3) {0.0f, 0.0f, 0.0f};
+
+	  // @TODO: fix this
+	  Collision_Point cp;
+	  cp.collision_point = (vec3){0.0f, 0.0f, 0.0f};
+	  cp.normal = (vec3){0.0f, 1.0f, 0.0};
+	  cp.penetration = 0.0f;
 	}
 	// Find the new support in the normal direction of the closest face
 	Support_Point sup_p = collision_gjk_support(b1, b2, faces[index].normal);
