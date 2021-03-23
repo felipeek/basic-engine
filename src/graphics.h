@@ -37,6 +37,11 @@ typedef struct
 	u32* indices;
 } Mesh;
 
+typedef struct {
+  u32 vertex_count;
+  vec3* vertices;
+} Bounding_Shape;
+
 typedef struct
 {
 	Mesh mesh;
@@ -50,6 +55,8 @@ typedef struct
 	vec3 angular_momentum;
 	mat3 inverse_inertia_tensor;
 	r32 mass;
+
+	Bounding_Shape bs;
 } Entity;
 
 typedef struct

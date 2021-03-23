@@ -156,26 +156,33 @@ static void physics_update(Entity* cube, r32 dt) {
     graphics_entity_set_position(cube, gm_vec4_add(cube->world_position, (vec4){position_change.x, position_change.y, position_change.z, 0.0f}));
 }
 
+extern vec3 col_point;
+extern boolean collision;
+extern vec3 penetration;
+
 #if 1
 // nonconvex rigid bodies with stacking by Guendelman et al.
 void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_Force* forces) {
 	vec4 old_position = cube->world_position;
 	Quaternion old_rotation = cube->world_rotation;
 
+	collision = false;
+
 	boolean has_collision = true;
 	for (u32 i = 0; i < 5 && has_collision; ++i) {
 		has_collision = false;
         physics_update(cube, dt);
 
-        Collision_Point* collision_points = collision_get_plane_cube_points(cube, plane_y);
-        if (array_length(collision_points) > 0) {
-			for (u32 j = 0; j < array_length(collision_points); ++j) {
-				vec4 new_pos = gm_mat4_multiply_vec4(&cube->model_matrix, cube->mesh.vertices[collision_points[j].vertex_index].position);
-				collision_points[j].collision_point = gm_vec4_to_vec3(new_pos);
-				apply_impulse(cube, plane, &collision_points[j], forces, 0.8f);
-			}
+		GJK_Support_List gjk_sl = {0};
+		has_collision = collision_gjk_collides(&gjk_sl, &cube->bs, &plane->bs);
 
-			has_collision = true;
+		if (has_collision) {
+			Collision_Point cp = collision_epa(gjk_sl.simplex, &cube->bs, &plane->bs);
+			col_point = cp.collision_point;
+			penetration = cp.normal;
+			apply_impulse(cube, plane, &cp, forces, 0.8f);
+
+			collision = true;
 		}
 
 		graphics_entity_set_position(cube, old_position);
@@ -190,15 +197,12 @@ void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_
 		r32 restitution = -0.9f;
         physics_update(cube, dt);
 
-        Collision_Point* collision_points = collision_get_plane_cube_points(cube, plane_y);
-        if (array_length(collision_points) > 0) {
-			for (u32 j = 0; j < array_length(collision_points); ++j) {
-				vec4 new_pos = gm_mat4_multiply_vec4(&cube->model_matrix, cube->mesh.vertices[collision_points[j].vertex_index].position);
-				collision_points[j].collision_point = gm_vec4_to_vec3(new_pos);
-				apply_impulse(cube, plane, &collision_points[j], forces, 0.0f);
-			}
+		GJK_Support_List gjk_sl = {0};
+		has_collision = collision_gjk_collides(&gjk_sl, &cube->bs, &plane->bs);
 
-			has_collision = true;
+		if (has_collision) {
+			Collision_Point cp = collision_epa(gjk_sl.simplex, &cube->bs, &plane->bs);
+			apply_impulse(cube, plane, &cp, forces, 0.0f);
 			restitution += 0.1f;
 		}
 

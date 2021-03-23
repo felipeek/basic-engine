@@ -375,6 +375,9 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_pos
 	entity->angular_momentum = (vec3){0.0f, 0.0f, 0.0f};
 	entity->linear_momentum = (vec3){0.0f, 0.0f, 0.0f};
 	recalculate_model_matrix(entity);
+
+	entity->bs.vertex_count = array_length(mesh.vertices);
+	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
 }
 
 void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass)
@@ -391,6 +394,9 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_p
 	entity->angular_momentum = (vec3){0.0f, 0.0f, 0.0f};
 	entity->linear_momentum = (vec3){0.0f, 0.0f, 0.0f};
 	recalculate_model_matrix(entity);
+
+	entity->bs.vertex_count = array_length(mesh.vertices);
+	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
 }
 
 void graphics_entity_destroy(Entity* entity)

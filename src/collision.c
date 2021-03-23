@@ -12,7 +12,6 @@ Collision_Point* collision_get_plane_cube_points(Entity* cube, r32 plane_y) {
 			cp.collision_point = gm_vec4_to_vec3(pos_wc);
 			cp.normal = (vec3){0.0f, 1.0f, 0.0f};
 			cp.penetration = plane_y - pos_wc.y;
-			cp.vertex_index = i;
 			array_push(collision_points, cp);
 		}
 	}
@@ -421,8 +420,8 @@ barycentric(vec3 p, vec3 a, vec3 b, vec3 c, r32 *u, r32 *v, r32 *w)
   *u = 1.0f - *v - *w;
 }
 
-vec3
-collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, vec3* penetration)
+Collision_Point
+collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
 {
   int index = -1;
   Face *faces = array_new_len(Face, 4);
@@ -442,13 +441,14 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, ve
 	if (faces[index].distance == 0.0f)
 	{
 	  array_free(faces);
-	  return (vec3) {0.0f, 0.0f, 0.0f};
+	  assert(0);
+	  //return (vec3) {0.0f, 0.0f, 0.0f};
 	}
 	// Find the new support in the normal direction of the closest face
 	Support_Point sup_p = collision_gjk_support(b1, b2, faces[index].normal);
 	vec3 p = sup_p.v;
 
-	if (gm_vec3_dot(p, faces[index].normal) - faces[index].distance < 0.01f)
+	if (gm_vec3_dot(p, faces[index].normal) - faces[index].distance < 0.1f)
 	{
 	  if (gm_vec3_equal(faces[index].normal, (vec3) {0.0f, 0.0f, 0.0f}))
 	  {
@@ -466,10 +466,14 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, ve
 		  gm_vec3_scalar_product(bary_w, faces[index].c.sup)
 		);
 
-	  *penetration = gm_vec3_scalar_product(faces[index].distance, gm_vec3_normalize(faces[index].normal));
+	  vec3 penetration = gm_vec3_scalar_product(faces[index].distance, gm_vec3_normalize(faces[index].normal));
 	  array_free(faces);
-	  //return penetration;
-	  return wcolpoint;
+
+	  Collision_Point cp;
+	  cp.collision_point = wcolpoint;
+	  cp.normal = gm_vec3_scalar_product(-1.0f, penetration);
+	  cp.penetration = gm_vec3_length(penetration);
+	  return cp;
 	}
 	// Expand polytope
 	Edge *edges = array_new_len(Edge, 16);
@@ -531,5 +535,5 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, ve
   array_free(faces);
   printf("The EPA routine took %d iterations and didn't complete", kk);
   assert(0); // this should be unreachable
-  return (vec3) {0};
+  return (Collision_Point){0};
 }
