@@ -319,6 +319,13 @@ void graphics_entity_change_color(Entity* entity, vec4 color, boolean delete_dif
 	entity->diffuse_info.diffuse_color = color;
 }
 
+static void update_bounding_shapes(Entity* entity)
+{
+	for (u32 i = 0; i < array_length(entity->mesh.vertices); ++i) {
+		entity->bs.vertices[i] = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&entity->model_matrix, entity->mesh.vertices[i].position));
+	}
+}
+
 static void recalculate_model_matrix(Entity* entity)
 {
 	r32 s, c;
@@ -374,10 +381,11 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_pos
 	assert(gm_mat3_inverse(&inertia_tensor, &entity->inverse_inertia_tensor));
 	entity->angular_momentum = (vec3){0.0f, 0.0f, 0.0f};
 	entity->linear_momentum = (vec3){0.0f, 0.0f, 0.0f};
-	recalculate_model_matrix(entity);
-
 	entity->bs.vertex_count = array_length(mesh.vertices);
 	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
+
+	recalculate_model_matrix(entity);
+	update_bounding_shapes(entity);
 }
 
 void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass)
@@ -393,10 +401,11 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_p
 	assert(gm_mat3_inverse(&inertia_tensor, &entity->inverse_inertia_tensor));
 	entity->angular_momentum = (vec3){0.0f, 0.0f, 0.0f};
 	entity->linear_momentum = (vec3){0.0f, 0.0f, 0.0f};
-	recalculate_model_matrix(entity);
-
 	entity->bs.vertex_count = array_length(mesh.vertices);
 	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
+
+	recalculate_model_matrix(entity);
+	update_bounding_shapes(entity);
 }
 
 void graphics_entity_destroy(Entity* entity)
@@ -420,18 +429,21 @@ void graphics_entity_set_position(Entity* entity, vec4 world_position)
 {
 	entity->world_position = world_position;
 	recalculate_model_matrix(entity);
+	update_bounding_shapes(entity);
 }
 
 void graphics_entity_set_rotation(Entity* entity, Quaternion world_rotation)
 {
 	entity->world_rotation = world_rotation;
 	recalculate_model_matrix(entity);
+	update_bounding_shapes(entity);
 }
 
 void graphics_entity_set_scale(Entity* entity, vec3 world_scale)
 {
 	entity->world_scale = world_scale;
 	recalculate_model_matrix(entity);
+	update_bounding_shapes(entity);
 }
 
 void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const Entity* entity)
