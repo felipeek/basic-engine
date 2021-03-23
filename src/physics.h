@@ -7,5 +7,5 @@ typedef struct {
 	vec3 force;
 } Physics_Force;
 
-void physics_simulate(Entity* cube, Entity* plane, r32 plane_y, r32 dt, Physics_Force* forces);
+void physics_simulate(Entity* entities, r32 dt, Physics_Force* forces);
 #endif

@@ -14,8 +14,7 @@
 
 static Perspective_Camera camera;
 static Light* lights;
-static Entity plane;
-static Entity cube;
+static Entity* entities;
 static Physics_Force* forces;
 
 static boolean is_mouse_bound_to_joint_target_position;
@@ -69,12 +68,21 @@ int core_init()
 	// Create light
 	lights = create_lights();
 
+	// Create entities
+	entities = array_new(Entity);
+	Entity e;
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&plane, m, (vec4){0.0f, PLANE_Y - 1.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	graphics_entity_create_with_color(&e, m, (vec4){0.0f, PLANE_Y - 1.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1000.0f, 1.0f, 1000.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
+	array_push(entities, e);
 	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&cube, m, (vec4){0.0f, 5.0f, 0.0f, 1.0f}, quaternion_new((vec3){3.0f, 1.0f, 0.5f}, 45.0f),
+	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 5.0f, 0.0f, 1.0f}, quaternion_new((vec3){3.0f, 1.0f, 0.5f}, 45.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
+	array_push(entities, e);
+	//m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	//graphics_entity_create_with_color(&e, m, (vec4){0.0f, 10.0f, 0.0f, 1.0f}, quaternion_new((vec3){3.0f, 1.0f, 0.5f}, 45.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
+	//array_push(entities, e);
 
 	//Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	//graphics_entity_create_with_color(&plane, m, (vec4){0.0f, PLANE_Y, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
@@ -92,7 +100,7 @@ int core_init()
 	array_push(forces, gravity_force);
 
 	graphics_renderer_primitives_init(&r_ctx);
-	bound_entity = &cube;
+	bound_entity = &entities[0];
 
 	return 0;
 }
@@ -110,34 +118,15 @@ void core_update(r32 delta_time)
 {
 	if (stop) return;
 
-	for (u32 i = 0; i < array_length(cube.mesh.vertices); ++i) {
-		cube.bs.vertices[i] = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&cube.model_matrix, cube.mesh.vertices[i].position));
-	}
-
-	for (u32 i = 0; i < array_length(plane.mesh.vertices); ++i) {
-		plane.bs.vertices[i] = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&plane.model_matrix, plane.mesh.vertices[i].position));
-	}
-
-	//GJK_Support_List simplex = { 0 };
-	//if (collision_gjk_collides(&simplex, &cube_bs, &plane_bs)) {
-	//	cube.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
-	//	plane.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
-	//	col_point = collision_epa(simplex.simplex, &cube_bs, &plane_bs, &penetration);
-	//	collision = true;
-	//} else {
-	//	cube.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
-	//	plane.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
-	//	collision = false;
-	//}
-
-	physics_simulate(&cube, &plane, PLANE_Y, delta_time, forces);
+	physics_simulate(entities, delta_time, forces);
 	//array_clear(forces);
 }
 
 void core_render()
 {
-	graphics_entity_render_phong_shader(&camera, &plane, lights);
-	graphics_entity_render_phong_shader(&camera, &cube, lights);
+	for (u32 i = 0; i < array_length(entities); ++i) {
+		graphics_entity_render_phong_shader(&camera, &entities[i], lights);
+	}
 
 	if (collision) {
 		graphics_renderer_debug_points(&r_ctx, &col_point, 1, (vec4){1.0f, 1.0f, 1.0f});
@@ -188,18 +177,17 @@ void core_input_process(boolean* key_state, r32 delta_time)
 	is_mouse_bound_to_joint_target_position = false;
 	if (key_state[GLFW_KEY_1])
 	{
-		bound_entity = &cube;
+		bound_entity = &entities[0];
 		is_mouse_bound_to_joint_target_position = true;
 	}
 	if (key_state[GLFW_KEY_2])
 	{
-		bound_entity = &plane;
+		bound_entity = &entities[1];
 		is_mouse_bound_to_joint_target_position = true;
 	}
 
 	if (key_state[GLFW_KEY_U])
 	{
-		bound_entity = &plane;
 		stop = true;
 		key_state[GLFW_KEY_U] = false;
 	}
