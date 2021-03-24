@@ -34,6 +34,10 @@ static void physics_update_momenta_based_on_forces(Entity* e, r32 dt, Physics_Fo
     e->angular_momentum = gm_vec3_add(e->angular_momentum, angular_momentum_change);
 }
 
+extern vec3 col_point;
+extern boolean collision;
+extern vec3 penetration;
+
 static void apply_impulse(Entity* e1, Entity* e2, Collision_Point* cp, Physics_Force* forces, r32 restitution) {
     cp->normal = gm_vec3_normalize(cp->normal);
 
@@ -96,32 +100,36 @@ static void apply_impulse(Entity* e1, Entity* e2, Collision_Point* cp, Physics_F
     e1->angular_momentum = gm_vec3_add(e1->angular_momentum, gm_vec3_scalar_product(-1.0f, gm_vec3_cross(rA, J_r)));
 	//e2->angular_momentum = gm_vec3_add(e2->angular_momentum, gm_vec3_cross(rB, J_r));
 
-#if 0
+#if 1
     // Tangential component
     vec3 fe = {0};
     for (u32 i = 0; i < array_length(forces); ++i) {
         fe = gm_vec3_add(fe, forces[i].force);
     }
-    r32 vR_dot_N = gm_vec3_dot(vR, cp->normal);
+    r32 vR_dot_N = gm_vec3_dot(vR_plus, cp->normal);
     r32 fe_dot_N = gm_vec3_dot(fe, cp->normal);
     vec3 t;
-    if (vR_dot_N != 0.0f) {
-        t = gm_vec3_normalize(gm_vec3_subtract(vR, gm_vec3_scalar_product(vR_dot_N, cp->normal)));
-    } else if (fe_dot_N != 0.0f) {
+	const r32 threshold = 0.1f;
+    if (fabs(vR_dot_N) < threshold) {
+        t = gm_vec3_normalize(gm_vec3_subtract(vR_plus, gm_vec3_scalar_product(vR_dot_N, cp->normal)));
+    } else if (fabs(fe_dot_N) < threshold) {
         t = gm_vec3_normalize(gm_vec3_subtract(fe, gm_vec3_scalar_product(fe_dot_N, cp->normal)));
     } else {
         t = (vec3){0.0f, 0.0f, 0.0f};
     }
 
-    const r32 static_coefficient = 0.5f;
-    const r32 dynamic_coefficient = 0.25f;
+	// project tangent onto normal's plane so we dont accumulate an error
+	//t = gm_vec3_normalize(gm_vec3_subtract(t, gm_vec3_scalar_product(gm_vec3_dot(t, cp->normal), cp->normal)));
+	t.y = 0.0f;
+
+    const r32 static_coefficient = 1.0f;
+    const r32 dynamic_coefficient = 1.0f;
     r32 j_s = static_coefficient * j_r;
     r32 j_d = dynamic_coefficient * j_r;
 
-    r32 m_vR_dot_t = gm_vec3_dot(gm_vec3_scalar_product(e1->mass, vR), t);
+    r32 m_vR_dot_t = gm_vec3_dot(gm_vec3_scalar_product(e1->mass, vR_plus), t);
     r32 j_f;
-    const r32 STATIC_THRESHOLD = 0.00001f;
-    if (gm_vec3_length(vR) < STATIC_THRESHOLD) {
+    if (gm_vec3_length(vR_plus) < threshold) {
         if (m_vR_dot_t <= j_s) {
             j_f = -m_vR_dot_t;
         } else {
@@ -133,14 +141,17 @@ static void apply_impulse(Entity* e1, Entity* e2, Collision_Point* cp, Physics_F
 
     vec3 J_f = gm_vec3_scalar_product(j_f, t);
     //printf("J_f: <%.3f, %.3f, %.3f>\n", J_f.x, J_f.y, J_f.z);
-    e1->linear_momentum = gm_vec3_add(e1->linear_momentum, gm_vec3_scalar_product(-1.0f, J_f));
-    e2->linear_momentum = gm_vec3_add(e2->linear_momentum, J_f);
-    e1->angular_momentum = gm_vec3_add(e1->angular_momentum, gm_vec3_scalar_product(-1.0f, gm_vec3_cross(rA, J_f)));
-    e2->angular_momentum = gm_vec3_add(e2->angular_momentum, gm_vec3_cross(rB, J_f));
+    e1->linear_momentum = gm_vec3_add(e1->linear_momentum, gm_vec3_scalar_product(1.0f, J_f));
+    //e2->linear_momentum = gm_vec3_add(e2->linear_momentum, J_f);
+    e1->angular_momentum = gm_vec3_add(e1->angular_momentum, gm_vec3_scalar_product(1.0f, gm_vec3_cross(rA, J_f)));
+    //e2->angular_momentum = gm_vec3_add(e2->angular_momentum, gm_vec3_cross(rB, J_f));
 #endif
 }
 
 static void physics_update(Entity* e, r32 dt) {
+	if (e->mass > MAX_MASS_TO_CONSIDER_STATIC_BODY) {
+		return;
+	}
 	mat3 dynamic_inertia_tensor_inverse = physics_get_dynamic_inertia_tensor_inverse(e);
 	vec3 angular_velocity = physics_get_angular_velocity(e, &dynamic_inertia_tensor_inverse);
 	vec3 linear_velocity = physics_get_linear_velocity(e);
@@ -156,10 +167,21 @@ static void physics_update(Entity* e, r32 dt) {
     graphics_entity_set_position(e, gm_vec4_add(e->world_position, (vec4){position_change.x, position_change.y, position_change.z, 0.0f}));
 }
 
-static void simulate_entity_pair(Entity* e1, Entity* e2, r32 dt, Physics_Force* forces) {
+static void force_collision_fix(Entity* moving_body, Entity* static_body) {
+	GJK_Support_List gjk_sl = {0};
+	boolean has_collision = collision_gjk_collides(&gjk_sl, &static_body->bs, &moving_body->bs);
+
+	if (has_collision) {
+		Collision_Point cp = collision_epa(gjk_sl.simplex, &static_body->bs, &moving_body->bs);
+		cp.normal = gm_vec3_scalar_product(-1.0f, cp.normal);
+		gjk_sl = (GJK_Support_List){0};
+		graphics_entity_set_position(moving_body, gm_vec4_add(moving_body->world_position, (vec4){cp.normal.x, cp.normal.y, cp.normal.z, 0.0f}));
+		moving_body->linear_momentum = (vec3){0};
+		moving_body->angular_momentum = (vec3){0};
+	}
 }
 
-void physics_simulate(Entity* entities, r32 dt, Physics_Force* forces) {
+void physics_simulate(Entity* entities, r32 dt) {
 
 	// First pass
 	boolean any_collision_found = true;
@@ -192,7 +214,13 @@ void physics_simulate(Entity* entities, r32 dt, Physics_Force* forces) {
 
 				if (has_collision) {
 					Collision_Point cp = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs);
-					apply_impulse(e1, e2, &cp, forces, 0.1f);
+					if (e1->mass < 1000.0f && e2->mass < 1000.0f) {
+						collision = true;
+						col_point = cp.collision_point;
+						penetration = cp.normal;
+					}
+					apply_impulse(e1, e2, &cp, e1->forces, 0.1f);
+
 
 					// Unfortunately we need to run GJK/EPA again to get the collision point wrt the other entity.
 					// The problem is that the impulse algorithm expects that the impulse is applied at the time of collision,
@@ -204,9 +232,11 @@ void physics_simulate(Entity* entities, r32 dt, Physics_Force* forces) {
 					// @TODO 2: Modify main loop to use dt_frac scheme, and see if by rewinding the time we can disregard the error
 					// @TODO 3: When one of the rigid bodies is static, we can avoid the second run.
 					gjk_sl = (GJK_Support_List){0};
-					assert(collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs));
-					cp = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
-					apply_impulse(e2, e1, &cp, forces, 0.1f);
+					// @TODO: this should always be true, but sometimes it isnt
+					if (collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs)) {
+						cp = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
+						apply_impulse(e2, e1, &cp, e1->forces, 0.1f);
+					}
 
 					any_collision_found = true;
 				}
@@ -227,7 +257,7 @@ void physics_simulate(Entity* entities, r32 dt, Physics_Force* forces) {
 	// Update entities momenta based on forces
 	for (u32 i = 0; i < array_length(entities); ++i) {
 		Entity* e = &entities[i];
-		physics_update_momenta_based_on_forces(e, dt, forces);
+		physics_update_momenta_based_on_forces(e, dt, e->forces);
 	}
 
 	// Second pass
@@ -261,7 +291,7 @@ void physics_simulate(Entity* entities, r32 dt, Physics_Force* forces) {
 
 				if (has_collision) {
 					Collision_Point cp = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs);
-					apply_impulse(e1, e2, &cp, forces, 0.0f);
+					apply_impulse(e1, e2, &cp, e1->forces, 0.0f);
 
 					// Unfortunately we need to run GJK/EPA again to get the collision point wrt the other entity.
 					// The problem is that the impulse algorithm expects that the impulse is applied at the time of collision,
@@ -273,9 +303,11 @@ void physics_simulate(Entity* entities, r32 dt, Physics_Force* forces) {
 					// @TODO 2: Modify main loop to use dt_frac scheme, and see if by rewinding the time we can disregard the error
 					// @TODO 3: When one of the rigid bodies is static, we can avoid the second run.
 					gjk_sl = (GJK_Support_List){0};
-					assert(collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs));
-					cp = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
-					apply_impulse(e2, e1, &cp, forces, 0.0f);
+					// @TODO: this should always be true, but sometimes it isnt
+					if (collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs)) {
+						cp = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
+						apply_impulse(e2, e1, &cp, e1->forces, 0.0f);
+					}
 
 					any_collision_found = true;
 				}

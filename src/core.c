@@ -15,7 +15,6 @@
 static Perspective_Camera camera;
 static Light* lights;
 static Entity* entities;
-static Physics_Force* forces;
 
 static boolean is_mouse_bound_to_joint_target_position;
 static Entity* bound_entity;
@@ -72,17 +71,29 @@ int core_init()
 	entities = array_new(Entity);
 	Entity e;
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 0.12f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){0.1f, 0.1f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
-	array_push(entities, e);
-	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&e, m, (vec4){0.0f, PLANE_Y - 1.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1000.0f, 1.0f, 1000.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
 	array_push(entities, e);
+	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 0.0f, -10.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+		(vec3){1000.0f, 1000.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
+	array_push(entities, e);
 	//m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	//graphics_entity_create_with_color(&e, m, (vec4){0.0f, 10.0f, 0.0f, 1.0f}, quaternion_new((vec3){3.0f, 1.0f, 0.5f}, 45.0f),
-	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
+	//graphics_entity_create_with_color(&e, m, (vec4){0.0f, 0.3f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	//	(vec3){0.3f, 0.3f, 2.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
 	//array_push(entities, e);
+	//m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	//graphics_entity_create_with_color(&e, m, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	//	(vec3){5.0f, 0.05f, 0.7f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
+	//array_push(entities, e);
+	//m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	//graphics_entity_create_with_color(&e, m, (vec4){-3.0f, 2.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	//	(vec3){0.5f, 0.5f, 0.5f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 100.0f);
+	//array_push(entities, e);
+	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 10.0f, 0.0f, 1.0f}, quaternion_new((vec3){3.0f, 1.0f, 0.5f}, 45.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
+	array_push(entities, e);
 
 	//Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	//graphics_entity_create_with_color(&plane, m, (vec4){0.0f, PLANE_Y, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
@@ -92,12 +103,6 @@ int core_init()
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
 
 	menu_register_dummy_callback(menu_dummy_callback);
-
-	forces = array_new(Physics_Force);
-	Physics_Force gravity_force;
-	gravity_force.force = (vec3){0.0f, -100.0f, 0.0f};
-	gravity_force.position = (vec3) {0.0f, 0.0f, 0.0f};
-	array_push(forces, gravity_force);
 
 	graphics_renderer_primitives_init(&r_ctx);
 	bound_entity = &entities[0];
@@ -118,8 +123,20 @@ void core_update(r32 delta_time)
 {
 	if (stop) return;
 
-	physics_simulate(entities, delta_time, forces);
-	//array_clear(forces);
+	Physics_Force gravity_force;
+	gravity_force.position = (vec3) {0.0f, 0.0f, 0.0f};
+	for (u32 i = 0; i < array_length(entities); ++i) {
+		if (entities[i].mass < MAX_MASS_TO_CONSIDER_STATIC_BODY) {
+			gravity_force.force = (vec3){0.0f, -10.0f * entities[i].mass, 0.0f};
+			array_push(entities[i].forces, gravity_force);
+		}
+	}
+
+	physics_simulate(entities, delta_time);
+
+	for (u32 i = 0; i < array_length(entities); ++i) {
+		array_clear(entities[i].forces);
+	}
 }
 
 void core_render()
@@ -165,14 +182,6 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		wireframe = !wireframe;
 		key_state[GLFW_KEY_L] = false;
 	}
-	if (key_state[GLFW_KEY_M])
-	{
-		Physics_Force gravity_force;
-		gravity_force.force = (vec3){0.0f, -100.0f, 0.0f};
-		gravity_force.position = (vec3) {0.0f, 0.0f, 0.0f};
-		array_push(forces, gravity_force);
-		key_state[GLFW_KEY_M] = false;
-	}
 
 	is_mouse_bound_to_joint_target_position = false;
 	if (key_state[GLFW_KEY_1])
@@ -186,10 +195,51 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		is_mouse_bound_to_joint_target_position = true;
 	}
 
+/*
 	if (key_state[GLFW_KEY_U])
 	{
 		stop = true;
 		key_state[GLFW_KEY_U] = false;
+	}
+	*/
+
+	if (key_state[GLFW_KEY_Q]) {
+		// MOVE TARGET POSITIONS!
+		vec3 camera_z = camera_get_z_axis(&camera);
+		vec4 camera_pos = camera.position;
+		r32 distance = 5.0f;
+		vec3 diff = gm_vec3_scalar_product(-distance, camera_z);
+		vec4 cube_position = gm_vec4_add(camera_pos, (vec4){diff.x, diff.y, diff.z, 0.0f});
+
+		Entity e;
+		Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+		graphics_entity_create_with_color(&e, m, cube_position, quaternion_new((vec3){0.35f, 0.44f, 0.12f}, 33.0f),
+			(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 1.0f, 1.0f}, 10.0f);
+
+		Physics_Force force;
+		force.force = gm_vec3_scalar_product(10000.0f, gm_vec3_scalar_product(-1.0f, camera_z));
+		force.position = (vec3) {0.0f, 0.0f, 0.0f};
+		array_push(e.forces, force);
+
+		array_push(entities, e);
+		key_state[GLFW_KEY_Q] = false;
+	}
+
+	if (key_state[GLFW_KEY_U]) {
+		Physics_Force force;
+		force.force = (vec3){1000.0f, 0.0f, 0.0f};
+		force.position = (vec3){0.0f, 0.0f, 0.0f};
+		array_push(entities[1].forces, force);
+		key_state[GLFW_KEY_U] = false;
+	}
+
+	if (key_state[GLFW_KEY_9]) {
+		Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+		Entity e;
+		graphics_entity_create_with_color(&e, m, (vec4){5.0f, 10.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+			(vec3){0.5f, 0.5f, 0.5f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1000.0f);
+		array_push(entities, e);
+		key_state[GLFW_KEY_9] = false;
 	}
 
 	if (key_state[GLFW_KEY_X])
@@ -271,7 +321,6 @@ void core_mouse_change_process(boolean reset, r64 x_pos, r64 y_pos)
 
 void core_mouse_click_process(s32 button, s32 action, r64 x_pos, r64 y_pos)
 {
-
 }
 
 void core_scroll_change_process(r64 x_offset, r64 y_offset)

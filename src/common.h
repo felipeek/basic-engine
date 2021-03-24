@@ -18,5 +18,6 @@ typedef double r64;
 #define false 0
 
 #define PI_F 3.14159265358979f
+#define MAX_MASS_TO_CONSIDER_STATIC_BODY 10000.0f
 
 #endif

@@ -42,6 +42,11 @@ typedef struct {
   vec3* vertices;
 } Bounding_Shape;
 
+typedef struct {
+	vec3 position;
+	vec3 force;
+} Physics_Force;
+
 typedef struct
 {
 	Mesh mesh;
@@ -57,6 +62,7 @@ typedef struct
 	r32 mass;
 
 	Bounding_Shape bs;
+	Physics_Force* forces;
 } Entity;
 
 typedef struct

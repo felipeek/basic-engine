@@ -383,6 +383,7 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_pos
 	entity->linear_momentum = (vec3){0.0f, 0.0f, 0.0f};
 	entity->bs.vertex_count = array_length(mesh.vertices);
 	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
+	entity->forces = array_new(Physics_Force);
 
 	recalculate_model_matrix(entity);
 	update_bounding_shapes(entity);
@@ -403,6 +404,7 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_p
 	entity->linear_momentum = (vec3){0.0f, 0.0f, 0.0f};
 	entity->bs.vertex_count = array_length(mesh.vertices);
 	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
+	entity->forces = array_new(Physics_Force);
 
 	recalculate_model_matrix(entity);
 	update_bounding_shapes(entity);
