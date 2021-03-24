@@ -76,7 +76,7 @@ int core_init()
 	array_push(entities, e);
 	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 0.0f, -10.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){1000.0f, 1000.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
+		(vec3){1000.0f, 1000.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.4f, 1.0f}, 1000000000.0f);
 	array_push(entities, e);
 	//m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	//graphics_entity_create_with_color(&e, m, (vec4){0.0f, 0.3f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
@@ -212,9 +212,18 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		vec4 cube_position = gm_vec4_add(camera_pos, (vec4){diff.x, diff.y, diff.z, 0.0f});
 
 		Entity e;
-		Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+		char* mesh_name;
+		int r = rand();
+		if (r % 3 == 0) {
+			mesh_name = "./res/cube.obj";
+		} else if (r % 3 == 1) {
+			mesh_name = "./res/ico.obj";
+		} else {
+			mesh_name = "./res/cone.obj";
+		}
+		Mesh m = graphics_mesh_create_from_obj(mesh_name, 0);
 		graphics_entity_create_with_color(&e, m, cube_position, quaternion_new((vec3){0.35f, 0.44f, 0.12f}, 33.0f),
-			(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 1.0f, 1.0f}, 10.0f);
+			(vec3){1.0f, 1.0f, 1.0f}, (vec4){rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, 1.0f}, 10.0f);
 
 		Physics_Force force;
 		force.force = gm_vec3_scalar_product(10000.0f, gm_vec3_scalar_product(-1.0f, camera_z));

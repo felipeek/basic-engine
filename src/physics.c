@@ -119,7 +119,7 @@ static void apply_impulse(Entity* e1, Entity* e2, Collision_Point* cp, Physics_F
     }
 
 	// project tangent onto normal's plane so we dont accumulate an error
-	//t = gm_vec3_normalize(gm_vec3_subtract(t, gm_vec3_scalar_product(gm_vec3_dot(t, cp->normal), cp->normal)));
+	// @TODO: somehow make this generic...
 	t.y = 0.0f;
 
     const r32 static_coefficient = 1.0f;
