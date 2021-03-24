@@ -15,12 +15,40 @@
 #define MENU_TITLE "Basic Engine"
 
 typedef void (*Dummy_Callback)();
+typedef void (*Restitution_Callback)(r32);
+typedef void (*Gravity_Callback)(r32);
+typedef void (*Static_Friction_Coefficient_Callback)(r32);
+typedef void (*Dynamic_Friction_Coefficient_Callback)(r32);
 
 static Dummy_Callback dummy_callback;
+static Restitution_Callback restitution_callback;
+static Gravity_Callback gravity_callback;
+static Static_Friction_Coefficient_Callback static_friction_coefficient_callback;
+static Dynamic_Friction_Coefficient_Callback dynamic_friction_coefficient_callback;
 
 extern "C" void menu_register_dummy_callback(Dummy_Callback f)
 {
 	dummy_callback = f;
+}
+
+extern "C" void menu_register_restitution_callback(Restitution_Callback f)
+{
+	restitution_callback = f;
+}
+
+extern "C" void menu_register_gravity_callback(Gravity_Callback f)
+{
+	gravity_callback = f;
+}
+
+extern "C" void menu_register_static_friction_coefficient_callback(Gravity_Callback f)
+{
+	static_friction_coefficient_callback = f;
+}
+
+extern "C" void menu_register_dynamic_friction_coefficient_callback(Gravity_Callback f)
+{
+	dynamic_friction_coefficient_callback = f;
 }
 
 extern "C" void menu_char_click_process(GLFWwindow* window, u32 c)
@@ -67,11 +95,39 @@ static void draw_main_window()
 		return;
 	}
 
-	if (ImGui::Button("Dummy"))
+	static r32 restitution = 0.1f;
+	if (ImGui::DragFloat("Restitution", &restitution, 0.01f, 0.0f, 1.0f))
 	{
-		if (dummy_callback)
+		if (restitution_callback)
 		{
-			dummy_callback();
+			restitution_callback(restitution);
+		}
+	}
+
+	static r32 gravity = 10.0f;
+	if (ImGui::DragFloat("Gravity", &gravity, 1.0f, 0.0f, 100.0f))
+	{
+		if (gravity_callback)
+		{
+			gravity_callback(gravity);
+		}
+	}
+
+	static r32 static_friction_coefficient = 1.0f;
+	if (ImGui::DragFloat("Static Friction Coefficient", &static_friction_coefficient, 0.01f, 0.0f, 1.0f))
+	{
+		if (static_friction_coefficient_callback)
+		{
+			static_friction_coefficient_callback(static_friction_coefficient);
+		}
+	}
+
+	static r32 dynamic_friction_coefficient = 1.0f;
+	if (ImGui::DragFloat("Dynamic Friction Coefficient", &dynamic_friction_coefficient, 0.01f, 0.0f, 1.0f))
+	{
+		if (dynamic_friction_coefficient_callback)
+		{
+			dynamic_friction_coefficient_callback(dynamic_friction_coefficient);
 		}
 	}
 

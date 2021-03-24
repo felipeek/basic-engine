@@ -60,6 +60,24 @@ static void menu_dummy_callback()
 	printf("dummy callback called!\n");
 }
 
+r32 restitution = 0.1f, gravity = 10.0f, static_friction_coefficient = 1.0f, dynamic_friction_coefficient = 1.0f;
+
+void restitution_callback(r32 _restitution) {
+	restitution = _restitution;
+}
+
+void gravity_callback(r32 _gravity) {
+	gravity = _gravity;
+}
+
+void dynamic_friction_coefficient_callback(r32 _dynamic_friction_coefficient) {
+	dynamic_friction_coefficient = _dynamic_friction_coefficient;
+}
+
+void static_friction_coefficient_callback(r32 _static_friction_coefficient) {
+	static_friction_coefficient = _static_friction_coefficient;
+}
+
 int core_init()
 {
 	// Create camera
@@ -105,6 +123,10 @@ int core_init()
 	menu_register_dummy_callback(menu_dummy_callback);
 
 	graphics_renderer_primitives_init(&r_ctx);
+	menu_register_restitution_callback(restitution_callback);
+	menu_register_gravity_callback(gravity_callback);
+	menu_register_static_friction_coefficient_callback(static_friction_coefficient_callback);
+	menu_register_dynamic_friction_coefficient_callback(dynamic_friction_coefficient_callback);
 	bound_entity = &entities[0];
 
 	return 0;
@@ -114,6 +136,7 @@ void core_destroy()
 {
 	array_free(lights);
 }
+
 
 vec3 col_point;
 boolean collision;
@@ -127,7 +150,7 @@ void core_update(r32 delta_time)
 	gravity_force.position = (vec3) {0.0f, 0.0f, 0.0f};
 	for (u32 i = 0; i < array_length(entities); ++i) {
 		if (entities[i].mass < MAX_MASS_TO_CONSIDER_STATIC_BODY) {
-			gravity_force.force = (vec3){0.0f, -10.0f * entities[i].mass, 0.0f};
+			gravity_force.force = (vec3){0.0f, -gravity * entities[i].mass, 0.0f};
 			array_push(entities[i].forces, gravity_force);
 		}
 	}
@@ -195,7 +218,7 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		is_mouse_bound_to_joint_target_position = true;
 	}
 
-/*
+	/*
 	if (key_state[GLFW_KEY_U])
 	{
 		stop = true;

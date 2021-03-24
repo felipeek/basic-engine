@@ -38,6 +38,7 @@ extern vec3 col_point;
 extern boolean collision;
 extern vec3 penetration;
 
+extern r32 static_friction_coefficient, dynamic_friction_coefficient;
 static void apply_impulse(Entity* e1, Entity* e2, Collision_Point* cp, Physics_Force* forces, r32 restitution) {
     cp->normal = gm_vec3_normalize(cp->normal);
 
@@ -122,8 +123,8 @@ static void apply_impulse(Entity* e1, Entity* e2, Collision_Point* cp, Physics_F
 	// @TODO: somehow make this generic...
 	t.y = 0.0f;
 
-    const r32 static_coefficient = 1.0f;
-    const r32 dynamic_coefficient = 1.0f;
+    const r32 static_coefficient = static_friction_coefficient;
+    const r32 dynamic_coefficient = dynamic_friction_coefficient;
     r32 j_s = static_coefficient * j_r;
     r32 j_d = dynamic_coefficient * j_r;
 
@@ -181,9 +182,10 @@ static void force_collision_fix(Entity* moving_body, Entity* static_body) {
 	}
 }
 
+extern r32 restitution;
 void physics_simulate(Entity* entities, r32 dt) {
 
-	const r32 restitution = 0.1f;
+	//const r32 restitution = 0.1f;
 
 	// First pass
 	boolean any_collision_found = true;
