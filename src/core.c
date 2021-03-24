@@ -203,7 +203,7 @@ void core_input_process(boolean* key_state, r32 delta_time)
 	}
 	*/
 
-	if (key_state[GLFW_KEY_Q]) {
+	if (key_state[GLFW_KEY_Q] || key_state[GLFW_KEY_9]) {
 		// MOVE TARGET POSITIONS!
 		vec3 camera_z = camera_get_z_axis(&camera);
 		vec4 camera_pos = camera.position;
@@ -232,6 +232,7 @@ void core_input_process(boolean* key_state, r32 delta_time)
 
 		array_push(entities, e);
 		key_state[GLFW_KEY_Q] = false;
+		key_state[GLFW_KEY_9] = false;
 	}
 
 	if (key_state[GLFW_KEY_U]) {
@@ -242,14 +243,14 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		key_state[GLFW_KEY_U] = false;
 	}
 
-	if (key_state[GLFW_KEY_9]) {
-		Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-		Entity e;
-		graphics_entity_create_with_color(&e, m, (vec4){5.0f, 10.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-			(vec3){0.5f, 0.5f, 0.5f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1000.0f);
-		array_push(entities, e);
-		key_state[GLFW_KEY_9] = false;
-	}
+	//if (key_state[GLFW_KEY_9]) {
+	//	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	//	Entity e;
+	//	graphics_entity_create_with_color(&e, m, (vec4){5.0f, 10.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	//		(vec3){0.5f, 0.5f, 0.5f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1000.0f);
+	//	array_push(entities, e);
+	//	key_state[GLFW_KEY_9] = false;
+	//}
 
 	if (key_state[GLFW_KEY_X])
 	{
