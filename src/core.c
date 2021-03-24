@@ -25,7 +25,7 @@ static boolean stop = false;
 static Perspective_Camera create_camera()
 {
 	Perspective_Camera camera;
-	vec4 camera_position =(vec4) {0.0f, 2.0f, 5.0f, 1.0f};
+	vec4 camera_position =(vec4) {0.0f, 2.0f, 10.0f, 1.0f};
 	r32 camera_near_plane = -0.01f;
 	r32 camera_far_plane = -1000.0f;
 	r32 camera_fov = 45.0f;

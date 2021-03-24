@@ -183,6 +183,8 @@ static void force_collision_fix(Entity* moving_body, Entity* static_body) {
 
 void physics_simulate(Entity* entities, r32 dt) {
 
+	const r32 restitution = 0.1f;
+
 	// First pass
 	boolean any_collision_found = true;
 	for (u32 i = 0; i < 5 && any_collision_found; ++i) {
@@ -219,7 +221,7 @@ void physics_simulate(Entity* entities, r32 dt) {
 						col_point = cp.collision_point;
 						penetration = cp.normal;
 					}
-					apply_impulse(e1, e2, &cp, e1->forces, 0.1f);
+					apply_impulse(e1, e2, &cp, e1->forces, restitution);
 
 
 					// Unfortunately we need to run GJK/EPA again to get the collision point wrt the other entity.
@@ -235,7 +237,7 @@ void physics_simulate(Entity* entities, r32 dt) {
 					// @TODO: this should always be true, but sometimes it isnt
 					if (collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs)) {
 						cp = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
-						apply_impulse(e2, e1, &cp, e1->forces, 0.1f);
+						apply_impulse(e2, e1, &cp, e1->forces, restitution);
 					}
 
 					any_collision_found = true;
