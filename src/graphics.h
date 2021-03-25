@@ -31,8 +31,9 @@ typedef struct
 typedef struct
 {
 	u32 VAO, VBO, EBO;
-	s32 indexes_size;
 	Normal_Mapping_Info normal_info;
+	Vertex* vertices;
+	u32* indices;
 } Mesh;
 
 typedef struct
@@ -74,7 +75,7 @@ void graphics_image_save(const s8* image_path, const Image_Data* image_data);
 void graphics_float_image_save(const s8* image_path, const Float_Image_Data* image_data);
 Shader graphics_shader_create(const s8* vertex_shader_path, const s8* fragment_shader_path);
 Mesh graphics_quad_create();
-Mesh graphics_mesh_create(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info);
+Mesh graphics_mesh_create(Vertex* vertices, u32* indices, Normal_Mapping_Info* normal_info);
 Mesh graphics_mesh_create_from_obj(const s8* obj_path, Normal_Mapping_Info* normal_info);
 void graphics_mesh_render(Shader shader, Mesh mesh);
 void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color);

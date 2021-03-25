@@ -4,7 +4,7 @@
 #include <GL/glew.h>
 #include <stb_image.h>
 #include <stb_image_write.h>
-#include <dynamic_array.h>
+#include <light_array.h>
 #include <math.h>
 
 #define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
@@ -139,47 +139,44 @@ static void init_predefined_shaders()
 	}
 }
 
-// Vertices must be Vertex[4]
-// Indexes must be u32[6]
-static void fill_quad_vertices_and_indexes(r32 size, Vertex* vertices, u32* indices)
-{
-	vertices[0].position = (vec4) { 0.0f, 0.0f, 0.0f, 1.0f };
-	vertices[0].normal = (vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
-	vertices[0].texture_coordinates = (vec2) { 0.0f, 0.0f };
-
-	vertices[1].position = (vec4) { size, 0.0f, 0.0f, 1.0f };
-	vertices[1].normal = (vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
-	vertices[1].texture_coordinates = (vec2) { 1.0f, 0.0f };
-
-	vertices[2].position = (vec4) { 0.0f, size, 0.0f, 1.0f };
-	vertices[2].normal = (vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
-	vertices[2].texture_coordinates = (vec2) { 0.0f, 1.0f };
-
-	vertices[3].position = (vec4) { size, size, 0.0f, 1.0f };
-	vertices[3].normal = (vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
-	vertices[3].texture_coordinates = (vec2) { 1.0f, 1.0f };
-
-	indices[0] = 0;
-	indices[1] = 1;
-	indices[2] = 2;
-	indices[3] = 1;
-	indices[4] = 3;
-	indices[5] = 2;
-}
-
 Mesh graphics_quad_create()
 {
 	r32 size = 1.0f;
-	Vertex vertices[4];
-	u32 indices[6];
+	Vertex* vertices = array_new(vertices);
+	u32* indices = array_new(u32);
 
-	fill_quad_vertices_and_indexes(size, vertices, indices);
+	Vertex v;
+	v.position = (vec4) { 0.0f, 0.0f, 0.0f, 1.0f };
+	v.normal = (vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
+	v.texture_coordinates = (vec2) { 0.0f, 0.0f };
+	array_push(vertices, v);
 
-	return graphics_mesh_create(vertices, sizeof(vertices) / sizeof(Vertex), indices,
-		sizeof(indices) / sizeof(u32), 0);
+	v.position = (vec4) { size, 0.0f, 0.0f, 1.0f };
+	v.normal = (vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
+	v.texture_coordinates = (vec2) { 1.0f, 0.0f };
+	array_push(vertices, v);
+
+	v.position = (vec4) { 0.0f, size, 0.0f, 1.0f };
+	v.normal = (vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
+	v.texture_coordinates = (vec2) { 0.0f, 1.0f };
+	array_push(vertices, v);
+
+	v.position = (vec4) { size, size, 0.0f, 1.0f };
+	v.normal = (vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
+	v.texture_coordinates = (vec2) { 1.0f, 1.0f };
+	array_push(vertices, v);
+
+	array_push(indices, 0);
+	array_push(indices, 1);
+	array_push(indices, 2);
+	array_push(indices, 1);
+	array_push(indices, 3);
+	array_push(indices, 2);
+
+	return graphics_mesh_create(vertices, indices, 0);
 }
 
-Mesh graphics_mesh_create(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info)
+Mesh graphics_mesh_create(Vertex* vertices, u32* indices, Normal_Mapping_Info* normal_info)
 {
 	Mesh mesh;
 	GLuint VBO, EBO, VAO;
@@ -190,8 +187,8 @@ Mesh graphics_mesh_create(Vertex* vertices, s32 vertices_size, u32* indices, s32
 	glBindVertexArray(VAO);
 
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, vertices_size * sizeof(Vertex), 0, GL_STATIC_DRAW);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, vertices_size * sizeof(Vertex), vertices);
+	glBufferData(GL_ARRAY_BUFFER, array_length(vertices) * sizeof(Vertex), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, array_length(vertices) * sizeof(Vertex), vertices);
 
 	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 10 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
 	glEnableVertexAttribArray(0);
@@ -203,8 +200,8 @@ Mesh graphics_mesh_create(Vertex* vertices, s32 vertices_size, u32* indices, s32
 	glEnableVertexAttribArray(2);
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_size * sizeof(u32), 0, GL_STATIC_DRAW);
-	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, indices_size * sizeof(u32), indices);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, array_length(indices) * sizeof(u32), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, array_length(indices) * sizeof(u32), indices);
 
 	glBindVertexArray(0);
 
@@ -214,7 +211,6 @@ Mesh graphics_mesh_create(Vertex* vertices, s32 vertices_size, u32* indices, s32
 	mesh.VAO = VAO;
 	mesh.VBO = VBO;
 	mesh.EBO = EBO;
-	mesh.indexes_size = indices_size;
 
 	if (!normal_info)
 	{
@@ -224,6 +220,9 @@ Mesh graphics_mesh_create(Vertex* vertices, s32 vertices_size, u32* indices, s32
 	}
 	else
 		mesh.normal_info = *normal_info;
+
+	mesh.vertices = vertices;
+	mesh.indices = indices;
 
 	return mesh;
 }
@@ -236,7 +235,7 @@ static s8* build_light_uniform_name(s8* buffer, s32 index, const s8* property)
 
 static void light_update_uniforms(const Light* lights, Shader shader)
 {
-	s32 number_of_lights = array_get_length(lights);
+	s32 number_of_lights = array_length(lights);
 	s8 buffer[64];
 	glUseProgram(shader);
 
@@ -296,7 +295,7 @@ void graphics_mesh_render(Shader shader, Mesh mesh)
 	glBindVertexArray(mesh.VAO);
 	glUseProgram(shader);
 	normals_update_uniforms(&mesh.normal_info, shader);
-	glDrawElements(GL_TRIANGLES, mesh.indexes_size, GL_UNSIGNED_INT, 0);
+	glDrawElements(GL_TRIANGLES, array_length(mesh.indices), GL_UNSIGNED_INT, 0);
 	glUseProgram(0);
 	glBindVertexArray(0);
 }
@@ -581,8 +580,6 @@ Mesh graphics_mesh_create_from_obj(const s8* obj_path, Normal_Mapping_Info* norm
 	Vertex* vertices;
 	u32* indexes;
 	obj_parse(obj_path, &vertices, &indexes);
-	Mesh m = graphics_mesh_create(vertices, array_get_length(vertices), indexes, array_get_length(indexes), normal_info);
-	array_release(vertices);
-	array_release(indexes);
+	Mesh m = graphics_mesh_create(vertices, indexes, normal_info);
 	return m;
 }
