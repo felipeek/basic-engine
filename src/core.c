@@ -16,7 +16,7 @@ static Entity e;
 static Perspective_Camera create_camera()
 {
 	Perspective_Camera camera;
-	vec4 camera_position =(vec4) {0.0f, 0.0f, 1.0f, 1.0f};
+	vec4 camera_position =(vec4) {0.0f, 0.0f, 5.0f, 1.0f};
 	r32 camera_near_plane = -0.01f;
 	r32 camera_far_plane = -1000.0f;
 	r32 camera_fov = 45.0f;
@@ -51,7 +51,7 @@ int core_init()
 	// Create light
 	lights = create_lights();
 
-	Mesh m = graphics_mesh_create_from_obj("./res/sphere.obj", 0);
+	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 
