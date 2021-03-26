@@ -46,6 +46,37 @@ typedef struct
 	Diffuse_Info diffuse_info;
 } Entity;
 
+typedef struct {
+	vec3 position;
+	vec3 velocity;
+	r32 inverse_mass;
+
+	vec3 candidate_position; // auxiliar
+} Particle;
+
+typedef enum {
+	CONSTRAINT_DISTANCE
+} Constraint_Type;
+
+typedef struct {
+	u32 p1;
+	u32 p2;
+	r32 distance;
+} Distance_Constraint;
+
+typedef struct {
+	Constraint_Type type;
+	r32 stiffness;
+	union {
+		Distance_Constraint distance_constraint;
+	};
+} Constraint;
+
+typedef struct {
+	Particle* particles;
+	Constraint* constraints;
+} Particle_Object;
+
 typedef struct
 {
 	vec4 position;
@@ -94,6 +125,8 @@ void graphics_entity_set_rotation(Entity* entity, Quaternion world_rotation);
 void graphics_entity_set_scale(Entity* entity, vec3 world_scale);
 void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const Entity* entity);
 void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const Entity* entity, const Light* lights);
+void graphics_particle_object_create(Particle_Object* po);
+void graphics_particle_object_render_phong_shader(const Perspective_Camera* camera, const Particle_Object* po, const Light* lights);
 void graphics_light_create(Light* light, vec4 position, vec4 ambient_color, vec4 diffuse_color, vec4 specular_color);
 u32 graphics_texture_create(const s8* texture_path);
 u32 graphics_texture_create_from_data(const Image_Data* image_data);

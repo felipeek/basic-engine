@@ -139,6 +139,21 @@ static void init_predefined_shaders()
 	}
 }
 
+typedef struct {
+	Entity sphere;
+	boolean initialized;
+} Predefined_Entities;
+
+Predefined_Entities predefined_entities;
+
+static void init_sphere_entity() {
+	if (!predefined_entities.initialized) {
+		Mesh sphere_mesh = graphics_mesh_create_from_obj("res/low_poly_sphere.obj", 0);
+		graphics_entity_create_with_color(&predefined_entities.sphere, sphere_mesh, (vec4){0.0f, 0.0f, 0.0f, 1.0f},
+			quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f), (vec3){1.0f, 1.0f, 1.0f}, (vec4){0.0f, 0.0f, 1.0f});
+	}
+}
+
 Mesh graphics_quad_create()
 {
 	r32 size = 1.0f;
@@ -582,4 +597,67 @@ Mesh graphics_mesh_create_from_obj(const s8* obj_path, Normal_Mapping_Info* norm
 	obj_parse(obj_path, &vertices, &indexes);
 	Mesh m = graphics_mesh_create(vertices, indexes, normal_info);
 	return m;
+}
+
+void graphics_particle_object_create(Particle_Object* po) {
+	po->particles = array_new(Particle);
+	po->constraints = array_new(Constraint);
+
+	const s32 height = 20;
+	const s32 width = 20;
+	const r32 particle_distance = 0.15f;
+	for (s32 i = 0; i < height; ++i) {
+		for (s32 j = 0; j < width; ++j) {
+			Particle p;
+			p.position = (vec3){(r32)j * particle_distance, (r32)i * particle_distance, 0.0f};
+			p.inverse_mass = 1.0f;
+			p.velocity = (vec3){0.0f, 0.0f, 0.0f};
+			if (i == height - 1) {
+				p.inverse_mass = 0.0f;
+			}
+			array_push(po->particles, p);
+
+			Constraint c;
+			const r32 STIFFNESS = 1.0f;
+
+			if (j - 1 >= 0) {
+				c.type = CONSTRAINT_DISTANCE;
+				c.distance_constraint.distance = particle_distance;
+				c.distance_constraint.p1 = i * width + j - 1; // left
+				c.distance_constraint.p2 = i * width + j;
+				c.stiffness = STIFFNESS;
+				array_push(po->constraints, c);
+			}
+
+			if (i - 1 >= 0) {
+				c.type = CONSTRAINT_DISTANCE;
+				c.distance_constraint.distance = particle_distance;
+				c.distance_constraint.p1 = (i - 1) * width + j; //top
+				c.distance_constraint.p2 = i * width + j;
+				c.stiffness = STIFFNESS;
+				array_push(po->constraints, c);
+			}
+
+			if (i - 1 >= 0 && j - 1 >= 0) {
+				c.type = CONSTRAINT_DISTANCE;
+				c.distance_constraint.distance = 1.414213562f * particle_distance;
+				c.distance_constraint.p1 = (i - 1) * width + (j - 1); // upper-left
+				c.distance_constraint.p2 = i * width + j;
+				c.stiffness = STIFFNESS;
+				array_push(po->constraints, c);
+			}
+		}
+	}
+}
+
+void graphics_particle_object_render_phong_shader(const Perspective_Camera* camera, const Particle_Object* po, const Light* lights) {
+	const r32 PARTICLE_SIZE = 0.1f;
+	init_sphere_entity();
+	graphics_entity_set_scale(&predefined_entities.sphere, (vec3){PARTICLE_SIZE, PARTICLE_SIZE, PARTICLE_SIZE});
+
+	for (u32 i = 0; i < array_length(po->particles); ++i) {
+		Particle* p = &po->particles[i];
+		graphics_entity_set_position(&predefined_entities.sphere, (vec4){p->position.x, p->position.y, p->position.z, 1.0f});
+		graphics_entity_render_phong_shader(camera, &predefined_entities.sphere, lights);
+	}
 }

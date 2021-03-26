@@ -6,12 +6,14 @@
 #include "graphics.h"
 #include "obj.h"
 #include "menu.h"
+#include "pbd.h"
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
 static Perspective_Camera camera;
 static Light* lights;
 static Entity e;
+static Particle_Object po;
 
 static Perspective_Camera create_camera()
 {
@@ -55,6 +57,8 @@ int core_init()
 	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 
+	graphics_particle_object_create(&po);
+
 	menu_register_dummy_callback(menu_dummy_callback);
 
 	return 0;
@@ -67,12 +71,13 @@ void core_destroy()
 
 void core_update(r32 delta_time)
 {
-
+	pbd_simulate(&po, delta_time);
 }
 
 void core_render()
 {
-	graphics_entity_render_phong_shader(&camera, &e, lights);
+	//graphics_entity_render_phong_shader(&camera, &e, lights);
+	graphics_particle_object_render_phong_shader(&camera, &po, lights);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
