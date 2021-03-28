@@ -6,6 +6,8 @@
 #include <stb_image_write.h>
 #include <light_array.h>
 #include <math.h>
+#include <float.h>
+#include "collision.h"
 
 #define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
 #define PHONG_FRAGMENT_SHADER_PATH "./shaders/phong_shader.fs"
@@ -599,19 +601,241 @@ Mesh graphics_mesh_create_from_obj(const s8* obj_path, Normal_Mapping_Info* norm
 	return m;
 }
 
+// Render primitives
+
+typedef struct {
+  u32 shader;
+  // Vector rendering
+  u32 vector_vao;
+  u32 vector_vbo;
+
+  void* data_ptr;
+  int vertex_count;
+
+  // Point rendering
+  u32 point_vao;
+  u32 point_vbo;
+  void* point_data_ptr;
+  int point_count;
+
+  boolean initialized;
+} Render_Primitives_Context;
+
+typedef struct {
+	vec3 position;
+	vec4 color;
+} Primitive_3D_Vertex;
+
+Render_Primitives_Context r_ctx;
+
+static void graphics_renderer_primitives_init() {
+	if (r_ctx.initialized) return;
+	r_ctx.initialized = true;
+
+	int batch_size = 1024 * 1024;
+
+	r_ctx.shader = graphics_shader_create("shaders/debug.vs", "shaders/debug.fs");
+	glUseProgram(r_ctx.shader);
+
+	glGenVertexArrays(1, &r_ctx.vector_vao);
+	glBindVertexArray(r_ctx.vector_vao);
+	glGenBuffers(1, &r_ctx.vector_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, r_ctx.vector_vbo);
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(Primitive_3D_Vertex) * batch_size * 2, 0, GL_DYNAMIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Primitive_3D_Vertex), &((Primitive_3D_Vertex *) 0)->position);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Primitive_3D_Vertex), &((Primitive_3D_Vertex *) 0)->color);
+
+	glGenVertexArrays(1, &r_ctx.point_vao);
+	glBindVertexArray(r_ctx.point_vao);
+	glGenBuffers(1, &r_ctx.point_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, r_ctx.point_vbo);
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(Primitive_3D_Vertex) * batch_size, 0, GL_DYNAMIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Primitive_3D_Vertex), &((Primitive_3D_Vertex *) 0)->position);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Primitive_3D_Vertex), &((Primitive_3D_Vertex *) 0)->color);
+
+	glUseProgram(0);
+}
+
+void graphics_renderer_primitives_flush(const Perspective_Camera* camera)
+{
+	graphics_renderer_primitives_init();
+	glUseProgram(r_ctx.shader);
+
+	// Vector
+	glDisable(GL_DEPTH_TEST);
+	glBindVertexArray(r_ctx.vector_vao);
+	glBindBuffer(GL_ARRAY_BUFFER, r_ctx.vector_vbo);
+	glUnmapBuffer(GL_ARRAY_BUFFER);
+
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+
+	GLint view_matrix_location = glGetUniformLocation(r_ctx.shader, "view_matrix");
+	GLint projection_matrix_location = glGetUniformLocation(r_ctx.shader, "projection_matrix");
+
+	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat *) camera->view_matrix.data);
+	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat *) camera->projection_matrix.data);
+
+	glDrawArrays(GL_LINES, 0, r_ctx.vertex_count);
+	r_ctx.vertex_count = 0;
+	r_ctx.data_ptr = 0;
+	glEnable(GL_DEPTH_TEST);
+
+	// Points
+	glDisable(GL_DEPTH_TEST);
+	glBindVertexArray(r_ctx.point_vao);
+	glBindBuffer(GL_ARRAY_BUFFER, r_ctx.point_vbo);
+	glUnmapBuffer(GL_ARRAY_BUFFER);
+
+	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat *) camera->view_matrix.data);
+	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat *) camera->projection_matrix.data);
+
+	glPointSize(10.0f);
+	glDrawArrays(GL_POINTS, 0, r_ctx.point_count);
+	r_ctx.point_count = 0;
+	r_ctx.point_data_ptr = 0;
+	glEnable(GL_DEPTH_TEST);
+
+	glUseProgram(0);
+
+}
+
+static void setup_primitives_render()
+{
+	if (r_ctx.data_ptr == 0)
+	{
+		glBindVertexArray(r_ctx.vector_vao);
+		glBindBuffer(GL_ARRAY_BUFFER, r_ctx.vector_vbo);
+		r_ctx.data_ptr = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+	}
+}
+
+static void setup_primitives_point_render()
+{
+	if (r_ctx.point_data_ptr == 0)
+	{
+		glBindVertexArray(r_ctx.point_vao);
+		glBindBuffer(GL_ARRAY_BUFFER, r_ctx.point_vbo);
+		r_ctx.point_data_ptr = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+	}
+}
+
+void graphics_renderer_debug_points(vec3* points, int point_count, vec4 color)
+{
+	graphics_renderer_primitives_init();
+	setup_primitives_point_render();
+	Primitive_3D_Vertex *verts = (Primitive_3D_Vertex *)r_ctx.point_data_ptr + r_ctx.point_count;
+
+	for (s32 i = 0; i < point_count; ++i)
+	{
+		verts[i].position = points[i];
+		verts[i].color = color;
+	}
+
+	r_ctx.point_count += point_count;
+}
+
+void graphics_renderer_debug_vector(vec3 position, vec3 v, vec4 color)
+{
+	graphics_renderer_primitives_init();
+	setup_primitives_render();
+
+	Primitive_3D_Vertex *verts = (Primitive_3D_Vertex *)r_ctx.data_ptr + r_ctx.vertex_count;
+
+	verts[0].position = position;
+	verts[0].color = color;
+
+	verts[1].position = v;
+	verts[1].color = color;
+
+	r_ctx.vertex_count += 2;
+}
+
+const r32 PARTICLE_RADIUS = 0.15f;
+const r32 PARTICLE_SPACE = 2.0f * 0.02f * (0.75f);
+
+static boolean sample_position_to_particle(Particle* p, Mesh m, vec3 position) {
+	p->position = position;
+
+	vec3 mesh_intersection;
+	boolean inside_mesh = collision_get_point_closest_intersection_with_mesh(p->position, m, &mesh_intersection, &p->df_distance);
+	if (!inside_mesh) {
+		return false;
+	}
+
+	p->df_gradient = gm_vec3_normalize(gm_vec3_subtract(mesh_intersection, p->position));
+	return true;
+}
+
+void graphics_particle_object_create_from_mesh(Particle_Object* po, Mesh m) {
+	vec3 max = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+	vec3 min = {FLT_MAX, FLT_MAX, FLT_MAX};
+
+	for (s32 i = 0; i < array_length(m.vertices); ++i) {
+		vec4 current = m.vertices[i].position;
+		if (current.x < min.x) {
+			min.x = current.x;
+		}
+		if (current.y < min.y) {
+			min.y = current.y;
+		}
+		if (current.z < min.z) {
+			min.z = current.z;
+		}
+		if (current.x > max.x) {
+			max.x = current.x;
+		}
+		if (current.y > max.y) {
+			max.y = current.y;
+		}
+		if (current.z > max.z) {
+			max.z = current.z;
+		}
+	}
+
+	po->constraints = array_new(Constraint);
+	po->particles = array_new(Particle);
+
+	// @TODO: consider spacing
+	r32 x_min = ceilf(min.x / PARTICLE_RADIUS) * PARTICLE_RADIUS - PARTICLE_RADIUS;
+	u32 x_N = (u32)ceilf((max.x - x_min) / PARTICLE_RADIUS);
+	r32 y_min = ceilf(min.y / PARTICLE_RADIUS) * PARTICLE_RADIUS - PARTICLE_RADIUS;
+	u32 y_N = (u32)ceilf((max.y - y_min) / PARTICLE_RADIUS);
+	r32 z_min = ceilf(min.z / PARTICLE_RADIUS) * PARTICLE_RADIUS - PARTICLE_RADIUS;
+	u32 z_N = (u32)ceilf((max.z - z_min) / PARTICLE_RADIUS);
+
+	for (u32 x = 0; x < x_N; ++x) {
+		for (u32 y = 0; y < y_N; ++y) {
+			for (u32 z = 0; z < z_N; ++z) {
+				Particle p;
+				vec3 sample_position = (vec3){x_min + x * PARTICLE_RADIUS, y_min + y * PARTICLE_RADIUS, z_min + z * PARTICLE_RADIUS};
+				if (sample_position_to_particle(&p, m, sample_position)) {
+					array_push(po->particles, p);
+				}
+			}
+		}
+	}
+}
+
 void graphics_particle_object_create(Particle_Object* po) {
 	po->particles = array_new(Particle);
 	po->constraints = array_new(Constraint);
 
 	const s32 height = 20;
 	const s32 width = 20;
-	const r32 particle_distance = 0.15f;
 	for (s32 i = 0; i < height; ++i) {
 		for (s32 j = 0; j < width; ++j) {
 			Particle p;
-			p.position = (vec3){(r32)j * particle_distance, (r32)i * particle_distance, 0.0f};
-			p.inverse_mass = 1.0f;
+			p.position = (vec3){(r32)j * PARTICLE_SPACE, (r32)i * PARTICLE_SPACE, 0.0f};
+			p.inverse_mass = 0.1f;
 			p.velocity = (vec3){0.0f, 0.0f, 0.0f};
+			//if (i == height - 1 && j == 0) {
 			if (i == height - 1) {
 				p.inverse_mass = 0.0f;
 			}
@@ -620,9 +844,10 @@ void graphics_particle_object_create(Particle_Object* po) {
 			Constraint c;
 			const r32 STIFFNESS = 1.0f;
 
+			// Distance contraints
 			if (j - 1 >= 0) {
 				c.type = CONSTRAINT_DISTANCE;
-				c.distance_constraint.distance = particle_distance;
+				c.distance_constraint.distance = PARTICLE_SPACE;
 				c.distance_constraint.p1 = i * width + j - 1; // left
 				c.distance_constraint.p2 = i * width + j;
 				c.stiffness = STIFFNESS;
@@ -631,7 +856,7 @@ void graphics_particle_object_create(Particle_Object* po) {
 
 			if (i - 1 >= 0) {
 				c.type = CONSTRAINT_DISTANCE;
-				c.distance_constraint.distance = particle_distance;
+				c.distance_constraint.distance = PARTICLE_SPACE;
 				c.distance_constraint.p1 = (i - 1) * width + j; //top
 				c.distance_constraint.p2 = i * width + j;
 				c.stiffness = STIFFNESS;
@@ -640,10 +865,22 @@ void graphics_particle_object_create(Particle_Object* po) {
 
 			if (i - 1 >= 0 && j - 1 >= 0) {
 				c.type = CONSTRAINT_DISTANCE;
-				c.distance_constraint.distance = 1.414213562f * particle_distance;
+				c.distance_constraint.distance = 1.414213562f * PARTICLE_SPACE;
 				c.distance_constraint.p1 = (i - 1) * width + (j - 1); // upper-left
 				c.distance_constraint.p2 = i * width + j;
 				c.stiffness = STIFFNESS;
+				array_push(po->constraints, c);
+			}
+
+			// Bend constraints
+			if (i - 1 >= 0 && j - 1 >= 0) {
+				c.type = CONSTRAINT_BEND;
+				c.bend_constraint.phi0 = PI_F;
+				c.bend_constraint.p1 = i * width + (j - 1); // left
+				c.bend_constraint.p2 = (i - 1) * width + j; // top
+				c.bend_constraint.p3 = (i - 1) * width + (j - 1); // upper-left
+				c.bend_constraint.p4 = i * width + j;	// current
+				c.stiffness = 0.3f;
 				array_push(po->constraints, c);
 			}
 		}
@@ -651,13 +888,15 @@ void graphics_particle_object_create(Particle_Object* po) {
 }
 
 void graphics_particle_object_render_phong_shader(const Perspective_Camera* camera, const Particle_Object* po, const Light* lights) {
-	const r32 PARTICLE_SIZE = 0.1f;
 	init_sphere_entity();
-	graphics_entity_set_scale(&predefined_entities.sphere, (vec3){PARTICLE_SIZE, PARTICLE_SIZE, PARTICLE_SIZE});
+	graphics_entity_set_scale(&predefined_entities.sphere, (vec3){PARTICLE_RADIUS, PARTICLE_RADIUS, PARTICLE_RADIUS});
 
 	for (u32 i = 0; i < array_length(po->particles); ++i) {
 		Particle* p = &po->particles[i];
 		graphics_entity_set_position(&predefined_entities.sphere, (vec4){p->position.x, p->position.y, p->position.z, 1.0f});
 		graphics_entity_render_phong_shader(camera, &predefined_entities.sphere, lights);
+		//graphics_renderer_debug_vector(p->position, gm_vec3_add(p->position, p->df_gradient), (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 	}
+
+	graphics_renderer_primitives_flush(camera);
 }

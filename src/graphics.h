@@ -52,10 +52,15 @@ typedef struct {
 	r32 inverse_mass;
 
 	vec3 candidate_position; // auxiliar
+
+	// distance field
+	r32 df_distance;
+	vec3 df_gradient;
 } Particle;
 
 typedef enum {
-	CONSTRAINT_DISTANCE
+	CONSTRAINT_DISTANCE,
+	CONSTRAINT_BEND
 } Constraint_Type;
 
 typedef struct {
@@ -65,10 +70,19 @@ typedef struct {
 } Distance_Constraint;
 
 typedef struct {
+	u32 p1;
+	u32 p2;
+	u32 p3;
+	u32 p4;
+	r32 phi0;
+} Bend_Constraint;
+
+typedef struct {
 	Constraint_Type type;
 	r32 stiffness;
 	union {
 		Distance_Constraint distance_constraint;
+		Bend_Constraint bend_constraint;
 	};
 } Constraint;
 
@@ -126,6 +140,7 @@ void graphics_entity_set_scale(Entity* entity, vec3 world_scale);
 void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const Entity* entity);
 void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const Entity* entity, const Light* lights);
 void graphics_particle_object_create(Particle_Object* po);
+void graphics_particle_object_create_from_mesh(Particle_Object* po, Mesh m);
 void graphics_particle_object_render_phong_shader(const Perspective_Camera* camera, const Particle_Object* po, const Light* lights);
 void graphics_light_create(Light* light, vec4 position, vec4 ambient_color, vec4 diffuse_color, vec4 specular_color);
 u32 graphics_texture_create(const s8* texture_path);
@@ -134,5 +149,10 @@ u32 graphics_texture_create_from_float_data(const Float_Image_Data* image_data);
 void graphics_texture_delete(u32 texture_id);
 Float_Image_Data graphics_image_data_to_float_image_data(Image_Data* image_data, r32* memory);
 Image_Data graphics_float_image_data_to_image_data(const Float_Image_Data* float_image_Data, u8* memory);
+
+// Render primitives
+void graphics_renderer_primitives_flush(const Perspective_Camera* camera);
+void graphics_renderer_debug_points(vec3* points, int point_count, vec4 color);
+void graphics_renderer_debug_vector(vec3 position, vec3 v, vec4 color);
 
 #endif
