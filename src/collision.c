@@ -135,5 +135,31 @@ boolean collision_get_point_closest_intersection_with_mesh(vec3 point, Mesh m, v
 		}
 	}
 
+	vec3* closest_points = array_new(vec3);
+
+	for (u32 i = 0; i < array_length(m.indices); i += 3) {
+		vec3 t1 = gm_vec4_to_vec3(m.vertices[i + 0].position);
+		vec3 t2 = gm_vec4_to_vec3(m.vertices[i + 1].position);
+		vec3 t3 = gm_vec4_to_vec3(m.vertices[i + 2].position);
+
+		vec3 current_closest_point = collision_closest_point_to_triangle(point, t1, t2, t3);
+		r32 current_closest_distance = gm_vec3_length(gm_vec3_subtract(point, current_closest_point));
+
+		const r32 EPSILON = 0.001f;
+		if (current_closest_distance <= *closest_distance + EPSILON) {
+			array_push(closest_points, current_closest_point);
+		}
+	}
+
+	vec3 r = {0};
+	for (u32 i = 0; i < array_length(closest_points); ++i) {
+		r = gm_vec3_add(r, closest_points[i]);
+	}
+
+	r = gm_vec3_scalar_product(1.0f / array_length(closest_points), r);
+	array_free(closest_points);
+
+	*closest_point = r;
+
 	return inside_mesh;
 }

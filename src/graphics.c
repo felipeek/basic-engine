@@ -757,7 +757,7 @@ void graphics_renderer_debug_vector(vec3 position, vec3 v, vec4 color)
 	r_ctx.vertex_count += 2;
 }
 
-const r32 PARTICLE_RADIUS = 0.15f;
+const r32 PARTICLE_RADIUS = 0.4f;
 const r32 PARTICLE_SPACE = 2.0f * 0.02f * (0.75f);
 
 static boolean sample_position_to_particle(Particle* p, Mesh m, vec3 position) {
@@ -895,7 +895,7 @@ void graphics_particle_object_render_phong_shader(const Perspective_Camera* came
 		Particle* p = &po->particles[i];
 		graphics_entity_set_position(&predefined_entities.sphere, (vec4){p->position.x, p->position.y, p->position.z, 1.0f});
 		graphics_entity_render_phong_shader(camera, &predefined_entities.sphere, lights);
-		//graphics_renderer_debug_vector(p->position, gm_vec3_add(p->position, p->df_gradient), (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+		graphics_renderer_debug_vector(p->position, gm_vec3_add(p->position, p->df_gradient), (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 	}
 
 	graphics_renderer_primitives_flush(camera);
