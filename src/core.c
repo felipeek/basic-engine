@@ -8,6 +8,7 @@
 #include "menu.h"
 #include "physics.h"
 #include "collision.h"
+#include "matrix.h"
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 #define PLANE_Y (0.0f)
@@ -96,22 +97,22 @@ int core_init()
 	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 0.0f, -10.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1000.0f, 1000.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.4f, 1.0f}, 1000000000.0f);
 	array_push(entities, e);
-	//m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	//graphics_entity_create_with_color(&e, m, (vec4){0.0f, 0.3f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-	//	(vec3){0.3f, 0.3f, 2.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
-	//array_push(entities, e);
-	//m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	//graphics_entity_create_with_color(&e, m, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-	//	(vec3){5.0f, 0.05f, 0.7f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
-	//array_push(entities, e);
-	//m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	//graphics_entity_create_with_color(&e, m, (vec4){-3.0f, 2.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-	//	(vec3){0.5f, 0.5f, 0.5f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 100.0f);
-	//array_push(entities, e);
 	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 10.0f, 0.0f, 1.0f}, quaternion_new((vec3){3.0f, 1.0f, 0.5f}, 45.0f),
+	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 1.2f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
 	array_push(entities, e);
+	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 3.4f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 100.0f);
+	array_push(entities, e);
+	//m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	//graphics_entity_create_with_color(&e, m, (vec4){-3.0f, 2.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	//	(vec3){0.5f, 0.5f, 0.5f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
+	//array_push(entities, e);
+	//m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	//graphics_entity_create_with_color(&e, m, (vec4){0.0f, 10.0f, 0.0f, 1.0f}, quaternion_new((vec3){3.0f, 1.0f, 0.5f}, 45.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
+	//array_push(entities, e);
 
 	//Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	//graphics_entity_create_with_color(&plane, m, (vec4){0.0f, PLANE_Y, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
@@ -129,6 +130,22 @@ int core_init()
 	menu_register_dynamic_friction_coefficient_callback(dynamic_friction_coefficient_callback);
 	bound_entity = &entities[0];
 
+	Matrix A = matrix_create(3, 3);
+	A.data[0][0] = 2.0f;
+	A.data[0][1] = 7.0f;
+	A.data[0][2] = 1.0f;
+	A.data[1][0] = 7.0f;
+	A.data[1][1] = 3.0f;
+	A.data[1][2] = 9.0f;
+	A.data[2][0] = 1.0f;
+	A.data[2][1] = 9.0f;
+	A.data[2][2] = 4.0f;
+	r32* b = array_new(r32);
+	array_push(b, -0.3f);
+	array_push(b, -0.5f);
+	array_push(b, -1.0f);
+	r32* results = qp_solve(&A, b);
+
 	return 0;
 }
 
@@ -136,7 +153,6 @@ void core_destroy()
 {
 	array_free(lights);
 }
-
 
 vec3 col_point;
 boolean collision;

@@ -1,6 +1,8 @@
 #include "physics.h"
 #include "collision.h"
 #include <light_array.h>
+#include "matrix.h"
+#include <float.h>
 
 static mat3 physics_get_dynamic_inertia_tensor_inverse(Entity* e) {
     mat4 rotation_matrix = quaternion_get_matrix(&e->world_rotation);
@@ -177,8 +179,8 @@ static void force_collision_fix(Entity* moving_body, Entity* static_body) {
 		cp.normal = gm_vec3_scalar_product(-1.0f, cp.normal);
 		gjk_sl = (GJK_Support_List){0};
 		graphics_entity_set_position(moving_body, gm_vec4_add(moving_body->world_position, (vec4){cp.normal.x, cp.normal.y, cp.normal.z, 0.0f}));
-		moving_body->linear_momentum = (vec3){0};
-		moving_body->angular_momentum = (vec3){0};
+		//moving_body->linear_momentum = (vec3){0};
+		//moving_body->angular_momentum = (vec3){0};
 	}
 }
 
@@ -333,4 +335,176 @@ void physics_simulate(Entity* entities, r32 dt) {
 		Entity* e = &entities[j];
 		physics_update(e, dt);
 	}
+
+	//force_collision_fix(&entities[2], &entities[0]);
+	//force_collision_fix(&entities[3], &entities[0]);
+	//force_collision_fix(&entities[4], &entities[0]);
+	//force_collision_fix(&entities[3], &entities[2]);
+	//force_collision_fix(&entities[4], &entities[3]);
+}
+
+static void max_step(r32* f, r32* a, r32* delta_f, r32* delta_a, s32 d, u32* C, u32* NC, r32* s, s32* j) {
+	*s = FLT_MAX;
+	*j = -1;
+	if (delta_a[d] > 0) {
+		*j = d;
+		*s = -a[d] / delta_a[d];
+	}
+
+	for (u32 i = 0; i < array_length(C); ++i) {
+		if (delta_f[i] < 0.0f) {
+			r32 _s = -f[i] / delta_f[i];
+			if (_s < *s) {
+				*s = _s;
+				*j = i;
+			}
+		}
+	}
+
+	for (u32 i = 0; i < array_length(NC); ++i) {
+		if (delta_a[i] < 0.0f) {
+			r32 _s = -a[i] / delta_a[i];
+			if (_s < *s) {
+				*s = _s;
+				*j = i;
+			}
+		}
+	}
+}
+
+// C must be sorted (low to high)
+static r32* fdirection(s32 d, const Matrix* A, u32* C) {
+	s32 delta_f_size = A->columns;
+	r32* delta_f = array_new_len(r32, delta_f_size);
+	for (u32 i = 0; i < delta_f_size; ++i) {
+		array_push(delta_f, 0.0f);
+	}
+	delta_f[d] = 1.0f;
+
+	u32 C_len = array_length(C);
+	if (C_len == 0) {
+		// nothing to solve here
+		return delta_f;
+	} else if (C_len == 1) {
+		// 1x1 system - solve directly
+		r32 A11 = A->data[C[0]][C[0]];
+		r32 v1 = A->data[C[0]][d];
+		r32 x = -v1 / A11;
+		delta_f[C[0]] = x;
+	} else {
+		// 2x2 or greater system - solve via LU decomposition
+
+		// build the submatrix
+		Matrix Acc = matrix_create(array_length(C), array_length(C));
+		r32* neg_v1 = array_new_len(r32, array_length(C));
+		for (u32 i = 0; i < array_length(C); ++i) {
+			u32 row = C[i];
+			for (u32 j = 0; j < array_length(C); ++j) {
+				u32 column = C[j];
+				Acc.data[i][j] = A->data[row][column];
+			}
+
+			array_push(neg_v1, -A->data[row][d]);
+		}
+
+		r32* x = malloc(sizeof(r32) * array_length(C));
+		matrix_solve_system(&Acc, neg_v1, x);
+
+		for (u32 i = 0; i < array_length(C); ++i) {
+			delta_f[C[i]] = x[i];
+		}
+
+		matrix_destroy(&Acc);
+		free(x);
+	}
+
+	return delta_f;
+}
+
+static s32 v_find(u32* v, u32 x) {
+	// can be optimized
+	for (s32 i = 0; i < array_length(v); ++i) {
+		if (v[i] == x) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+int v_compare(const void* e1, const void* e2) {
+	return *(u32*)e1 - *(u32*)e2;
+}
+
+static boolean v_put(u32* v, u32 x) {
+	array_push(v, x);
+	qsort(v, array_length(v), sizeof(u32), v_compare);
+}
+
+static boolean v_remove(u32* v, s32 index) {
+	array_remove_ordered(v, index);
+}
+
+static void drive_to_zero(s32 d, const Matrix* A, u32* C, u32* NC, r32* f, r32* a) {
+	while (true) {
+		r32* delta_f = fdirection(d, A, C);
+		Matrix delta_f_matrix = matrix_from_vec(delta_f);
+		Matrix delta_a_matrix = matrix_multiply(A, &delta_f_matrix);
+		r32* delta_a = array_new_len(r32, delta_a_matrix.rows);
+		for (u32 i = 0; i < delta_a_matrix.rows; ++i) {
+			array_push(delta_a, delta_a_matrix.data[i][0]);
+		}
+
+		r32 s;
+		s32 j;
+		max_step(f, a, delta_f, delta_a, d, C, NC, &s, &j);
+
+		for (u32 i = 0; i < array_length(f); ++i) {
+			f[i] = f[i] + s * delta_f[i];
+		}
+
+		for (u32 i = 0; i < array_length(a); ++i) {
+			a[i] = a[i] + s * delta_a[i];
+		}
+
+		array_free(delta_f);
+		array_free(delta_a);
+		matrix_destroy(&delta_f_matrix);
+		matrix_destroy(&delta_a_matrix);
+
+		s32 j_C = v_find(C, j);
+		s32 j_NC = v_find(NC, j);
+		if (j_C != -1) {
+			v_remove(C, j_C);
+			v_put(NC, j);
+		} else if (j_NC != -1) {
+			v_remove(NC, j_C);
+			v_put(C, j);
+		} else {
+			v_put(C, j);
+			return;
+		}
+	}
+}
+
+r32* qp_solve(const Matrix* A, r32* b) {
+	assert(A->columns == A->rows);
+	assert(array_length(b) == A->columns);
+	r32* a = array_copy(b);
+	r32* f = array_new_len(r32, array_length(b));
+	for (u32 i = 0; i < array_length(b); ++i) {
+		array_push(f, 0.0f);
+	}
+
+	u32* C = array_new_len(u32, array_length(f));
+	u32* NC = array_new_len(u32, array_length(f));
+
+	for (u32 d = 0; d < array_length(a); ++d) {
+		if (a[d] < 0.0f) {
+			drive_to_zero(d, A, C, NC, f, a);
+		}
+	}
+
+	array_free(a);
+	return f;
 }
