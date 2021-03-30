@@ -20,16 +20,20 @@ static vec3 physics_get_angular_velocity(Entity* e, mat3* dynamic_inertia_tensor
     return gm_mat3_multiply_vec3(dynamic_inertia_tensor_inverse, e->angular_momentum);
 }
 
-static void physics_update_momenta_based_on_forces(Entity* e, r32 dt, Physics_Force* forces) {
-    // Calculate total force and torque
+static void physics_calculate_total_force_and_torque(Entity* e, vec3* total_force, vec3* total_torque) {
     const vec3 center_of_mass = (vec3){0.0f, 0.0f, 0.0f};
-    vec3 total_force = (vec3){0.0f, 0.0f, 0.0f};
-    vec3 total_torque = (vec3){0.0f, 0.0f, 0.0f};
-    for (u32 i = 0; forces && i < array_length(forces); ++i) {
-        vec3 distance = gm_vec3_subtract(forces[i].position, center_of_mass);
-        total_force = gm_vec3_add(total_force, forces[i].force);
-        total_torque = gm_vec3_add(total_torque, gm_vec3_cross(distance, forces[i].force));
+    *total_force = (vec3){0.0f, 0.0f, 0.0f};
+    *total_torque = (vec3){0.0f, 0.0f, 0.0f};
+    for (u32 i = 0; i < array_length(e->forces); ++i) {
+        vec3 distance = gm_vec3_subtract(e->forces[i].position, center_of_mass);
+        *total_force = gm_vec3_add(*total_force, e->forces[i].force);
+        *total_torque = gm_vec3_add(*total_torque, gm_vec3_cross(distance, e->forces[i].force));
     }
+}
+
+static void physics_update_momenta_based_on_forces(Entity* e, r32 dt, Physics_Force* forces) {
+	vec3 total_force, total_torque;
+	physics_calculate_total_force_and_torque(e, &total_force, &total_torque);
     vec3 angular_momentum_change = gm_vec3_scalar_product(dt, total_torque);
     vec3 linear_momentum_change = gm_vec3_scalar_product(dt, total_force);
     e->linear_momentum = gm_vec3_add(e->linear_momentum, linear_momentum_change);
@@ -151,198 +155,7 @@ static void apply_impulse(Entity* e1, Entity* e2, Collision_Point* cp, Physics_F
 #endif
 }
 
-static void physics_update(Entity* e, r32 dt) {
-	if (e->mass > MAX_MASS_TO_CONSIDER_STATIC_BODY) {
-		return;
-	}
-	mat3 dynamic_inertia_tensor_inverse = physics_get_dynamic_inertia_tensor_inverse(e);
-	vec3 angular_velocity = physics_get_angular_velocity(e, &dynamic_inertia_tensor_inverse);
-	vec3 linear_velocity = physics_get_linear_velocity(e);
-
-    // Calculate orientation change
-    r32 rotation_angle = gm_vec3_length(angular_velocity) * dt;
-    vec3 rotation_axis = gm_vec3_normalize(angular_velocity);
-    Quaternion orientation_change = quaternion_new_radians(rotation_axis, rotation_angle);
-    graphics_entity_set_rotation(e, quaternion_product(&orientation_change, &e->world_rotation));
-
-    // Calculate position change
-    vec3 position_change = gm_vec3_scalar_product(dt, linear_velocity);
-    graphics_entity_set_position(e, gm_vec4_add(e->world_position, (vec4){position_change.x, position_change.y, position_change.z, 0.0f}));
-}
-
-static void force_collision_fix(Entity* moving_body, Entity* static_body) {
-	GJK_Support_List gjk_sl = {0};
-	boolean has_collision = collision_gjk_collides(&gjk_sl, &static_body->bs, &moving_body->bs);
-
-	if (has_collision) {
-		Collision_Point cp = collision_epa(gjk_sl.simplex, &static_body->bs, &moving_body->bs);
-		cp.normal = gm_vec3_scalar_product(-1.0f, cp.normal);
-		gjk_sl = (GJK_Support_List){0};
-		graphics_entity_set_position(moving_body, gm_vec4_add(moving_body->world_position, (vec4){cp.normal.x, cp.normal.y, cp.normal.z, 0.0f}));
-		//moving_body->linear_momentum = (vec3){0};
-		//moving_body->angular_momentum = (vec3){0};
-	}
-}
-
-extern r32 restitution;
-void physics_simulate(Entity* entities, r32 dt) {
-
-	//const r32 restitution = 0.1f;
-
-	// First pass
-	boolean any_collision_found = true;
-	for (u32 i = 0; i < 5 && any_collision_found; ++i) {
-		any_collision_found = false;
-
-		// Update all entities based on their current momenta
-		vec4* entities_original_positions = array_new(vec4);
-		Quaternion* entities_original_rotations = array_new(Quaternion);
-		for (u32 j = 0; j < array_length(entities); ++j) {
-			Entity* e = &entities[j];
-			array_push(entities_original_positions, e->world_position);
-			array_push(entities_original_rotations, e->world_rotation);
-			physics_update(e, dt);
-		}
-
-		// Resolve all collisions
-		for (u32 j = 0; j < array_length(entities); ++j) {
-			Entity* e1 = &entities[j];
-			vec4 e1_old_position = e1->world_position;
-			Quaternion e1_old_rotation = e1->world_rotation;
-
-			for (u32 k = j + 1; k < array_length(entities); ++k) {
-				Entity* e2 = &entities[k];
-				vec4 e2_old_position = e2->world_position;
-				Quaternion e2_old_rotation = e2->world_rotation;
-
-				GJK_Support_List gjk_sl = {0};
-				boolean has_collision = collision_gjk_collides(&gjk_sl, &e1->bs, &e2->bs);
-
-				if (has_collision) {
-					Collision_Point cp = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs);
-					if (e1->mass < 1000.0f && e2->mass < 1000.0f) {
-						collision = true;
-						col_point = cp.collision_point;
-						penetration = cp.normal;
-					}
-					apply_impulse(e1, e2, &cp, e1->forces, restitution);
-
-
-					// Unfortunately we need to run GJK/EPA again to get the collision point wrt the other entity.
-					// The problem is that the impulse algorithm expects that the impulse is applied at the time of collision,
-					// i.e. the collision point is exact the same for both entities.
-					// Unfortunately, this will not be true, since there will be an overlap between the entities.
-					// For this reason, we run GJK/EPA again so we can correctly estimate the collision point of each one
-					// If we don't do this, an error will be introduced and the error might grow as the time passes
-					// @TODO 1: Investigate if we can tweak GJK/EPA to get both points at the same time
-					// @TODO 2: Modify main loop to use dt_frac scheme, and see if by rewinding the time we can disregard the error
-					// @TODO 3: When one of the rigid bodies is static, we can avoid the second run.
-					gjk_sl = (GJK_Support_List){0};
-					// @TODO: this should always be true, but sometimes it isnt
-					if (collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs)) {
-						cp = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
-						apply_impulse(e2, e1, &cp, e1->forces, restitution);
-					}
-
-					any_collision_found = true;
-				}
-			}
-		}
-
-		// Reset position/orientation of all entities
-		for (u32 j = 0; j < array_length(entities); ++j) {
-			Entity* e = &entities[j];
-			graphics_entity_set_position(e, entities_original_positions[j]);
-			graphics_entity_set_rotation(e, entities_original_rotations[j]);
-		}
-
-		array_free(entities_original_positions);
-		array_free(entities_original_rotations);
-	}
-
-	// Update entities momenta based on forces
-	for (u32 i = 0; i < array_length(entities); ++i) {
-		Entity* e = &entities[i];
-		physics_update_momenta_based_on_forces(e, dt, e->forces);
-	}
-
-	// Second pass
-	any_collision_found = true;
-	for (u32 i = 0; i < 10 && any_collision_found; ++i) {
-		any_collision_found = false;
-
-		// Update all entities based on their current momenta
-		vec4* entities_original_positions = array_new(vec4);
-		Quaternion* entities_original_rotations = array_new(Quaternion);
-		for (u32 j = 0; j < array_length(entities); ++j) {
-			Entity* e = &entities[j];
-			array_push(entities_original_positions, e->world_position);
-			array_push(entities_original_rotations, e->world_rotation);
-			physics_update(e, dt);
-		}
-
-		// Resolve all collisions
-		for (u32 j = 0; j < array_length(entities); ++j) {
-			Entity* e1 = &entities[j];
-			vec4 e1_old_position = e1->world_position;
-			Quaternion e1_old_rotation = e1->world_rotation;
-
-			for (u32 k = j + 1; k < array_length(entities); ++k) {
-				Entity* e2 = &entities[k];
-				vec4 e2_old_position = e2->world_position;
-				Quaternion e2_old_rotation = e2->world_rotation;
-
-				GJK_Support_List gjk_sl = {0};
-				boolean has_collision = collision_gjk_collides(&gjk_sl, &e1->bs, &e2->bs);
-
-				if (has_collision) {
-					Collision_Point cp = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs);
-					apply_impulse(e1, e2, &cp, e1->forces, 0.0f);
-
-					// Unfortunately we need to run GJK/EPA again to get the collision point wrt the other entity.
-					// The problem is that the impulse algorithm expects that the impulse is applied at the time of collision,
-					// i.e. the collision point is exact the same for both entities.
-					// Unfortunately, this will not be true, since there will be an overlap between the entities.
-					// For this reason, we run GJK/EPA again so we can correctly estimate the collision point of each one
-					// If we don't do this, an error will be introduced and the error might grow as the time passes
-					// @TODO 1: Investigate if we can tweak GJK/EPA to get both points at the same time
-					// @TODO 2: Modify main loop to use dt_frac scheme, and see if by rewinding the time we can disregard the error
-					// @TODO 3: When one of the rigid bodies is static, we can avoid the second run.
-					gjk_sl = (GJK_Support_List){0};
-					// @TODO: this should always be true, but sometimes it isnt
-					if (collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs)) {
-						cp = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
-						apply_impulse(e2, e1, &cp, e1->forces, 0.0f);
-					}
-
-					any_collision_found = true;
-				}
-			}
-		}
-
-		// Reset position/orientation of all entities
-		for (u32 j = 0; j < array_length(entities); ++j) {
-			Entity* e = &entities[j];
-			graphics_entity_set_position(e, entities_original_positions[j]);
-			graphics_entity_set_rotation(e, entities_original_rotations[j]);
-		}
-
-		array_free(entities_original_positions);
-		array_free(entities_original_rotations);
-	}
-
-	for (u32 j = 0; j < array_length(entities); ++j) {
-		Entity* e = &entities[j];
-		physics_update(e, dt);
-	}
-
-	//force_collision_fix(&entities[2], &entities[0]);
-	//force_collision_fix(&entities[3], &entities[0]);
-	//force_collision_fix(&entities[4], &entities[0]);
-	//force_collision_fix(&entities[3], &entities[2]);
-	//force_collision_fix(&entities[4], &entities[3]);
-}
-
+// --------- REST CONTACT START -----------
 static void max_step(r32* f, r32* a, r32* delta_f, r32* delta_a, s32 d, u32* C, u32* NC, r32* s, s32* j) {
 	*s = FLT_MAX;
 	*j = -1;
@@ -507,4 +320,346 @@ r32* qp_solve(const Matrix* A, r32* b) {
 
 	array_free(a);
 	return f;
+}
+
+typedef struct {
+	Entity* a;
+	Entity* b;
+	vec3 contact_normal;		// must be attached to 'b'
+	vec3 contact_position;
+} Contact;
+
+static vec3 compute_ndot(Contact* c) {
+	// @TODO: we could store the angular velocity
+	mat3 dynamic_inertia_tensor_inverse = physics_get_dynamic_inertia_tensor_inverse(c->b);
+	vec3 angular_velocity = physics_get_angular_velocity(c->b, &dynamic_inertia_tensor_inverse);
+	return gm_vec3_cross(angular_velocity, c->contact_normal);
+}
+
+static vec3 pt_velocity(Entity* e, vec3 p) {
+	// @TODO: we could store the linear and angular velocity
+	vec3 linear_velocity = physics_get_linear_velocity(e);
+	mat3 dynamic_inertia_tensor_inverse = physics_get_dynamic_inertia_tensor_inverse(e);
+	vec3 angular_velocity = physics_get_angular_velocity(e, &dynamic_inertia_tensor_inverse);
+	return gm_vec3_add(linear_velocity, gm_vec3_cross(angular_velocity, gm_vec3_subtract(p, gm_vec4_to_vec3(e->world_position))));
+}
+
+static r32* compute_b_vector(Contact* contacts) {
+	r32* b = array_new_len(r32, array_length(contacts));
+
+	for (u32 i = 0; i < array_length(contacts); ++i) {
+		Contact* c = &contacts[i];
+		Entity* A = contacts[i].a;
+		Entity* B = contacts[i].b;
+		vec3 n = c->contact_normal;
+		vec3 ra = gm_vec3_subtract(c->contact_position, gm_vec4_to_vec3(A->world_position));
+		vec3 rb = gm_vec3_subtract(c->contact_position, gm_vec4_to_vec3(B->world_position));
+		vec3 f_ext_a, f_ext_b, t_ext_a, t_ext_b;
+		physics_calculate_total_force_and_torque(A, &f_ext_a, &t_ext_a);
+		physics_calculate_total_force_and_torque(B, &f_ext_b, &t_ext_b);
+
+		mat3 a_dynamic_inertia_tensor_inverse = physics_get_dynamic_inertia_tensor_inverse(A);
+		vec3 a_angular_velocity = physics_get_angular_velocity(A, &a_dynamic_inertia_tensor_inverse);
+		mat3 b_dynamic_inertia_tensor_inverse = physics_get_dynamic_inertia_tensor_inverse(B);
+		vec3 b_angular_velocity = physics_get_angular_velocity(B, &b_dynamic_inertia_tensor_inverse);
+
+		vec3 a_ext_part = gm_vec3_add(gm_vec3_scalar_product(1.0f / A->mass, f_ext_a),
+			gm_vec3_cross(gm_mat3_multiply_vec3(&a_dynamic_inertia_tensor_inverse, t_ext_a), ra));
+		vec3 b_ext_part = gm_vec3_add(gm_vec3_scalar_product(1.0f / B->mass, f_ext_b),
+			gm_vec3_cross(gm_mat3_multiply_vec3(&b_dynamic_inertia_tensor_inverse, t_ext_b), rb));
+
+		vec3 a_vel_part = gm_vec3_add(
+			gm_vec3_cross(a_angular_velocity, gm_vec3_cross(a_angular_velocity, ra)),
+			gm_vec3_cross(gm_mat3_multiply_vec3(&a_dynamic_inertia_tensor_inverse, gm_vec3_cross(A->angular_momentum, a_angular_velocity)), ra));
+		vec3 b_vel_part = gm_vec3_add(
+			gm_vec3_cross(b_angular_velocity, gm_vec3_cross(b_angular_velocity, rb)),
+			gm_vec3_cross(gm_mat3_multiply_vec3(&b_dynamic_inertia_tensor_inverse, gm_vec3_cross(B->angular_momentum, b_angular_velocity)), rb));
+		
+		r32 k1 = gm_vec3_dot(n, gm_vec3_subtract(gm_vec3_add(a_ext_part, a_vel_part), gm_vec3_add(b_ext_part, b_vel_part)));
+		vec3 ndot = compute_ndot(c);
+		r32 k2 = 2.0f * gm_vec3_dot(ndot, gm_vec3_subtract(pt_velocity(A, c->contact_position), pt_velocity(B, c->contact_position)));
+
+		array_push(b, k1 + k2);
+	}
+
+	return b;
+}
+
+static r32 compute_aij(Contact* ci, Contact* cj) {
+	if ((ci->a != cj->a) && (ci->b != cj->b) && (ci->a != cj->b) && (ci->b != cj->a)) {
+		return 0.0f;
+	}
+
+	Entity* A = ci->a;
+	Entity* B = ci->b;
+	vec3 ni = ci->contact_normal;
+	vec3 nj = cj->contact_normal;
+	vec3 pi = ci->contact_position;
+	vec3 pj = cj->contact_position;
+	vec3 ra = gm_vec3_subtract(pi, gm_vec4_to_vec3(A->world_position));
+	vec3 rb = gm_vec3_subtract(pj, gm_vec4_to_vec3(B->world_position));
+
+	vec3 force_on_a = (vec3){0.0f, 0.0f, 0.0f};
+	vec3 torque_on_a = (vec3){0.0f, 0.0f, 0.0f};
+
+	if (cj->a == ci->a) {
+		force_on_a = nj;
+		torque_on_a = gm_vec3_cross(gm_vec3_subtract(pj, gm_vec4_to_vec3(A->world_position)), nj);
+	} else if (cj->b == ci->a) {
+		force_on_a = gm_vec3_scalar_product(-1.0f, nj);
+		torque_on_a = gm_vec3_cross(gm_vec3_subtract(pj, gm_vec4_to_vec3(A->world_position)), nj);
+	}
+
+	vec3 force_on_b = (vec3){0.0f, 0.0f, 0.0f};
+	vec3 torque_on_b = (vec3){0.0f, 0.0f, 0.0f};
+
+	if (cj->a == ci->b) {
+		force_on_b = nj;
+		torque_on_b = gm_vec3_cross(gm_vec3_subtract(pj, gm_vec4_to_vec3(B->world_position)), nj);
+	} else if (cj->b == ci->b) {
+		force_on_b = gm_vec3_scalar_product(-1.0f, nj);
+		torque_on_b = gm_vec3_cross(gm_vec3_subtract(pj, gm_vec4_to_vec3(B->world_position)), nj);
+	}
+
+	mat3 a_dynamic_inertia_tensor_inverse = physics_get_dynamic_inertia_tensor_inverse(A);
+	mat3 b_dynamic_inertia_tensor_inverse = physics_get_dynamic_inertia_tensor_inverse(B);
+
+	vec3 a_linear = gm_vec3_scalar_product(1.0f / A->mass, force_on_a);
+	vec3 a_angular = gm_vec3_cross(gm_mat3_multiply_vec3(&a_dynamic_inertia_tensor_inverse, torque_on_a), ra);
+	vec3 b_linear = gm_vec3_scalar_product(1.0f / B->mass, force_on_b);
+	vec3 b_angular = gm_vec3_cross(gm_mat3_multiply_vec3(&b_dynamic_inertia_tensor_inverse, torque_on_b), rb);
+
+	return gm_vec3_dot(ni, gm_vec3_subtract(gm_vec3_add(a_linear, a_angular), gm_vec3_add(b_linear, b_angular)));
+}
+
+static Matrix compute_a_matrix(Contact* contacts) {
+	Matrix A = matrix_create(array_length(contacts), array_length(contacts));
+	for (u32 i = 0; i < array_length(contacts); ++i) {
+		for (u32 j = 0; j < array_length(contacts); ++j) {
+			A.data[i][j] = compute_aij(&contacts[i], &contacts[j]);
+		}
+	}
+	return A;
+}
+
+void compute_contact_forces(Contact* contacts, r32 dt) {
+	Matrix A = compute_a_matrix(contacts);
+	r32* b = compute_b_vector(contacts);
+	r32* f = qp_solve(&A, b);
+
+	for (u32 i = 0; i < array_length(contacts); ++i) {
+		r32 f_i = f[i];
+		vec3 n = contacts[i].contact_normal;
+		Entity* A = contacts[i].a;
+		Entity* B = contacts[i].b;
+
+		vec3 A_force = gm_vec3_scalar_product(f_i, n);
+		vec3 A_torque = gm_vec3_cross(gm_vec3_subtract(contacts[i].contact_position, gm_vec4_to_vec3(A->world_position)), gm_vec3_scalar_product(f_i, n));
+		vec3 B_force = gm_vec3_scalar_product(-f_i, n);
+		vec3 B_torque = gm_vec3_scalar_product(-1.0f, gm_vec3_cross(gm_vec3_subtract(contacts[i].contact_position, gm_vec4_to_vec3(B->world_position)), gm_vec3_scalar_product(f_i, n)));
+
+		vec3 A_angular_momentum_change = gm_vec3_scalar_product(dt, A_torque);
+		vec3 A_linear_momentum_change = gm_vec3_scalar_product(dt, A_force);
+		A->angular_momentum = gm_vec3_add(A->angular_momentum, A_angular_momentum_change);
+		A->linear_momentum = gm_vec3_add(A->linear_momentum, A_linear_momentum_change);
+
+		vec3 B_angular_momentum_change = gm_vec3_scalar_product(dt, B_torque);
+		vec3 B_linear_momentum_change = gm_vec3_scalar_product(dt, B_force);
+		B->angular_momentum = gm_vec3_add(B->angular_momentum, B_angular_momentum_change);
+		B->linear_momentum = gm_vec3_add(B->linear_momentum, B_linear_momentum_change);
+	}
+}
+
+// --------- REST CONTACT FINISH -----------
+
+static void physics_update(Entity* e, r32 dt) {
+	if (e->mass > MAX_MASS_TO_CONSIDER_STATIC_BODY) {
+		return;
+	}
+	mat3 dynamic_inertia_tensor_inverse = physics_get_dynamic_inertia_tensor_inverse(e);
+	vec3 angular_velocity = physics_get_angular_velocity(e, &dynamic_inertia_tensor_inverse);
+	vec3 linear_velocity = physics_get_linear_velocity(e);
+
+    // Calculate orientation change
+    r32 rotation_angle = gm_vec3_length(angular_velocity) * dt;
+    vec3 rotation_axis = gm_vec3_normalize(angular_velocity);
+    Quaternion orientation_change = quaternion_new_radians(rotation_axis, rotation_angle);
+    graphics_entity_set_rotation(e, quaternion_product(&orientation_change, &e->world_rotation));
+
+    // Calculate position change
+    vec3 position_change = gm_vec3_scalar_product(dt, linear_velocity);
+    graphics_entity_set_position(e, gm_vec4_add(e->world_position, (vec4){position_change.x, position_change.y, position_change.z, 0.0f}));
+}
+
+static void force_collision_fix(Entity* moving_body, Entity* static_body) {
+	GJK_Support_List gjk_sl = {0};
+	boolean has_collision = collision_gjk_collides(&gjk_sl, &static_body->bs, &moving_body->bs);
+
+	if (has_collision) {
+		Collision_Point cp = collision_epa(gjk_sl.simplex, &static_body->bs, &moving_body->bs);
+		cp.normal = gm_vec3_scalar_product(-1.0f, cp.normal);
+		gjk_sl = (GJK_Support_List){0};
+		graphics_entity_set_position(moving_body, gm_vec4_add(moving_body->world_position, (vec4){cp.normal.x, cp.normal.y, cp.normal.z, 0.0f}));
+		//moving_body->linear_momentum = (vec3){0};
+		//moving_body->angular_momentum = (vec3){0};
+	}
+}
+
+extern r32 restitution;
+void physics_simulate(Entity* entities, r32 dt) {
+
+	//const r32 restitution = 0.1f;
+
+	// First pass
+	boolean any_collision_found = true;
+	for (u32 i = 0; i < 5 && any_collision_found; ++i) {
+		any_collision_found = false;
+
+		// Update all entities based on their current momenta
+		vec4* entities_original_positions = array_new(vec4);
+		Quaternion* entities_original_rotations = array_new(Quaternion);
+		for (u32 j = 0; j < array_length(entities); ++j) {
+			Entity* e = &entities[j];
+			array_push(entities_original_positions, e->world_position);
+			array_push(entities_original_rotations, e->world_rotation);
+			physics_update(e, dt);
+		}
+
+		// Resolve all collisions
+		for (u32 j = 0; j < array_length(entities); ++j) {
+			Entity* e1 = &entities[j];
+			vec4 e1_old_position = e1->world_position;
+			Quaternion e1_old_rotation = e1->world_rotation;
+
+			for (u32 k = j + 1; k < array_length(entities); ++k) {
+				Entity* e2 = &entities[k];
+				vec4 e2_old_position = e2->world_position;
+				Quaternion e2_old_rotation = e2->world_rotation;
+
+				GJK_Support_List gjk_sl = {0};
+				boolean has_collision = collision_gjk_collides(&gjk_sl, &e1->bs, &e2->bs);
+
+				if (has_collision) {
+					Collision_Point cp = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs);
+					if (e1->mass < 1000.0f && e2->mass < 1000.0f) {
+						collision = true;
+						col_point = cp.collision_point;
+						penetration = cp.normal;
+					}
+					
+					apply_impulse(e1, e2, &cp, e1->forces, restitution);
+
+					// Unfortunately we need to run GJK/EPA again to get the collision point wrt the other entity.
+					// The problem is that the impulse algorithm expects that the impulse is applied at the time of collision,
+					// i.e. the collision point is exact the same for both entities.
+					// Unfortunately, this will not be true, since there will be an overlap between the entities.
+					// For this reason, we run GJK/EPA again so we can correctly estimate the collision point of each one
+					// If we don't do this, an error will be introduced and the error might grow as the time passes
+					// @TODO 1: Investigate if we can tweak GJK/EPA to get both points at the same time
+					// @TODO 2: Modify main loop to use dt_frac scheme, and see if by rewinding the time we can disregard the error
+					// @TODO 3: When one of the rigid bodies is static, we can avoid the second run.
+					gjk_sl = (GJK_Support_List){0};
+					// @TODO: this should always be true, but sometimes it isnt
+					if (collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs)) {
+						cp = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
+						apply_impulse(e2, e1, &cp, e1->forces, restitution);
+					}
+
+					any_collision_found = true;
+				}
+			}
+		}
+
+		// Reset position/orientation of all entities
+		for (u32 j = 0; j < array_length(entities); ++j) {
+			Entity* e = &entities[j];
+			graphics_entity_set_position(e, entities_original_positions[j]);
+			graphics_entity_set_rotation(e, entities_original_rotations[j]);
+		}
+
+		array_free(entities_original_positions);
+		array_free(entities_original_rotations);
+	}
+
+	// Update entities momenta based on forces
+	for (u32 i = 0; i < array_length(entities); ++i) {
+		Entity* e = &entities[i];
+		physics_update_momenta_based_on_forces(e, dt, e->forces);
+	}
+
+	// Second pass
+	any_collision_found = true;
+	for (u32 i = 0; i < 10 && any_collision_found; ++i) {
+		any_collision_found = false;
+
+		// Update all entities based on their current momenta
+		vec4* entities_original_positions = array_new(vec4);
+		Quaternion* entities_original_rotations = array_new(Quaternion);
+		for (u32 j = 0; j < array_length(entities); ++j) {
+			Entity* e = &entities[j];
+			array_push(entities_original_positions, e->world_position);
+			array_push(entities_original_rotations, e->world_rotation);
+			physics_update(e, dt);
+		}
+
+		// Resolve all collisions
+		for (u32 j = 0; j < array_length(entities); ++j) {
+			Entity* e1 = &entities[j];
+			vec4 e1_old_position = e1->world_position;
+			Quaternion e1_old_rotation = e1->world_rotation;
+
+			for (u32 k = j + 1; k < array_length(entities); ++k) {
+				Entity* e2 = &entities[k];
+				vec4 e2_old_position = e2->world_position;
+				Quaternion e2_old_rotation = e2->world_rotation;
+
+				GJK_Support_List gjk_sl = {0};
+				boolean has_collision = collision_gjk_collides(&gjk_sl, &e1->bs, &e2->bs);
+
+				if (has_collision) {
+					Collision_Point cp = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs);
+					apply_impulse(e1, e2, &cp, e1->forces, 0.0f);
+
+					// Unfortunately we need to run GJK/EPA again to get the collision point wrt the other entity.
+					// The problem is that the impulse algorithm expects that the impulse is applied at the time of collision,
+					// i.e. the collision point is exact the same for both entities.
+					// Unfortunately, this will not be true, since there will be an overlap between the entities.
+					// For this reason, we run GJK/EPA again so we can correctly estimate the collision point of each one
+					// If we don't do this, an error will be introduced and the error might grow as the time passes
+					// @TODO 1: Investigate if we can tweak GJK/EPA to get both points at the same time
+					// @TODO 2: Modify main loop to use dt_frac scheme, and see if by rewinding the time we can disregard the error
+					// @TODO 3: When one of the rigid bodies is static, we can avoid the second run.
+					gjk_sl = (GJK_Support_List){0};
+					// @TODO: this should always be true, but sometimes it isnt
+					if (collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs)) {
+						cp = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
+						apply_impulse(e2, e1, &cp, e1->forces, 0.0f);
+					}
+
+					any_collision_found = true;
+				}
+			}
+		}
+
+		// Reset position/orientation of all entities
+		for (u32 j = 0; j < array_length(entities); ++j) {
+			Entity* e = &entities[j];
+			graphics_entity_set_position(e, entities_original_positions[j]);
+			graphics_entity_set_rotation(e, entities_original_rotations[j]);
+		}
+
+		array_free(entities_original_positions);
+		array_free(entities_original_rotations);
+	}
+
+	for (u32 j = 0; j < array_length(entities); ++j) {
+		Entity* e = &entities[j];
+		physics_update(e, dt);
+	}
+
+	//force_collision_fix(&entities[2], &entities[0]);
+	//force_collision_fix(&entities[3], &entities[0]);
+	//force_collision_fix(&entities[4], &entities[0]);
+	//force_collision_fix(&entities[3], &entities[2]);
+	//force_collision_fix(&entities[4], &entities[3]);
 }
