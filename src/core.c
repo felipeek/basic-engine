@@ -90,16 +90,16 @@ int core_init()
 	entities = array_new(Entity);
 	Entity e;
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 1.2f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
+	array_push(entities, e);
+	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&e, m, (vec4){0.0f, PLANE_Y - 1.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1000.0f, 1.0f, 1000.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
 	array_push(entities, e);
 	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 0.0f, -10.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1000.0f, 1000.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.4f, 1.0f}, 1000000000.0f);
-	array_push(entities, e);
-	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 1.2f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
 	array_push(entities, e);
 	//m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	//graphics_entity_create_with_color(&e, m, (vec4){0.0f, 3.4f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
@@ -183,6 +183,16 @@ void core_render()
 	for (u32 i = 0; i < array_length(entities); ++i) {
 		graphics_entity_render_phong_shader(&camera, &entities[i], lights);
 	}
+
+	vec3 test1 = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&entities[0].model_matrix, entities[0].mesh.vertices[4].position));
+	graphics_renderer_debug_points(&r_ctx, &test1, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+	test1 = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&entities[0].model_matrix, entities[0].mesh.vertices[5].position));
+	graphics_renderer_debug_points(&r_ctx, &test1, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+	test1 = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&entities[0].model_matrix, entities[0].mesh.vertices[9].position));
+	graphics_renderer_debug_points(&r_ctx, &test1, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+	test1 = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&entities[0].model_matrix, entities[0].mesh.vertices[7].position));
+	graphics_renderer_debug_points(&r_ctx, &test1, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+	graphics_renderer_primitives_flush(&r_ctx, &camera);
 
 	if (collision) {
 		graphics_renderer_debug_points(&r_ctx, &col_point, 1, (vec4){1.0f, 1.0f, 1.0f});

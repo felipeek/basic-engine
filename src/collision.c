@@ -478,7 +478,7 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
 
 	  Collision_Point cp;
 	  cp.collision_point = wcolpoint;
-	  cp.normal = gm_vec3_scalar_product(-1.0f, penetration);
+	  cp.normal = gm_vec3_normalize(gm_vec3_scalar_product(-1.0f, penetration));
 	  cp.penetration = gm_vec3_length(penetration);
 	  return cp;
 	}
