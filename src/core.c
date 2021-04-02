@@ -73,6 +73,8 @@ void core_update(r32 delta_time)
 void core_render()
 {
 	graphics_entity_render_phong_shader(&camera, &e, lights);
+    graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+    graphics_renderer_primitives_flush(&camera);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)

@@ -102,4 +102,9 @@ void graphics_texture_delete(u32 texture_id);
 Float_Image_Data graphics_image_data_to_float_image_data(Image_Data* image_data, r32* memory);
 Image_Data graphics_float_image_data_to_image_data(const Float_Image_Data* float_image_Data, u8* memory);
 
+// Render primitives
+void graphics_renderer_primitives_flush(const Perspective_Camera* camera);
+void graphics_renderer_debug_points(vec3* points, int point_count, vec4 color);
+void graphics_renderer_debug_vector(vec3 p1, vec3 p2, vec4 color);
+
 #endif
