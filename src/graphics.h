@@ -36,6 +36,11 @@ typedef struct
 	u32* indices;
 } Mesh;
 
+typedef struct {
+	vec3 position;
+	vec3 force;
+} Physics_Force;
+
 typedef struct
 {
 	Mesh mesh;
@@ -44,6 +49,12 @@ typedef struct
 	vec3 world_scale;
 	mat4 model_matrix;
 	Diffuse_Info diffuse_info;
+
+    r32 mass;
+    mat3 inverse_inertia_tensor;
+    vec3 angular_momentum;
+    vec3 linear_momentum;
+    Physics_Force* forces;
 } Entity;
 
 typedef struct
@@ -78,8 +89,8 @@ Mesh graphics_quad_create();
 Mesh graphics_mesh_create(Vertex* vertices, u32* indices, Normal_Mapping_Info* normal_info);
 Mesh graphics_mesh_create_from_obj(const s8* obj_path, Normal_Mapping_Info* normal_info);
 void graphics_mesh_render(Shader shader, Mesh mesh);
-void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color);
-void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture);
+void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass);
+void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass);
 void graphics_entity_destroy(Entity* entity);
 // If entity already has a diffuse map, the older diffuse map will be deleted if delete_diffuse_map is true.
 // If entity has a color instead of a diffuse map, the mesh will lose the color and be set to use the diffuse map.

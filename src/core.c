@@ -6,12 +6,13 @@
 #include "graphics.h"
 #include "obj.h"
 #include "menu.h"
+#include "physics.h"
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
 static Perspective_Camera camera;
 static Light* lights;
-static Entity e;
+static Entity* entities;
 
 static Perspective_Camera create_camera()
 {
@@ -51,9 +52,12 @@ int core_init()
 	// Create light
 	lights = create_lights();
 
+    Entity e;
+    entities = array_new(Entity);
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 0.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
+    array_push(entities, e);
 
 	menu_register_dummy_callback(menu_dummy_callback);
 
@@ -67,14 +71,19 @@ void core_destroy()
 
 void core_update(r32 delta_time)
 {
-
+    physics_simulate(entities, delta_time);
+    for (u32 i = 0; i < array_length(entities); ++i) {
+        array_clear(entities[i].forces);
+    }
 }
 
 void core_render()
 {
-	graphics_entity_render_phong_shader(&camera, &e, lights);
-    graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
-    graphics_renderer_primitives_flush(&camera);
+    for (u32 i = 0; i < array_length(entities); ++i) {
+        graphics_entity_render_phong_shader(&camera, &entities[i], lights);
+    }
+    //graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+    //graphics_renderer_primitives_flush(&camera);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
@@ -100,12 +109,12 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
 		{
 			Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
 		}
 		else
 		{
 			Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, -rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
 		}
 	}
 	if (key_state[GLFW_KEY_Y])
@@ -113,12 +122,12 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
 		{
 			Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
 		}
 		else
 		{
 			Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, -rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
 		}
 	}
 	if (key_state[GLFW_KEY_Z])
@@ -126,12 +135,12 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
 		{
 			Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
 		}
 		else
 		{
 			Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, -rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
 		}
 	}
 	if (key_state[GLFW_KEY_L])
@@ -145,6 +154,15 @@ void core_input_process(boolean* key_state, r32 delta_time)
 
 		wireframe = !wireframe;
 		key_state[GLFW_KEY_L] = false;
+	}
+	if (key_state[GLFW_KEY_Q])
+	{
+        Physics_Force pf;
+        pf.force = (vec3) {0.0f, 0.0f, -10000.0f};
+        pf.position = (vec3) {-1.0f, -1.0f, 1.0f};
+        array_push(entities[0].forces, pf);
+        printf("Created force.\n");
+		key_state[GLFW_KEY_Q] = false;
 	}
 }
 
