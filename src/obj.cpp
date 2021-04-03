@@ -73,15 +73,12 @@ extern "C" int obj_parse(const char* obj_path, Vertex** vertices, u32** indexes)
 			v[0].position.x = attrib.vertices[3 * f0 + 0];
 			v[0].position.y = attrib.vertices[3 * f0 + 1];
 			v[0].position.z = attrib.vertices[3 * f0 + 2];
-			v[0].position.w = 1.0f;
 			v[1].position.x = attrib.vertices[3 * f1 + 0];
 			v[1].position.y = attrib.vertices[3 * f1 + 1];
 			v[1].position.z = attrib.vertices[3 * f1 + 2];
-			v[1].position.w = 1.0f;
 			v[2].position.x = attrib.vertices[3 * f2 + 0];
 			v[2].position.y = attrib.vertices[3 * f2 + 1];
 			v[2].position.z = attrib.vertices[3 * f2 + 2];
-			v[2].position.w = 1.0f;
 
 			if (!generate_normals)
 			{
@@ -92,21 +89,18 @@ extern "C" int obj_parse(const char* obj_path, Vertex** vertices, u32** indexes)
 				v[0].normal.x = attrib.normals[3 * nf0 + 0];
 				v[0].normal.y = attrib.normals[3 * nf0 + 1];
 				v[0].normal.z = attrib.normals[3 * nf0 + 2];
-				v[0].normal.w = 0.0f;
 				v[1].normal.x = attrib.normals[3 * nf1 + 0];
 				v[1].normal.y = attrib.normals[3 * nf1 + 1];
 				v[1].normal.z = attrib.normals[3 * nf1 + 2];
-				v[1].normal.w = 0.0f;
 				v[2].normal.x = attrib.normals[3 * nf2 + 0];
 				v[2].normal.y = attrib.normals[3 * nf2 + 1];
 				v[2].normal.z = attrib.normals[3 * nf2 + 2];
-				v[2].normal.w = 0.0f;
 			}
 			else
 			{
-				v[0].normal = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
-				v[1].normal = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
-				v[2].normal = (vec4){0.0f, 0.0f, 0.0f, 0.0f};
+				v[0].normal = (vec3){0.0f, 0.0f, 0.0f};
+				v[1].normal = (vec3){0.0f, 0.0f, 0.0f};
+				v[2].normal = (vec3){0.0f, 0.0f, 0.0f};
 			}
 
 			array_push(*vertices, v[0]);
@@ -144,9 +138,9 @@ extern "C" int obj_parse(const char* obj_path, Vertex** vertices, u32** indexes)
 			normal.z = first_edge.x * second_edge.y - first_edge.y * second_edge.x;
 
 			// Assign normals
-			vertex_a->normal = (vec4){vertex_a->normal.x + normal.x, vertex_a->normal.y + normal.y, vertex_a->normal.z + normal.z};
-			vertex_b->normal = (vec4){vertex_b->normal.x + normal.x, vertex_b->normal.y + normal.y, vertex_b->normal.z + normal.z};
-			vertex_c->normal = (vec4){vertex_c->normal.x + normal.x, vertex_c->normal.y + normal.y, vertex_c->normal.z + normal.z};
+			vertex_a->normal = (vec3){vertex_a->normal.x + normal.x, vertex_a->normal.y + normal.y, vertex_a->normal.z + normal.z};
+			vertex_b->normal = (vec3){vertex_b->normal.x + normal.x, vertex_b->normal.y + normal.y, vertex_b->normal.z + normal.z};
+			vertex_c->normal = (vec3){vertex_c->normal.x + normal.x, vertex_c->normal.y + normal.y, vertex_c->normal.z + normal.z};
 		}
 	}
 

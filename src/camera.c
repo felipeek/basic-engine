@@ -47,7 +47,7 @@ static void recalculate_projection_matrix(Perspective_Camera* camera)
 	camera->projection_matrix = gm_mat4_scalar_product(-1, &mp);
 }
 
-void camera_init(Perspective_Camera* camera, vec4 position, r32 near_plane, r32 far_plane, r32 fov)
+void camera_init(Perspective_Camera* camera, vec3 position, r32 near_plane, r32 far_plane, r32 fov)
 {
 	camera->position = position;
 	camera->near_plane = near_plane;
@@ -59,7 +59,7 @@ void camera_init(Perspective_Camera* camera, vec4 position, r32 near_plane, r32 
 	recalculate_projection_matrix(camera);
 }
 
-void camera_set_position(Perspective_Camera* camera, vec4 position)
+void camera_set_position(Perspective_Camera* camera, vec3 position)
 {
 	camera->position = position;
 	recalculate_view_matrix(camera);
@@ -101,7 +101,7 @@ void camera_move_forward(Perspective_Camera* camera, r32 amount)
 
 	vec3 forward = quaternion_get_forward_inverted(&f);
 	forward = gm_vec3_scalar_product(amount, gm_vec3_normalize(forward));
-	camera->position = gm_vec4_add((vec4) {-forward.x, -forward.y, -forward.z, 0.0}, camera->position);
+	camera->position = gm_vec3_add((vec3) {-forward.x, -forward.y, -forward.z}, camera->position);
 
 	recalculate_view_matrix(camera);
 }
@@ -112,7 +112,7 @@ void camera_move_right(Perspective_Camera* camera, r32 amount)
 
 	vec3 right = quaternion_get_right_inverted(&f);
 	right = gm_vec3_scalar_product(amount, gm_vec3_normalize(right));
-	camera->position = gm_vec4_add((vec4) {right.x, right.y, right.z, 0.0}, camera->position);
+	camera->position = gm_vec3_add((vec3) {right.x, right.y, right.z}, camera->position);
 
 	recalculate_view_matrix(camera);
 }

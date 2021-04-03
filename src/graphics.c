@@ -146,23 +146,23 @@ Mesh graphics_quad_create()
 	u32* indices = array_new(u32);
 
 	Vertex v;
-	v.position = (vec4) { 0.0f, 0.0f, 0.0f, 1.0f };
-	v.normal = (vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
+	v.position = (vec3) { 0.0f, 0.0f, 0.0f};
+	v.normal = (vec3) { 0.0f, 0.0f, 1.0f};
 	v.texture_coordinates = (vec2) { 0.0f, 0.0f };
 	array_push(vertices, v);
 
-	v.position = (vec4) { size, 0.0f, 0.0f, 1.0f };
-	v.normal = (vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
+	v.position = (vec3) { size, 0.0f, 0.0f };
+	v.normal = (vec3) { 0.0f, 0.0f, 1.0f };
 	v.texture_coordinates = (vec2) { 1.0f, 0.0f };
 	array_push(vertices, v);
 
-	v.position = (vec4) { 0.0f, size, 0.0f, 1.0f };
-	v.normal = (vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
+	v.position = (vec3) { 0.0f, size, 0.0f };
+	v.normal = (vec3) { 0.0f, 0.0f, 1.0f };
 	v.texture_coordinates = (vec2) { 0.0f, 1.0f };
 	array_push(vertices, v);
 
-	v.position = (vec4) { size, size, 0.0f, 1.0f };
-	v.normal = (vec4) { 0.0f, 0.0f, 1.0f, 0.0f };
+	v.position = (vec3) { size, size, 0.0f };
+	v.normal = (vec3) { 0.0f, 0.0f, 1.0f };
 	v.texture_coordinates = (vec2) { 1.0f, 1.0f };
 	array_push(vertices, v);
 
@@ -190,13 +190,13 @@ Mesh graphics_mesh_create(Vertex* vertices, u32* indices, Normal_Mapping_Info* n
 	glBufferData(GL_ARRAY_BUFFER, array_length(vertices) * sizeof(Vertex), 0, GL_STATIC_DRAW);
 	glBufferSubData(GL_ARRAY_BUFFER, 0, array_length(vertices) * sizeof(Vertex), vertices);
 
-	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 10 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (void*)(0 * sizeof(GLfloat)));
 	glEnableVertexAttribArray(0);
 
-	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 10 * sizeof(GLfloat), (void*)(4 * sizeof(GLfloat)));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
 	glEnableVertexAttribArray(1);
 
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 10 * sizeof(GLfloat), (void*)(8 * sizeof(GLfloat)));
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (void*)(6 * sizeof(GLfloat)));
 	glEnableVertexAttribArray(2);
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
@@ -246,7 +246,7 @@ static void light_update_uniforms(const Light* lights, Shader shader)
 		GLint ambient_color_location = glGetUniformLocation(shader, build_light_uniform_name(buffer, i, "ambient_color"));
 		GLint diffuse_color_location = glGetUniformLocation(shader, build_light_uniform_name(buffer, i, "diffuse_color"));
 		GLint specular_color_location = glGetUniformLocation(shader, build_light_uniform_name(buffer, i, "specular_color"));
-		glUniform4f(light_position_location, light.position.x, light.position.y, light.position.z, light.position.w);
+		glUniform3f(light_position_location, light.position.x, light.position.y, light.position.z);
 		glUniform4f(ambient_color_location, light.ambient_color.x, light.ambient_color.y, light.ambient_color.z, light.ambient_color.w);
 		glUniform4f(diffuse_color_location, light.diffuse_color.x, light.diffuse_color.y, light.diffuse_color.z, light.diffuse_color.w);
 		glUniform4f(specular_color_location, light.specular_color.x, light.specular_color.y, light.specular_color.z, light.specular_color.w);
@@ -342,7 +342,7 @@ static void recalculate_model_matrix(Entity* entity)
 	entity->model_matrix = gm_mat4_multiply(&translation_matrix, &entity->model_matrix);
 }
 
-void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color)
+void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color)
 {
 	entity->mesh = mesh;
 	entity->world_position = world_position;
@@ -353,7 +353,7 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_pos
 	recalculate_model_matrix(entity);
 }
 
-void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture)
+void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture)
 {
 	entity->mesh = mesh;
 	entity->world_position = world_position;
@@ -381,7 +381,7 @@ void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_norm
 	entity->mesh = mesh;
 }
 
-void graphics_entity_set_position(Entity* entity, vec4 world_position)
+void graphics_entity_set_position(Entity* entity, vec3 world_position)
 {
 	entity->world_position = world_position;
 	recalculate_model_matrix(entity);
@@ -425,7 +425,7 @@ void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const
 	GLint model_matrix_location = glGetUniformLocation(shader, "model_matrix");
 	GLint view_matrix_location = glGetUniformLocation(shader, "view_matrix");
 	GLint projection_matrix_location = glGetUniformLocation(shader, "projection_matrix");
-	glUniform4f(camera_position_location, camera->position.x, camera->position.y, camera->position.z, camera->position.w);
+	glUniform3f(camera_position_location, camera->position.x, camera->position.y, camera->position.z);
 	glUniform1f(shineness_location, 128.0f);
 	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)entity->model_matrix.data);
 	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)camera->view_matrix.data);
@@ -507,7 +507,7 @@ void graphics_texture_delete(u32 texture_id)
 	glDeleteTextures(1, &texture_id);
 }
 
-void graphics_light_create(Light* light, vec4 position, vec4 ambient_color, vec4 diffuse_color, vec4 specular_color)
+void graphics_light_create(Light* light, vec3 position, vec4 ambient_color, vec4 diffuse_color, vec4 specular_color)
 {
 	light->position = position;
 	light->ambient_color = ambient_color;

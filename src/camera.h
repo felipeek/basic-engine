@@ -5,7 +5,7 @@
 
 typedef struct
 {
-	vec4 position;
+	vec3 position;
 	r32 near_plane;
 	r32 far_plane;
 	r32 fov;
@@ -15,8 +15,8 @@ typedef struct
 	Quaternion yrotation;
 } Perspective_Camera;
 
-void camera_init(Perspective_Camera* camera, vec4 position, r32 near_plane, r32 far_plane, r32 fov);
-void camera_set_position(Perspective_Camera* camera, vec4 position);
+void camera_init(Perspective_Camera* camera, vec3 position, r32 near_plane, r32 far_plane, r32 fov);
+void camera_set_position(Perspective_Camera* camera, vec3 position);
 void camera_set_near_plane(Perspective_Camera* camera, r32 near_plane);
 void camera_set_far_plane(Perspective_Camera* camera, r32 far_plane);
 void camera_set_fov(Perspective_Camera* camera, r32 fov);
