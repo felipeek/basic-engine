@@ -3,7 +3,7 @@
 #include <assert.h>
 #include "collision.h"
 
-#define NUM_SUBSTEPS 10
+#define NUM_SUBSTEPS 1
 #define NUM_POS_ITERS 1
 
 static mat3 get_inertia_tensor(Entity* e) {
@@ -117,7 +117,8 @@ static vec3 calculate_external_torque(Entity* e) {
 
 void pbd_simulate(r32 dt, Entity* entities) {
 	if (dt <= 0.0f) return;
-	r32 h = dt / NUM_SUBSTEPS;
+	//r32 h = dt / NUM_SUBSTEPS;
+	r32 h = 0.01f;
 
 	for (u32 i = 0; i < NUM_SUBSTEPS; ++i) {
 		for (u32 j = 0; j < array_length(entities); ++j) {
@@ -202,7 +203,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 		}
 
 		// solve velocities
-		#if 0
+		#if 1
 		for (u32 j = 0; j < array_length(constraints); ++j) {
 			Constraint* constraint = &constraints[j];
 			vec3 v1 = entities[1].linear_velocity;
@@ -247,7 +248,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				vec3 v_til = gm_vec3_subtract(gm_vec3_add(old_v1, gm_vec3_cross(old_w1, r1)), gm_vec3_subtract(old_v2, gm_vec3_cross(old_w2, r2)));
 				r32 vn_til = gm_vec3_dot(n, v_til);
 				r32 e = 0.0f;
-				r32 fact = -vn + MAX(-e * vn_til, 0.0f);
+				r32 fact = vn + MAX(e * vn_til, 0.0f);
 				vec3 delta_v = gm_vec3_scalar_product(fact, n);
 				mat3 e1_inverse_inertia_tensor = get_inverse_inertia_tensor(e1);
 				mat3 e2_inverse_inertia_tensor = get_inverse_inertia_tensor(e2);
@@ -257,9 +258,13 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				vec3 p = gm_vec3_scalar_product(1.0f / (_w1 + _w2), delta_v);
 				e1->linear_velocity = gm_vec3_add(e1->linear_velocity, gm_vec3_scalar_product(1.0f / e1->mass, p));
 				e2->linear_velocity = gm_vec3_subtract(e2->linear_velocity, gm_vec3_scalar_product(1.0f / e2->mass, p));
+				//e2->linear_velocity = gm_vec3_scalar_product(vn_til, n);
 				e1->angular_velocity = gm_vec3_add(e1->angular_velocity, gm_mat3_multiply_vec3(&e1_inverse_inertia_tensor, gm_vec3_cross(r1, p)));
 				e2->angular_velocity = gm_vec3_subtract(e2->angular_velocity, gm_mat3_multiply_vec3(&e2_inverse_inertia_tensor, gm_vec3_cross(r2, p)));
 			}
+
+			printf("e2->linear_velocity = <%.3f, %.3f, %.3f>\n", e2->linear_velocity.x, e2->linear_velocity.y, e2->linear_velocity.z);
+			printf("e2->angular_velocity = <%.3f, %.3f, %.3f>\n", e2->angular_velocity.x, e2->angular_velocity.y, e2->angular_velocity.z);
 		}
 		#endif
 
