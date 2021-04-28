@@ -51,10 +51,17 @@ typedef struct
 	Diffuse_Info diffuse_info;
 
     r32 mass;
+    mat3 inertia_tensor;
     mat3 inverse_inertia_tensor;
-    vec3 angular_momentum;
-    vec3 linear_momentum;
-    Physics_Force* forces;
+    vec3 angular_velocity;
+    vec3 linear_velocity;
+	Physics_Force* forces;
+
+	// auxiliar
+	vec3 previous_world_position;
+	Quaternion previous_world_rotation;
+	vec3 previous_linear_velocity;
+	vec3 previous_angular_velocity;
 } Entity;
 
 typedef struct
@@ -103,6 +110,7 @@ void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_norm
 void graphics_entity_set_position(Entity* entity, vec3 world_position);
 void graphics_entity_set_rotation(Entity* entity, Quaternion world_rotation);
 void graphics_entity_set_scale(Entity* entity, vec3 world_scale);
+void graphics_entity_recalculate_model_matrix(Entity* entity);
 void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const Entity* entity);
 void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const Entity* entity, const Light* lights);
 void graphics_light_create(Light* light, vec3 position, vec4 ambient_color, vec4 diffuse_color, vec4 specular_color);

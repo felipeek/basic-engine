@@ -18,5 +18,7 @@ typedef double r64;
 #define false 0
 
 #define PI_F 3.14159265358979f
+#define MIN(x,y) ((x) > (y) ? (y) : (x))
+#define MAX(x,y) ((x) > (y) ? (x) : (y))
 
 #endif

@@ -13,6 +13,7 @@ Quaternion quaternion_product(const Quaternion* q1, const Quaternion* q2);
 Quaternion quaternion_nlerp(const Quaternion* q1, const Quaternion* q2, r32 t);
 Quaternion quaternion_slerp(const Quaternion* q1, const Quaternion* q2, r32 t);
 Quaternion quaternion_inverse(const Quaternion* q);
+mat3 quaternion_get_matrix3(const Quaternion* quat);
 mat4 quaternion_get_matrix(const Quaternion* quat);
 vec3 quaternion_get_forward(const Quaternion* quat);
 vec3 quaternion_get_up(const Quaternion* quat);

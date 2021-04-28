@@ -93,6 +93,26 @@ Quaternion quaternion_inverse(const Quaternion* q)
 	return result;
 }
 
+mat3 quaternion_get_matrix3(const Quaternion* quat)
+{
+	mat3 result;
+
+	result.data[0][0] = 1.0f - 2.0f * quat->y * quat->y - 2.0f * quat->z * quat->z;
+	result.data[1][0] = 2.0f * quat->x * quat->y + 2.0f * quat->w * quat->z;
+	result.data[2][0] = 2.0f * quat->x * quat->z - 2.0f * quat->w * quat->y;
+
+	result.data[0][1] = 2.0f * quat->x * quat->y - 2.0f * quat->w * quat->z;
+	result.data[1][1] = 1.0f - (2.0f * quat->x * quat->x) - (2.0f * quat->z * quat->z);
+	result.data[2][1] = 2.0f * quat->y * quat->z + 2.0f * quat->w * quat->x;
+
+	result.data[0][2] = 2.0f * quat->x * quat->z + 2.0f * quat->w * quat->y;
+	result.data[1][2] = 2.0f * quat->y * quat->z - 2.0f * quat->w * quat->x;
+	result.data[2][2] = 1.0f - (2.0f * quat->x * quat->x) - (2.0f * quat->y * quat->y);
+
+	return result;
+}
+
+
 mat4 quaternion_get_matrix(const Quaternion* quat)
 {
 	mat4 result;

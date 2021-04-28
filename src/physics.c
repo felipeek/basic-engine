@@ -1,6 +1,8 @@
 #include "physics.h"
 #include <light_array.h>
 
+/*
+
 #define MAX_MASS_TO_CONSIDER_STATIC_BODY 10000.0f
 
 static mat3 physics_get_inverse_inertia_tensor_dynamic(Entity* e) {
@@ -61,3 +63,5 @@ void physics_simulate(Entity* entities, r32 dt) {
 		physics_update(e, dt);
 	}
 }
+
+*/

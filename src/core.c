@@ -6,7 +6,7 @@
 #include "graphics.h"
 #include "obj.h"
 #include "menu.h"
-#include "physics.h"
+#include "pbd.h"
 #include "collision.h"
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
@@ -61,11 +61,11 @@ int core_init()
     Entity e;
     entities = array_new(Entity);
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 0.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 0.0f, 0.0f}, quaternion_new((vec3){2.0f, 1.0f, 3.0f}, 30.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
     array_push(entities, e);
 	graphics_entity_create_with_color(&e, m, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){5.0f, 0.0f, 5.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, 1.0f);
+		(vec3){5.0f, 0.0f, 5.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, 10000.0f);
     array_push(entities, e);
 
 	menu_register_dummy_callback(menu_dummy_callback);
@@ -80,7 +80,11 @@ void core_destroy()
 
 void core_update(r32 delta_time)
 {
-    physics_simulate(entities, delta_time);
+	Physics_Force pf;
+	//pf.force = (vec3){0.0f, -1.0f, 0.0f};
+	//pf.position = (vec3){0.0f, 0.0f, 0.0f};
+	//array_push(entities[0].forces, pf);
+    pbd_simulate(delta_time, entities);
     for (u32 i = 0; i < array_length(entities); ++i) {
         array_clear(entities[i].forces);
     }
@@ -174,7 +178,7 @@ void core_input_process(boolean* key_state, r32 delta_time)
 	if (key_state[GLFW_KEY_Q])
 	{
         Physics_Force pf;
-        pf.force = (vec3) {0.0f, 0.0f, -10000.0f};
+        pf.force = (vec3) {0.0f, -100.0f, 0.0f};
         pf.position = (vec3) {-1.0f, -1.0f, 1.0f};
         array_push(entities[0].forces, pf);
         printf("Created force.\n");
@@ -190,7 +194,7 @@ void core_input_process(boolean* key_state, r32 delta_time)
 
 void core_mouse_change_process(boolean reset, r64 x_pos, r64 y_pos)
 {
-    	static r64 x_pos_old, y_pos_old;
+	static r64 x_pos_old, y_pos_old;
 
 	r64 x_difference = x_pos - x_pos_old;
 	r64 y_difference = y_pos - y_pos_old;

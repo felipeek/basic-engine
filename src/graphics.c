@@ -318,7 +318,7 @@ void graphics_entity_change_color(Entity* entity, vec4 color, boolean delete_dif
 	entity->diffuse_info.diffuse_color = color;
 }
 
-static void recalculate_model_matrix(Entity* entity)
+void graphics_entity_recalculate_model_matrix(Entity* entity)
 {
 	r32 s, c;
 
@@ -368,13 +368,13 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_pos
 	entity->world_scale = world_scale;
 	entity->diffuse_info.diffuse_color = color;
 	entity->diffuse_info.use_diffuse_map = false;
-	recalculate_model_matrix(entity);
-    entity->angular_momentum = (vec3){0.0f, 0.0f, 0.0f};
-    entity->linear_momentum = (vec3){0.0f, 0.0f, 0.0f};
-    entity->forces = array_new(Physics_Force);
+	graphics_entity_recalculate_model_matrix(entity);
+    entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
+    entity->linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
     entity->mass = mass;
-    mat3 inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);
-	assert(gm_mat3_inverse(&inertia_tensor, &entity->inverse_inertia_tensor));
+    entity->inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);
+	assert(gm_mat3_inverse(&entity->inertia_tensor, &entity->inverse_inertia_tensor));
+	entity->forces = array_new(Physics_Force);
 }
 
 void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass)
@@ -385,13 +385,13 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_p
 	entity->world_scale = world_scale;
 	entity->diffuse_info.diffuse_map = texture;
 	entity->diffuse_info.use_diffuse_map = true;
-	recalculate_model_matrix(entity);
-    entity->angular_momentum = (vec3){0.0f, 0.0f, 0.0f};
-    entity->linear_momentum = (vec3){0.0f, 0.0f, 0.0f};
-    entity->forces = array_new(Physics_Force);
+	graphics_entity_recalculate_model_matrix(entity);
+    entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
+    entity->linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
     entity->mass = mass;
-    mat3 inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);
-	assert(gm_mat3_inverse(&inertia_tensor, &entity->inverse_inertia_tensor));
+    entity->inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);
+	assert(gm_mat3_inverse(&entity->inertia_tensor, &entity->inverse_inertia_tensor));
+	entity->forces = array_new(Physics_Force);
 }
 
 void graphics_entity_destroy(Entity* entity)
@@ -414,19 +414,19 @@ void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_norm
 void graphics_entity_set_position(Entity* entity, vec3 world_position)
 {
 	entity->world_position = world_position;
-	recalculate_model_matrix(entity);
+	graphics_entity_recalculate_model_matrix(entity);
 }
 
 void graphics_entity_set_rotation(Entity* entity, Quaternion world_rotation)
 {
 	entity->world_rotation = world_rotation;
-	recalculate_model_matrix(entity);
+	graphics_entity_recalculate_model_matrix(entity);
 }
 
 void graphics_entity_set_scale(Entity* entity, vec3 world_scale)
 {
 	entity->world_scale = world_scale;
-	recalculate_model_matrix(entity);
+	graphics_entity_recalculate_model_matrix(entity);
 }
 
 void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const Entity* entity)
