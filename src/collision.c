@@ -12,6 +12,7 @@ Collision_Point* collision_get_plane_cube_points(Entity* cube, r32 plane_y) {
 			cp.collision_point = gm_vec4_to_vec3(pos_wc);
 			cp.normal = (vec3){0.0f, 1.0f, 0.0f};
 			cp.penetration = plane_y - pos_wc.y;
+			cp.r_lc = (vec3){v->position.x, v->position.y, v->position.z};
 			array_push(collision_points, cp);
 		}
 	}

@@ -81,9 +81,9 @@ void core_destroy()
 void core_update(r32 delta_time)
 {
 	Physics_Force pf;
-	//pf.force = (vec3){0.0f, -1.0f, 0.0f};
-	//pf.position = (vec3){0.0f, 0.0f, 0.0f};
-	//array_push(entities[0].forces, pf);
+	pf.force = (vec3){0.0f, -1.0f, 0.0f};
+	pf.position = (vec3){0.0f, 0.0f, 0.0f};
+	array_push(entities[0].forces, pf);
     pbd_simulate(delta_time, entities);
     for (u32 i = 0; i < array_length(entities); ++i) {
         array_clear(entities[i].forces);

@@ -7,6 +7,7 @@
 
 typedef struct {
 	vec3 collision_point;
+	vec3 r_lc;
 	vec3 normal;
     r32 penetration;
 } Collision_Point;
