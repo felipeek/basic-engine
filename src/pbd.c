@@ -3,7 +3,7 @@
 #include <assert.h>
 #include "collision.h"
 
-#define NUM_SUBSTEPS 1
+#define NUM_SUBSTEPS 50
 #define NUM_POS_ITERS 1
 
 static void solve_positional_constraint(Constraint* constraint, r32 h) {
@@ -179,20 +179,19 @@ void pbd_simulate(r32 dt, Entity* entities) {
 					array_push(constraints, constraint);
 
 					// static friction
-					#if 0
+					// @TODO: this should depend only be called if lambda_t is less then something but it doesnt make sense?
+					#if 1
 					const r32 static_friction_coefficient = 1.0f;
 					vec3 delta_p = gm_vec3_subtract(gm_vec3_subtract(p1, p1_til), gm_vec3_subtract(p2, p2_til));
-					vec3 delta_p_t = gm_vec3_subtract(delta_p, gm_vec3_scalar_product(gm_vec3_dot(delta_p, cp->normal), cp->normal));
+					vec3 delta_p_t = gm_vec3_subtract(delta_p, gm_vec3_scalar_product(gm_vec3_dot(delta_p, ci->normal), ci->normal));
 					Constraint constraint = {0};
 					constraint.type = POSITIONAL_CONSTRAINT;
 					constraint.positional_constraint.compliance = 0.0f;
-					constraint.positional_constraint.e1 = &entities[1];
-					constraint.positional_constraint.e2 = &entities[0];
-					constraint.positional_constraint.lambda = &cp->lambda_t;
-					// r1 and r2 world coords?
-					constraint.positional_constraint.r1 = (vec3){0.0f, 0.0f, 0.0f};
-					vec3 r2 = cp->r_lc;
-					constraint.positional_constraint.r2 = r2;
+					constraint.positional_constraint.e1 = ci->e1;
+					constraint.positional_constraint.e2 = ci->e2;
+					constraint.positional_constraint.lambda = &ci->lambda_t;
+					constraint.positional_constraint.r1 = ci->r1_wc;
+					constraint.positional_constraint.r2 = ci->r2_wc;
 					constraint.positional_constraint.delta_x_wc = delta_p_t;
 					array_push(constraints, constraint);
 					#endif
@@ -253,20 +252,20 @@ void pbd_simulate(r32 dt, Entity* entities) {
 			r32 vn = gm_vec3_dot(n, v);
 			vec3 vt = gm_vec3_subtract(v, gm_vec3_scalar_product(vn, n));
 			
-			#if 0
+			#if 1
 			{
 				const r32 dynamic_friction_coefficient = 0.2f;
 				r32 fn = lambda_n / (h * h);
 				r32 fact = MIN(h * dynamic_friction_coefficient * fn, gm_vec3_length(vt));
 				vec3 delta_v = gm_vec3_scalar_product(-fact, gm_vec3_normalize(vt));
 
-				r32 _w1 = 1.0f / e1->mass + gm_vec3_dot(gm_vec3_cross(r1, n), gm_mat3_multiply_vec3(&e1->inverse_inertia_tensor, gm_vec3_cross(r1, n)));
-				r32 _w2 = 1.0f / e2->mass + gm_vec3_dot(gm_vec3_cross(r2, n), gm_mat3_multiply_vec3(&e2->inverse_inertia_tensor, gm_vec3_cross(r2, n)));
+				r32 _w1 = 1.0f / e1->mass + gm_vec3_dot(gm_vec3_cross(r1_wc, n), gm_mat3_multiply_vec3(&e1->inverse_inertia_tensor, gm_vec3_cross(r1_wc, n)));
+				r32 _w2 = 1.0f / e2->mass + gm_vec3_dot(gm_vec3_cross(r2_wc, n), gm_mat3_multiply_vec3(&e2->inverse_inertia_tensor, gm_vec3_cross(r2_wc, n)));
 				vec3 p = gm_vec3_scalar_product(1.0f / (_w1 + _w2), delta_v);
 				e1->linear_velocity = gm_vec3_add(e1->linear_velocity, gm_vec3_scalar_product(1.0f / e1->mass, p));
 				e2->linear_velocity = gm_vec3_subtract(e2->linear_velocity, gm_vec3_scalar_product(1.0f / e2->mass, p));
-				e1->angular_velocity = gm_vec3_add(e1->angular_velocity, gm_mat3_multiply_vec3(&e1->inverse_inertia_tensor, gm_vec3_cross(r1, p)));
-				e2->angular_velocity = gm_vec3_subtract(e2->angular_velocity, gm_mat3_multiply_vec3(&e2->inverse_inertia_tensor, gm_vec3_cross(r2, p)));
+				e1->angular_velocity = gm_vec3_add(e1->angular_velocity, gm_mat3_multiply_vec3(&e1->inverse_inertia_tensor, gm_vec3_cross(r1_wc, p)));
+				e2->angular_velocity = gm_vec3_subtract(e2->angular_velocity, gm_mat3_multiply_vec3(&e2->inverse_inertia_tensor, gm_vec3_cross(r2_wc, p)));
 			}
 			#endif
 
