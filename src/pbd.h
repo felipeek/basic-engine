@@ -9,12 +9,12 @@ typedef enum {
 typedef struct {
 	Entity* e1;
 	Entity* e2;
-	vec3 r1_wc;
-	vec3 r2_wc;
+	vec3 r1;
+	vec3 r2;
 	r32 compliance;
 	vec3 delta_x_wc;
 	
-	r32 lambda;
+	r32* lambda;
 } Positional_Constaint;
 
 typedef struct {
