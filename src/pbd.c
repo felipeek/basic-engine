@@ -34,7 +34,7 @@ static void solve_positional_constraint(Constraint* constraint, r32 h) {
 	e2->world_position = gm_vec3_add(e2->world_position, gm_vec3_scalar_product(-1.0f / e2->mass, positional_impulse));
 	vec3 rot1 = gm_mat3_multiply_vec3(&e1->inverse_inertia_tensor, gm_vec3_cross(r1, positional_impulse));
 	vec3 rot2 = gm_mat3_multiply_vec3(&e2->inverse_inertia_tensor, gm_vec3_cross(r2, positional_impulse));
-	#if 1
+	#if 0
 	r32 q1_rotation_angle = gm_vec3_length(rot1);
 	vec3 q1_rotation_axis = gm_vec3_normalize(rot1);
 	Quaternion q1 = quaternion_new_radians(q1_rotation_axis, q1_rotation_angle);
@@ -96,8 +96,8 @@ static vec3 calculate_external_torque(Entity* e) {
 
 void pbd_simulate(r32 dt, Entity* entities) {
 	if (dt <= 0.0f) return;
-	//r32 h = dt / NUM_SUBSTEPS;
-	r32 h = 0.01f;
+	r32 h = dt / NUM_SUBSTEPS;
+	//r32 h = 0.01f;
 
 	for (u32 i = 0; i < NUM_SUBSTEPS; ++i) {
 		for (u32 j = 0; j < array_length(entities); ++j) {
@@ -238,17 +238,18 @@ void pbd_simulate(r32 dt, Entity* entities) {
 			Collision_Info* ci = &collision_infos[j];
 			vec3 v1 = ci->e1->linear_velocity;
 			vec3 w1 = ci->e1->angular_velocity;
-			vec3 r1 = ci->r1_lc;
+			vec3 r1_wc = ci->r1_wc;
 			vec3 v2 = ci->e2->linear_velocity;
 			vec3 w2 = ci->e2->angular_velocity;
-			vec3 r2 = ci->r2_lc;
+			vec3 r2_lc = ci->r2_lc;
+			vec3 r2_wc = ci->r2_wc;
 			vec3 n = ci->normal;
 			r32 lambda_n = ci->lambda_n;
 			r32 lambda_t = ci->lambda_t;
 			Entity* e1 = ci->e1;
 			Entity* e2 = ci->e2;
 
-			vec3 v = gm_vec3_subtract(gm_vec3_add(v1, gm_vec3_cross(w1, r1)), gm_vec3_subtract(v2, gm_vec3_cross(w2, r2)));
+			vec3 v = gm_vec3_subtract(gm_vec3_add(v1, gm_vec3_cross(w1, r1_wc)), gm_vec3_subtract(v2, gm_vec3_cross(w2, r2_wc)));
 			r32 vn = gm_vec3_dot(n, v);
 			vec3 vt = gm_vec3_subtract(v, gm_vec3_scalar_product(vn, n));
 			
@@ -269,27 +270,27 @@ void pbd_simulate(r32 dt, Entity* entities) {
 			}
 			#endif
 
-			#if 0
+			#if 1
 			{
 				vec3 old_v1 = e1->previous_linear_velocity;
 				vec3 old_w1 = e1->previous_angular_velocity;
 				vec3 old_v2 = e2->previous_linear_velocity;
 				vec3 old_w2 = e2->previous_angular_velocity;
-				vec3 v_til = gm_vec3_subtract(gm_vec3_add(old_v1, gm_vec3_cross(old_w1, r1)), gm_vec3_subtract(old_v2, gm_vec3_cross(old_w2, r2)));
+				vec3 v_til = gm_vec3_subtract(gm_vec3_add(old_v1, gm_vec3_cross(old_w1, r1_wc)), gm_vec3_subtract(old_v2, gm_vec3_cross(old_w2, r2_wc)));
 				r32 vn_til = gm_vec3_dot(n, v_til);
 				r32 e = 0.0f;
 				r32 fact = -vn + MAX(-e * vn_til, 0.0f);
 				//r32 fact = -vn_til;
 				vec3 delta_v = gm_vec3_scalar_product(fact, n);
 
-				r32 _w1 = 1.0f / e1->mass + gm_vec3_dot(gm_vec3_cross(r1, n), gm_mat3_multiply_vec3(&e1->inverse_inertia_tensor, gm_vec3_cross(r1, n)));
-				r32 _w2 = 1.0f / e2->mass + gm_vec3_dot(gm_vec3_cross(r2, n), gm_mat3_multiply_vec3(&e2->inverse_inertia_tensor, gm_vec3_cross(r2, n)));
+				r32 _w1 = 1.0f / e1->mass + gm_vec3_dot(gm_vec3_cross(r1_wc, n), gm_mat3_multiply_vec3(&e1->inverse_inertia_tensor, gm_vec3_cross(r1_wc, n)));
+				r32 _w2 = 1.0f / e2->mass + gm_vec3_dot(gm_vec3_cross(r2_wc, n), gm_mat3_multiply_vec3(&e2->inverse_inertia_tensor, gm_vec3_cross(r2_wc, n)));
 				vec3 p = gm_vec3_scalar_product(1.0f / (_w1 + _w2), delta_v);
 				e1->linear_velocity = gm_vec3_add(e1->linear_velocity, gm_vec3_scalar_product(1.0f / e1->mass, p));
 				e2->linear_velocity = gm_vec3_subtract(e2->linear_velocity, gm_vec3_scalar_product(1.0f / e2->mass, p));
 				//e2->linear_velocity = gm_vec3_scalar_product(vn_til, n);
-				e1->angular_velocity = gm_vec3_add(e1->angular_velocity, gm_mat3_multiply_vec3(&e1->inverse_inertia_tensor, gm_vec3_cross(r1, p)));
-				e2->angular_velocity = gm_vec3_subtract(e2->angular_velocity, gm_mat3_multiply_vec3(&e2->inverse_inertia_tensor, gm_vec3_cross(r2, p)));
+				e1->angular_velocity = gm_vec3_add(e1->angular_velocity, gm_mat3_multiply_vec3(&e1->inverse_inertia_tensor, gm_vec3_cross(r1_wc, p)));
+				e2->angular_velocity = gm_vec3_subtract(e2->angular_velocity, gm_mat3_multiply_vec3(&e2->inverse_inertia_tensor, gm_vec3_cross(r2_wc, p)));
 			}
 			#endif
 
