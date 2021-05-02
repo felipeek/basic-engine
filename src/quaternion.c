@@ -282,3 +282,22 @@ Quaternion quaternion_from_matrix(const mat4* m)
 
 	return q;
 }
+
+void quaternion_to_axis_angle(Quaternion* q, vec3* axis, r32* angle) {
+	Quaternion q1 = *q;
+	if (q1.w > 1.0f) {
+		q1 = quaternion_normalize(q);
+	}
+
+	*angle = 2.0f * acosf(q1.w);
+	r32 s = sqrtf(1.0f - q1.w * q1.w);
+	if (s < 0.001f) {
+		axis->x = q1.x;
+		axis->y = q1.y;
+		axis->z = q1.z;
+	} else {
+		axis->x = q1.x / s;
+		axis->y = q1.y / s;
+		axis->z = q1.z / s;
+	}
+}
