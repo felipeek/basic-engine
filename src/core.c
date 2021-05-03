@@ -23,7 +23,7 @@ static Entity* bound_entity;
 static Perspective_Camera create_camera()
 {
 	Perspective_Camera camera;
-	vec3 camera_position = (vec3) { 0.0f, 0.0f, 5.0f };
+	vec3 camera_position = (vec3) { 0.0f, -1.0f, 5.0f };
 	r32 camera_near_plane = -0.01f;
 	r32 camera_far_plane = -1000.0f;
 	r32 camera_fov = 45.0f;
@@ -62,11 +62,11 @@ int core_init()
     entities = array_new(Entity);
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 0.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
 	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
     array_push(entities, e);
 	graphics_entity_create_with_color(&e, m, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){5.0f, 0.0f, 5.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, 10000.0f);
+		(vec3){5.0f, 0.0f, 5.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, 100000000.0f);
     array_push(entities, e);
 
 	menu_register_dummy_callback(menu_dummy_callback);
