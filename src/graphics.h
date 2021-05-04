@@ -37,6 +37,11 @@ typedef struct
 } Mesh;
 
 typedef struct {
+  u32 vertex_count;
+  vec3* vertices;
+} Bounding_Shape;
+
+typedef struct {
 	vec3 position;
 	vec3 force;
 } Physics_Force;
@@ -63,6 +68,7 @@ typedef struct
 	vec3 previous_linear_velocity;
 	vec3 previous_angular_velocity;
 
+	Bounding_Shape bs;
 	boolean fixed;
 } Entity;
 

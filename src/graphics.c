@@ -318,6 +318,14 @@ void graphics_entity_change_color(Entity* entity, vec4 color, boolean delete_dif
 	entity->diffuse_info.diffuse_color = color;
 }
 
+static void update_bounding_shapes(Entity* entity)
+{
+	for (u32 i = 0; i < array_length(entity->mesh.vertices); ++i) {
+		entity->bs.vertices[i] = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&entity->model_matrix,
+			(vec4){entity->mesh.vertices[i].position.x, entity->mesh.vertices[i].position.y, entity->mesh.vertices[i].position.z, 1.0f}));
+	}
+}
+
 void graphics_entity_recalculate_model_matrix(Entity* entity)
 {
 	r32 s, c;
@@ -340,6 +348,7 @@ void graphics_entity_recalculate_model_matrix(Entity* entity)
 
 	entity->model_matrix = gm_mat4_multiply(&rotation_matrix, &scale_matrix);
 	entity->model_matrix = gm_mat4_multiply(&translation_matrix, &entity->model_matrix);
+	update_bounding_shapes(entity);
 }
 
 static mat3 get_symmetric_inertia_tensor_for_object(Vertex* vertices, r32 mass) {
@@ -368,7 +377,6 @@ void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 wor
 	entity->world_scale = world_scale;
 	entity->diffuse_info.diffuse_color = color;
 	entity->diffuse_info.use_diffuse_map = false;
-	graphics_entity_recalculate_model_matrix(entity);
     entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
     entity->linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
 	entity->previous_linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
@@ -378,6 +386,9 @@ void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 wor
 	entity->inverse_inertia_tensor = (mat3){0};
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = true;
+	entity->bs.vertex_count = array_length(mesh.vertices);
+	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
+	graphics_entity_recalculate_model_matrix(entity);
 }
 
 void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass)
@@ -388,7 +399,6 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_pos
 	entity->world_scale = world_scale;
 	entity->diffuse_info.diffuse_color = color;
 	entity->diffuse_info.use_diffuse_map = false;
-	graphics_entity_recalculate_model_matrix(entity);
     entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
     entity->linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
 	entity->previous_linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
@@ -398,6 +408,9 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_pos
 	assert(gm_mat3_inverse(&entity->inertia_tensor, &entity->inverse_inertia_tensor));
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = false;
+	entity->bs.vertex_count = array_length(mesh.vertices);
+	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
+	graphics_entity_recalculate_model_matrix(entity);
 }
 
 void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass)
@@ -408,7 +421,6 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_p
 	entity->world_scale = world_scale;
 	entity->diffuse_info.diffuse_map = texture;
 	entity->diffuse_info.use_diffuse_map = true;
-	graphics_entity_recalculate_model_matrix(entity);
     entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
     entity->linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
 	entity->previous_linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
@@ -417,6 +429,10 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_p
     entity->inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);
 	assert(gm_mat3_inverse(&entity->inertia_tensor, &entity->inverse_inertia_tensor));
 	entity->forces = array_new(Physics_Force);
+	entity->fixed = false;
+	entity->bs.vertex_count = array_length(mesh.vertices);
+	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
+	graphics_entity_recalculate_model_matrix(entity);
 }
 
 void graphics_entity_destroy(Entity* entity)

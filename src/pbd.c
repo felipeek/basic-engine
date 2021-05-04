@@ -152,11 +152,21 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				gm_mat3_multiply_vec3(&e_inverse_inertia_tensor, gm_vec3_subtract(external_torque,
 				gm_vec3_cross(e->angular_velocity, gm_mat3_multiply_vec3(&e_inertia_tensor, e->angular_velocity))))));
 
+			#if 0
 			// deviated from paper
 			r32 rotation_angle = gm_vec3_length(e->angular_velocity) * h;
 			vec3 rotation_axis = gm_vec3_normalize(e->angular_velocity);
 			Quaternion orientation_change = quaternion_new_radians(rotation_axis, rotation_angle);
 			e->world_rotation = quaternion_product(&orientation_change, &e->world_rotation);
+			#else
+			Quaternion aux = (Quaternion){e->angular_velocity.x, e->angular_velocity.y, e->angular_velocity.z, 0.0f};
+			Quaternion prod = quaternion_product(&aux, &e->world_rotation);
+			e->world_rotation.x = e->world_rotation.x + h * 0.5f * prod.x;
+			e->world_rotation.y = e->world_rotation.y + h * 0.5f * prod.y;
+			e->world_rotation.z = e->world_rotation.z + h * 0.5f * prod.z;
+			e->world_rotation.w = e->world_rotation.w + h * 0.5f * prod.w;
+			e->world_rotation = quaternion_normalize(&e->world_rotation);
+			#endif
 
 			graphics_entity_recalculate_model_matrix(e);
 		}
