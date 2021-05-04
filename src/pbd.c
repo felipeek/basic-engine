@@ -185,19 +185,34 @@ void pbd_simulate(r32 dt, Entity* entities) {
 
 		Collision_Info* collision_infos = array_new(Collision_Info);
 
-		// Collect Collisions
-		Collision_Point* pts = collision_get_plane_cube_points(&entities[0], -2.0f);
-		for (u32 j = 0; j < array_length(pts); ++j) {
-			Collision_Point* cp = &pts[j];
-			Collision_Info ci = (Collision_Info){0};
-			ci.e1 = &entities[1];
-			ci.e2 = &entities[0];
-			ci.r1_lc = (vec3){0.0f, 0.0f, 0.0f};
-			ci.r2_lc = cp->r_lc;
-			ci.r1_wc = (vec3){0.0f, 0.0f, 0.0f};
-			ci.r2_wc = cp->r_wc;
-			ci.normal = cp->normal;
-			array_push(collision_infos, ci);
+		for (u32 j = 0; j < array_length(entities); ++j) {
+			Entity* e1 = &entities[j];
+			for (u32 k = j + 1; k < array_length(entities); ++k) {
+				Entity* e2 = &entities[k];
+				GJK_Support_List gjk_sl = {0};
+				if (collision_gjk_collides(&gjk_sl, &e1->bs, &e2->bs)) {
+					Collision_Point cp1 = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs);
+					gjk_sl = (GJK_Support_List){0};
+					if (collision_gjk_collides(&gjk_sl, &e1->bs, &e2->bs)) {
+						Collision_Point cp2 = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
+						Collision_Info ci = (Collision_Info){0};
+						ci.e1 = e1;
+						ci.e2 = e2;
+						ci.normal = gm_vec3_normalize(cp1.normal); // why cp1 though?
+						ci.r1_wc = gm_vec3_subtract(cp1.collision_point, e1->world_position);
+						ci.r2_wc = gm_vec3_subtract(cp2.collision_point, e2->world_position);
+
+						Quaternion q1_inv = quaternion_inverse(&e1->world_rotation);
+						mat3 q1_mat = quaternion_get_matrix3(&q1_inv);
+						ci.r1_lc = gm_mat3_multiply_vec3(&q1_mat, ci.r1_wc);
+
+						Quaternion q2_inv = quaternion_inverse(&e2->world_rotation);
+						mat3 q2_mat = quaternion_get_matrix3(&q2_inv);
+						ci.r2_lc = gm_mat3_multiply_vec3(&q2_mat, ci.r2_wc);
+						array_push(collision_infos, ci);
+					}
+				}
+			}
 		}
 
 		// Solve Constraints
@@ -348,7 +363,6 @@ void pbd_simulate(r32 dt, Entity* entities) {
 		}
 		#endif
 
-		array_free(pts);
 		array_free(constraints);
 		array_free(collision_infos);
 	}
