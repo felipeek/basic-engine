@@ -50,7 +50,7 @@ typedef struct
 	mat4 model_matrix;
 	Diffuse_Info diffuse_info;
 
-    r32 mass;
+    r32 inverse_mass;
     mat3 inertia_tensor;
     mat3 inverse_inertia_tensor;
     vec3 angular_velocity;
@@ -62,6 +62,8 @@ typedef struct
 	Quaternion previous_world_rotation;
 	vec3 previous_linear_velocity;
 	vec3 previous_angular_velocity;
+
+	boolean fixed;
 } Entity;
 
 typedef struct
@@ -96,6 +98,7 @@ Mesh graphics_quad_create();
 Mesh graphics_mesh_create(Vertex* vertices, u32* indices, Normal_Mapping_Info* normal_info);
 Mesh graphics_mesh_create_from_obj(const s8* obj_path, Normal_Mapping_Info* normal_info);
 void graphics_mesh_render(Shader shader, Mesh mesh);
+void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color);
 void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass);
 void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass);
 void graphics_entity_destroy(Entity* entity);

@@ -3,8 +3,32 @@
 #include <assert.h>
 #include "collision.h"
 
-#define NUM_SUBSTEPS 5
+#define NUM_SUBSTEPS 20
 #define NUM_POS_ITERS 1
+
+static mat3 get_inertia_tensor(Entity* e) {
+#if 1
+    mat4 rotation_matrix = quaternion_get_matrix(&e->world_rotation);
+    mat3 rotation_matrix_m3 = gm_mat4_to_mat3(&rotation_matrix);
+    mat3 transposed_rotation_matrix = gm_mat3_transpose(&rotation_matrix_m3);
+    mat3 aux = gm_mat3_multiply(&rotation_matrix_m3, &e->inertia_tensor);
+    return gm_mat3_multiply(&aux, &transposed_rotation_matrix);
+#else
+	return e->inertia_tensor;
+#endif
+}
+
+static mat3 get_inverse_inertia_tensor(Entity* e) {
+#if 1
+    mat4 rotation_matrix = quaternion_get_matrix(&e->world_rotation);
+    mat3 rotation_matrix_m3 = gm_mat4_to_mat3(&rotation_matrix);
+    mat3 transposed_rotation_matrix = gm_mat3_transpose(&rotation_matrix_m3);
+    mat3 aux = gm_mat3_multiply(&rotation_matrix_m3, &e->inverse_inertia_tensor);
+    return gm_mat3_multiply(&aux, &transposed_rotation_matrix);
+#else
+	return e->inverse_inertia_tensor;
+#endif
+}
 
 static void solve_positional_constraint(Constraint* constraint, r32 h) {
 	assert(constraint->type == POSITIONAL_CONSTRAINT);
@@ -19,21 +43,28 @@ static void solve_positional_constraint(Constraint* constraint, r32 h) {
 	r32 compliance = constraint->positional_constraint.compliance;
 	vec3 delta_x = constraint->positional_constraint.delta_x_wc;
 
+	mat3 e1_inverse_inertia_tensor = get_inverse_inertia_tensor(e1);
+	mat3 e2_inverse_inertia_tensor = get_inverse_inertia_tensor(e2);
+
 	vec3 n = gm_vec3_normalize(delta_x);
 	r32 c = gm_vec3_length(delta_x);
 
-	r32 w1 = 1.0f / e1->mass + gm_vec3_dot(gm_vec3_cross(r1, n), gm_mat3_multiply_vec3(&e1->inverse_inertia_tensor, gm_vec3_cross(r1, n)));
-	r32 w2 = 1.0f / e2->mass + gm_vec3_dot(gm_vec3_cross(r2, n), gm_mat3_multiply_vec3(&e2->inverse_inertia_tensor, gm_vec3_cross(r2, n)));
+	r32 w1 = e1->inverse_mass + gm_vec3_dot(gm_vec3_cross(r1, n), gm_mat3_multiply_vec3(&e1_inverse_inertia_tensor, gm_vec3_cross(r1, n)));
+	r32 w2 = e2->inverse_mass + gm_vec3_dot(gm_vec3_cross(r2, n), gm_mat3_multiply_vec3(&e2_inverse_inertia_tensor, gm_vec3_cross(r2, n)));
 	r32 til_compliance = compliance / (h * h);
 	r32 delta_lambda = (- c - til_compliance * lambda) / (w1 + w2 + til_compliance);
 
 	*constraint->positional_constraint.lambda += delta_lambda;
 
 	vec3 positional_impulse = gm_vec3_scalar_product(delta_lambda, n);
-	e1->world_position = gm_vec3_add(e1->world_position, gm_vec3_scalar_product(1.0f / e1->mass, positional_impulse));
-	e2->world_position = gm_vec3_add(e2->world_position, gm_vec3_scalar_product(-1.0f / e2->mass, positional_impulse));
-	vec3 rot1 = gm_mat3_multiply_vec3(&e1->inverse_inertia_tensor, gm_vec3_cross(r1, positional_impulse));
-	vec3 rot2 = gm_mat3_multiply_vec3(&e2->inverse_inertia_tensor, gm_vec3_cross(r2, positional_impulse));
+	if (!e1->fixed) {
+		e1->world_position = gm_vec3_add(e1->world_position, gm_vec3_scalar_product(e1->inverse_mass, positional_impulse));
+	}
+	if (!e2->fixed) {
+		e2->world_position = gm_vec3_add(e2->world_position, gm_vec3_scalar_product(-e2->inverse_mass, positional_impulse));
+	}
+	vec3 rot1 = gm_mat3_multiply_vec3(&e1_inverse_inertia_tensor, gm_vec3_cross(r1, positional_impulse));
+	vec3 rot2 = gm_mat3_multiply_vec3(&e2_inverse_inertia_tensor, gm_vec3_cross(r2, positional_impulse));
 	#if 0
 	r32 q1_rotation_angle = gm_vec3_length(rot1);
 	vec3 q1_rotation_axis = gm_vec3_normalize(rot1);
@@ -49,16 +80,20 @@ static void solve_positional_constraint(Constraint* constraint, r32 h) {
 	Quaternion q2 = (Quaternion){rot2.x, rot2.y, rot2.z, 0.0f};
 	Quaternion qr1 = quaternion_product(&q1, &e1->world_rotation);
 	Quaternion qr2 = quaternion_product(&q2, &e2->world_rotation);
-	e1->world_rotation.x = e1->world_rotation.x + 0.5f * qr1.x;
-	e1->world_rotation.y = e1->world_rotation.y + 0.5f * qr1.y;
-	e1->world_rotation.z = e1->world_rotation.z + 0.5f * qr1.z;
-	e1->world_rotation.w = e1->world_rotation.w + 0.5f * qr1.w;
-	e2->world_rotation.x = e2->world_rotation.x - 0.5f * qr2.x;
-	e2->world_rotation.y = e2->world_rotation.y - 0.5f * qr2.y;
-	e2->world_rotation.z = e2->world_rotation.z - 0.5f * qr2.z;
-	e2->world_rotation.w = e2->world_rotation.w - 0.5f * qr2.w;
-	e1->world_rotation = quaternion_normalize(&e1->world_rotation);
-	e2->world_rotation = quaternion_normalize(&e2->world_rotation);
+	if (!e1->fixed) {
+		e1->world_rotation.x = e1->world_rotation.x + 0.5f * qr1.x;
+		e1->world_rotation.y = e1->world_rotation.y + 0.5f * qr1.y;
+		e1->world_rotation.z = e1->world_rotation.z + 0.5f * qr1.z;
+		e1->world_rotation.w = e1->world_rotation.w + 0.5f * qr1.w;
+		e1->world_rotation = quaternion_normalize(&e1->world_rotation);
+	}
+	if (!e2->fixed) {
+		e2->world_rotation.x = e2->world_rotation.x - 0.5f * qr2.x;
+		e2->world_rotation.y = e2->world_rotation.y - 0.5f * qr2.y;
+		e2->world_rotation.z = e2->world_rotation.z - 0.5f * qr2.z;
+		e2->world_rotation.w = e2->world_rotation.w - 0.5f * qr2.w;
+		e2->world_rotation = quaternion_normalize(&e2->world_rotation);
+	}
 	#endif
 }
 
@@ -102,16 +137,20 @@ void pbd_simulate(r32 dt, Entity* entities) {
 	for (u32 i = 0; i < NUM_SUBSTEPS; ++i) {
 		for (u32 j = 0; j < array_length(entities); ++j) {
 			Entity* e = &entities[j];
+			if (e->fixed) continue;
+
 			vec3 external_force = calculate_external_force(e);
 			vec3 external_torque = calculate_external_torque(e);
 			e->previous_world_position = e->world_position;
-			e->linear_velocity = gm_vec3_add(e->linear_velocity, gm_vec3_scalar_product(h / e->mass, external_force));
+			e->linear_velocity = gm_vec3_add(e->linear_velocity, gm_vec3_scalar_product(h * e->inverse_mass, external_force));
 			e->world_position = gm_vec3_add(e->world_position, gm_vec3_scalar_product(h, e->linear_velocity));
 
+			mat3 e_inverse_inertia_tensor = get_inverse_inertia_tensor(e);
+			mat3 e_inertia_tensor = get_inertia_tensor(e);
 			e->previous_world_rotation = e->world_rotation;
 			e->angular_velocity = gm_vec3_add(e->angular_velocity, gm_vec3_scalar_product(h, 
-				gm_mat3_multiply_vec3(&e->inverse_inertia_tensor, gm_vec3_subtract(external_torque,
-				gm_vec3_cross(e->angular_velocity, gm_mat3_multiply_vec3(&e->inertia_tensor, e->angular_velocity))))));
+				gm_mat3_multiply_vec3(&e_inverse_inertia_tensor, gm_vec3_subtract(external_torque,
+				gm_vec3_cross(e->angular_velocity, gm_mat3_multiply_vec3(&e_inertia_tensor, e->angular_velocity))))));
 
 			// deviated from paper
 			r32 rotation_angle = gm_vec3_length(e->angular_velocity) * h;
@@ -208,6 +247,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 
 		for (u32 j = 0; j < array_length(entities); ++j) {
 			Entity* e = &entities[j];
+			if (e->fixed) continue;
 			e->previous_linear_velocity = e->linear_velocity;
 			e->previous_angular_velocity = e->angular_velocity;
 			e->linear_velocity = gm_vec3_scalar_product(1.0f / h, gm_vec3_subtract(e->world_position, e->previous_world_position));
@@ -253,11 +293,11 @@ void pbd_simulate(r32 dt, Entity* entities) {
 
 			vec3 delta_v = (vec3){0};
 			
-			#if 0
+			#if 1
 			{
-				const r32 dynamic_friction_coefficient = 0.2f;
+				const r32 dynamic_friction_coefficient = 0.5f;
 				r32 fn = lambda_n / (h * h);
-				r32 fact = MIN(h * dynamic_friction_coefficient * fn, gm_vec3_length(vt));
+				r32 fact = MIN(-h * dynamic_friction_coefficient * fn, gm_vec3_length(vt));
 				delta_v = gm_vec3_add(delta_v, gm_vec3_scalar_product(-fact, gm_vec3_normalize(vt)));
 			}
 			#endif
@@ -270,7 +310,8 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				vec3 old_w2 = e2->previous_angular_velocity;
 				vec3 v_til = gm_vec3_subtract(gm_vec3_add(old_v1, gm_vec3_cross(old_w1, r1_wc)), gm_vec3_add(old_v2, gm_vec3_cross(old_w2, r2_wc)));
 				r32 vn_til = gm_vec3_dot(n, v_til);
-				r32 e = 0.5f;
+				//r32 e = (fabsf(vn) > 2.0f * GRAVITY * h) ? 0.8f : 0.0f;
+				r32 e = 0.4f;
 				r32 fact = -vn + MIN(-e * vn_til, 0.0f);
 				//r32 fact = -vn - 0.5f * vn_til;
 				//printf("Wanted: <%.3f>\nGot (paper): <%.3f>\n", fact, paper_fact);
@@ -278,13 +319,19 @@ void pbd_simulate(r32 dt, Entity* entities) {
 			}
 			#endif
 
-			r32 _w1 = 1.0f / e1->mass + gm_vec3_dot(gm_vec3_cross(r1_wc, n), gm_mat3_multiply_vec3(&e1->inverse_inertia_tensor, gm_vec3_cross(r1_wc, n)));
-			r32 _w2 = 1.0f / e2->mass + gm_vec3_dot(gm_vec3_cross(r2_wc, n), gm_mat3_multiply_vec3(&e2->inverse_inertia_tensor, gm_vec3_cross(r2_wc, n)));
+			mat3 e1_inverse_inertia_tensor = get_inverse_inertia_tensor(e1);
+			mat3 e2_inverse_inertia_tensor = get_inverse_inertia_tensor(e2);
+			r32 _w1 = e1->inverse_mass + gm_vec3_dot(gm_vec3_cross(r1_wc, n), gm_mat3_multiply_vec3(&e1_inverse_inertia_tensor, gm_vec3_cross(r1_wc, n)));
+			r32 _w2 = e2->inverse_mass + gm_vec3_dot(gm_vec3_cross(r2_wc, n), gm_mat3_multiply_vec3(&e2_inverse_inertia_tensor, gm_vec3_cross(r2_wc, n)));
 			vec3 p = gm_vec3_scalar_product(1.0f / (_w1 + _w2), delta_v);
-			e1->linear_velocity = gm_vec3_add(e1->linear_velocity, gm_vec3_scalar_product(1.0f / e1->mass, p));
-			e2->linear_velocity = gm_vec3_subtract(e2->linear_velocity, gm_vec3_scalar_product(1.0f / e2->mass, p));
-			e1->angular_velocity = gm_vec3_add(e1->angular_velocity, gm_mat3_multiply_vec3(&e1->inverse_inertia_tensor, gm_vec3_cross(r1_wc, p)));
-			e2->angular_velocity = gm_vec3_subtract(e2->angular_velocity, gm_mat3_multiply_vec3(&e2->inverse_inertia_tensor, gm_vec3_cross(r2_wc, p)));
+			if (!e1->fixed) {
+				e1->linear_velocity = gm_vec3_add(e1->linear_velocity, gm_vec3_scalar_product(e1->inverse_mass, p));
+				e1->angular_velocity = gm_vec3_add(e1->angular_velocity, gm_mat3_multiply_vec3(&e1_inverse_inertia_tensor, gm_vec3_cross(r1_wc, p)));
+			}
+			if (!e2->fixed) {
+				e2->linear_velocity = gm_vec3_subtract(e2->linear_velocity, gm_vec3_scalar_product(e2->inverse_mass, p));
+				e2->angular_velocity = gm_vec3_subtract(e2->angular_velocity, gm_mat3_multiply_vec3(&e2_inverse_inertia_tensor, gm_vec3_cross(r2_wc, p)));
+			}
 
 			printf("e2->linear_velocity = <%.3f, %.3f, %.3f>\n", e2->linear_velocity.x, e2->linear_velocity.y, e2->linear_velocity.z);
 			printf("e2->angular_velocity = <%.3f, %.3f, %.3f>\n", e2->angular_velocity.x, e2->angular_velocity.y, e2->angular_velocity.z);

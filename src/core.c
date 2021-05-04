@@ -61,12 +61,12 @@ int core_init()
     Entity e;
     entities = array_new(Entity);
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 0.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
+	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 5.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
 	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
     array_push(entities, e);
-	graphics_entity_create_with_color(&e, m, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){5.0f, 0.0f, 5.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, 100000000.0f);
+	graphics_entity_create_with_color_fixed(&e, m, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+		(vec3){5.0f, 0.0f, 5.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f});
     array_push(entities, e);
 
 	menu_register_dummy_callback(menu_dummy_callback);
@@ -82,7 +82,7 @@ void core_destroy()
 void core_update(r32 delta_time)
 {
 	Physics_Force pf;
-	pf.force = (vec3){0.0f, -10.0f, 0.0f};
+	pf.force = (vec3){0.0f, -GRAVITY * 1.0f / entities[0].inverse_mass, 0.0f};
 	pf.position = (vec3){0.0f, 0.0f, 0.0f};
 	array_push(entities[0].forces, pf);
     pbd_simulate(delta_time, entities);

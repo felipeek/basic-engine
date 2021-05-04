@@ -360,6 +360,26 @@ static mat3 get_symmetric_inertia_tensor_for_object(Vertex* vertices, r32 mass) 
     return result;
 }
 
+void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color)
+{
+	entity->mesh = mesh;
+	entity->world_position = world_position;
+	entity->world_rotation = world_rotation;
+	entity->world_scale = world_scale;
+	entity->diffuse_info.diffuse_color = color;
+	entity->diffuse_info.use_diffuse_map = false;
+	graphics_entity_recalculate_model_matrix(entity);
+    entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
+    entity->linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
+	entity->previous_linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
+	entity->previous_angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
+    entity->inverse_mass = 0.0f;
+    entity->inertia_tensor = (mat3){0}; // this is not correct, but it shouldn't make a difference
+	entity->inverse_inertia_tensor = (mat3){0};
+	entity->forces = array_new(Physics_Force);
+	entity->fixed = true;
+}
+
 void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass)
 {
 	entity->mesh = mesh;
@@ -371,10 +391,13 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_pos
 	graphics_entity_recalculate_model_matrix(entity);
     entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
     entity->linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
-    entity->mass = mass;
+	entity->previous_linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
+	entity->previous_angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
+    entity->inverse_mass = 1.0f / mass;
     entity->inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);
 	assert(gm_mat3_inverse(&entity->inertia_tensor, &entity->inverse_inertia_tensor));
 	entity->forces = array_new(Physics_Force);
+	entity->fixed = false;
 }
 
 void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass)
@@ -388,7 +411,9 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_p
 	graphics_entity_recalculate_model_matrix(entity);
     entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
     entity->linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
-    entity->mass = mass;
+	entity->previous_linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
+	entity->previous_angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
+    entity->inverse_mass = 1.0f / mass;
     entity->inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);
 	assert(gm_mat3_inverse(&entity->inertia_tensor, &entity->inverse_inertia_tensor));
 	entity->forces = array_new(Physics_Force);
