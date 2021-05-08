@@ -12,7 +12,7 @@ typedef struct {
 	vec3 r1;
 	vec3 r2;
 	r32 compliance;
-	vec3 delta_x_wc;
+	vec3 delta_x;
 	
 	r32* lambda;
 } Positional_Constaint;

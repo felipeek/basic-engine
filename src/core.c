@@ -10,7 +10,6 @@
 #include "collision.h"
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
-#define PLANE_Y -2.0f
 
 static Perspective_Camera camera;
 static Light* lights;

@@ -22,5 +22,6 @@ typedef double r64;
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
 
 #define GRAVITY 10.0f
+#define PLANE_Y -2.0f
 
 #endif

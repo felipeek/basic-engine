@@ -37,11 +37,6 @@ typedef struct
 } Mesh;
 
 typedef struct {
-  u32 vertex_count;
-  vec3* vertices;
-} Bounding_Shape;
-
-typedef struct {
 	vec3 position;
 	vec3 force;
 } Physics_Force;
@@ -52,7 +47,6 @@ typedef struct
 	vec3 world_position;
 	Quaternion world_rotation;
 	vec3 world_scale;
-	mat4 model_matrix;
 	Diffuse_Info diffuse_info;
 
     r32 inverse_mass;
@@ -68,7 +62,6 @@ typedef struct
 	vec3 previous_linear_velocity;
 	vec3 previous_angular_velocity;
 
-	Bounding_Shape bs;
 	boolean fixed;
 } Entity;
 
@@ -119,7 +112,8 @@ void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_norm
 void graphics_entity_set_position(Entity* entity, vec3 world_position);
 void graphics_entity_set_rotation(Entity* entity, Quaternion world_rotation);
 void graphics_entity_set_scale(Entity* entity, vec3 world_scale);
-void graphics_entity_recalculate_model_matrix(Entity* entity);
+mat4 graphics_entity_get_model_matrix_without_scale(const Entity* entity);
+mat4 graphics_entity_get_model_matrix(const Entity* entity);
 void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const Entity* entity);
 void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const Entity* entity, const Light* lights);
 void graphics_light_create(Light* light, vec3 position, vec4 ambient_color, vec4 diffuse_color, vec4 specular_color);

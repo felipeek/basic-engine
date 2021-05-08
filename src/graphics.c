@@ -318,18 +318,22 @@ void graphics_entity_change_color(Entity* entity, vec4 color, boolean delete_dif
 	entity->diffuse_info.diffuse_color = color;
 }
 
-static void update_bounding_shapes(Entity* entity)
+mat4 graphics_entity_get_model_matrix_without_scale(const Entity* entity)
 {
-	for (u32 i = 0; i < array_length(entity->mesh.vertices); ++i) {
-		entity->bs.vertices[i] = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&entity->model_matrix,
-			(vec4){entity->mesh.vertices[i].position.x, entity->mesh.vertices[i].position.y, entity->mesh.vertices[i].position.z, 1.0f}));
-	}
+	mat4 rotation_matrix = quaternion_get_matrix(&entity->world_rotation);
+
+	mat4 translation_matrix = (mat4) {
+		1.0f, 0.0f, 0.0f, entity->world_position.x,
+			0.0f, 1.0f, 0.0f, entity->world_position.y,
+			0.0f, 0.0f, 1.0f, entity->world_position.z,
+			0.0f, 0.0f, 0.0f, 1.0f
+	};
+
+	return gm_mat4_multiply(&translation_matrix, &rotation_matrix);
 }
 
-void graphics_entity_recalculate_model_matrix(Entity* entity)
+mat4 graphics_entity_get_model_matrix(const Entity* entity)
 {
-	r32 s, c;
-
 	mat4 scale_matrix = (mat4) {
 		entity->world_scale.x, 0.0f, 0.0f, 0.0f,
 			0.0f, entity->world_scale.y, 0.0f, 0.0f,
@@ -346,9 +350,8 @@ void graphics_entity_recalculate_model_matrix(Entity* entity)
 			0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	entity->model_matrix = gm_mat4_multiply(&rotation_matrix, &scale_matrix);
-	entity->model_matrix = gm_mat4_multiply(&translation_matrix, &entity->model_matrix);
-	update_bounding_shapes(entity);
+	mat4 model_matrix = gm_mat4_multiply(&rotation_matrix, &scale_matrix);
+	return gm_mat4_multiply(&translation_matrix, &model_matrix);
 }
 
 static mat3 get_symmetric_inertia_tensor_for_object(Vertex* vertices, r32 mass) {
@@ -386,9 +389,6 @@ void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 wor
 	entity->inverse_inertia_tensor = (mat3){0};
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = true;
-	entity->bs.vertex_count = array_length(mesh.vertices);
-	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
-	graphics_entity_recalculate_model_matrix(entity);
 }
 
 void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass)
@@ -408,9 +408,6 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_pos
 	assert(gm_mat3_inverse(&entity->inertia_tensor, &entity->inverse_inertia_tensor));
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = false;
-	entity->bs.vertex_count = array_length(mesh.vertices);
-	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
-	graphics_entity_recalculate_model_matrix(entity);
 }
 
 void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass)
@@ -430,9 +427,6 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_p
 	assert(gm_mat3_inverse(&entity->inertia_tensor, &entity->inverse_inertia_tensor));
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = false;
-	entity->bs.vertex_count = array_length(mesh.vertices);
-	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
-	graphics_entity_recalculate_model_matrix(entity);
 }
 
 void graphics_entity_destroy(Entity* entity)
@@ -455,19 +449,16 @@ void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_norm
 void graphics_entity_set_position(Entity* entity, vec3 world_position)
 {
 	entity->world_position = world_position;
-	graphics_entity_recalculate_model_matrix(entity);
 }
 
 void graphics_entity_set_rotation(Entity* entity, Quaternion world_rotation)
 {
 	entity->world_rotation = world_rotation;
-	graphics_entity_recalculate_model_matrix(entity);
 }
 
 void graphics_entity_set_scale(Entity* entity, vec3 world_scale)
 {
 	entity->world_scale = world_scale;
-	graphics_entity_recalculate_model_matrix(entity);
 }
 
 void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const Entity* entity)
@@ -478,7 +469,8 @@ void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const
 	GLint model_matrix_location = glGetUniformLocation(shader, "model_matrix");
 	GLint view_matrix_location = glGetUniformLocation(shader, "view_matrix");
 	GLint projection_matrix_location = glGetUniformLocation(shader, "projection_matrix");
-	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)entity->model_matrix.data);
+	mat4 model_matrix = graphics_entity_get_model_matrix(entity);
+	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)model_matrix.data);
 	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)camera->view_matrix.data);
 	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)camera->projection_matrix.data);
 	graphics_mesh_render(shader, entity->mesh);
@@ -498,7 +490,8 @@ void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const
 	GLint projection_matrix_location = glGetUniformLocation(shader, "projection_matrix");
 	glUniform3f(camera_position_location, camera->position.x, camera->position.y, camera->position.z);
 	glUniform1f(shineness_location, 128.0f);
-	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)entity->model_matrix.data);
+	mat4 model_matrix = graphics_entity_get_model_matrix(entity);
+	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)model_matrix.data);
 	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)camera->view_matrix.data);
 	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)camera->projection_matrix.data);
 	diffuse_update_uniforms(&entity->diffuse_info, shader);
