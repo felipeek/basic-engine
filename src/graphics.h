@@ -41,28 +41,39 @@ typedef struct {
 	vec3 force;
 } Physics_Force;
 
-typedef struct
-{
-	Mesh mesh;
-	vec3 world_position;
-	Quaternion world_rotation;
-	vec3 world_scale;
-	Diffuse_Info diffuse_info;
-
-    r32 inverse_mass;
-    mat3 inertia_tensor;
-    mat3 inverse_inertia_tensor;
-    vec3 angular_velocity;
-    vec3 linear_velocity;
-	Physics_Force* forces;
-
-	// auxiliar
+typedef struct {
 	vec3 previous_world_position;
 	Quaternion previous_world_rotation;
 	vec3 previous_linear_velocity;
 	vec3 previous_angular_velocity;
 
+	vec3 world_position;		// the absolute position of the particle, in world coordinates.
+	Quaternion world_rotation;	// the rotation of the particle w/ relation to the center of mass of the entity it is part of
+	vec3 linear_velocity;		// the linear velocity of the particle
+	vec3 angular_velocity;		// the angular velocity of the particle
+
+	r32 inverse_mass;
+
+	// @TODO: decide if forces are per particle or per entity
+	Physics_Force* forces;
 	boolean fixed;
+} Particle;
+
+typedef struct {
+	Particle* p1;
+	Particle* p2;
+	r32 distance;
+} Particle_Connection;
+
+typedef struct
+{
+	Mesh mesh;
+	Diffuse_Info diffuse_info;
+
+	Particle** particles;
+	Particle_Connection* connections;
+
+	vec3 center_of_mass; // dynamic
 } Entity;
 
 typedef struct
@@ -109,13 +120,10 @@ void graphics_entity_change_diffuse_map(Entity* entity, u32 diffuse_map, boolean
 // The entity will be set to use the color.
 void graphics_entity_change_color(Entity* entity, vec4 color, boolean delete_diffuse_map);
 void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_normal_map);
-void graphics_entity_set_position(Entity* entity, vec3 world_position);
-void graphics_entity_set_rotation(Entity* entity, Quaternion world_rotation);
-void graphics_entity_set_scale(Entity* entity, vec3 world_scale);
-mat4 graphics_entity_get_model_matrix_without_scale(const Entity* entity);
-mat4 graphics_entity_get_model_matrix(const Entity* entity);
+mat4 graphics_particle_get_model_matrix(const Particle* particle);
 void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const Entity* entity);
 void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const Entity* entity, const Light* lights);
+vec3 graphics_entity_get_center_of_mass(const Entity* entity);
 void graphics_light_create(Light* light, vec3 position, vec4 ambient_color, vec4 diffuse_color, vec4 specular_color);
 u32 graphics_texture_create(const s8* texture_path);
 u32 graphics_texture_create_from_data(const Image_Data* image_data);

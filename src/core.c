@@ -64,9 +64,9 @@ int core_init()
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
 	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
     array_push(entities, e);
-	graphics_entity_create_with_color_fixed(&e, m, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){5.0f, 0.0f, 5.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f});
-    array_push(entities, e);
+	//graphics_entity_create_with_color_fixed(&e, m, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	//	(vec3){5.0f, 0.0f, 5.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f});
+ //   array_push(entities, e);
 
 	menu_register_dummy_callback(menu_dummy_callback);
 
@@ -80,21 +80,36 @@ void core_destroy()
 
 void core_update(r32 delta_time)
 {
+	/*
 	Physics_Force pf;
 	pf.force = (vec3){0.0f, -GRAVITY * 1.0f / entities[0].inverse_mass, 0.0f};
 	pf.position = (vec3){0.0f, 0.0f, 0.0f};
 	array_push(entities[0].forces, pf);
+	*/
+
+	Physics_Force pf;
+	pf.force = (vec3){0.0f, 2.0f, 0.0f};
+	pf.position = (vec3){0.0f, 0.0f, 0.0f};
+	array_push(entities[0].particles[0]->forces, pf);
     pbd_simulate(delta_time, entities);
     for (u32 i = 0; i < array_length(entities); ++i) {
-        array_clear(entities[i].forces);
+		for (u32 j = 0; j < array_length(entities->particles); ++j) {
+			array_clear(entities[i].particles[j]->forces);
+		}
     }
 }
 
 void core_render()
 {
+	/*
     for (u32 i = 0; i < array_length(entities); ++i) {
         graphics_entity_render_phong_shader(&camera, &entities[i], lights);
     }
+	*/
+
+	graphics_entity_render_phong_shader(&camera, &entities[0], lights);
+
+	/*
     //graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
     Collision_Point* cps = collision_get_plane_cube_points(&entities[0], PLANE_Y);
     for (u32 i = 0; i < array_length(cps); ++i) {
@@ -104,6 +119,16 @@ void core_render()
     }
     graphics_renderer_primitives_flush(&camera);
     array_free(cps);
+	*/
+
+	Entity* cube = &entities[0];
+	for (u32 i = 0; i < array_length(cube->connections); ++i) {
+		Particle_Connection* conn = &cube->connections[i];
+		Particle* p1 = conn->p1;
+		Particle* p2 = conn->p2;
+		graphics_renderer_debug_vector(p1->world_position, p2->world_position, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+	}
+    graphics_renderer_primitives_flush(&camera);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
@@ -124,47 +149,7 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		camera_move_right(&camera, -movement_speed * delta_time);
 	if (key_state[GLFW_KEY_D])
 		camera_move_right(&camera, movement_speed * delta_time);
-	if (key_state[GLFW_KEY_X])
-	{
-		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
-		{
-			Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, rotation_speed * delta_time);
-			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
-		}
-		else
-		{
-			Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, -rotation_speed * delta_time);
-			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
-		}
-	}
-	if (key_state[GLFW_KEY_Y])
-	{
-		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
-		{
-			Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, rotation_speed * delta_time);
-			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
-		}
-		else
-		{
-			Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, -rotation_speed * delta_time);
-			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
-		}
-	}
-	if (key_state[GLFW_KEY_Z])
-	{
-		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
-		{
-			Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, rotation_speed * delta_time);
-			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
-		}
-		else
-		{
-			Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, -rotation_speed * delta_time);
-			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
-		}
-	}
-	if (key_state[GLFW_KEY_L])
-	{
+	if (key_state[GLFW_KEY_L]) {
 		static boolean wireframe = false;
 
 		if (wireframe)
@@ -175,14 +160,15 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		wireframe = !wireframe;
 		key_state[GLFW_KEY_L] = false;
 	}
-	if (key_state[GLFW_KEY_Q])
-	{
+	if (key_state[GLFW_KEY_Q]) {
+		/*
         Physics_Force pf;
         pf.force = (vec3) {0.0f, -100.0f, 0.0f};
         pf.position = (vec3) {-1.0f, -1.0f, 1.0f};
         array_push(entities[0].forces, pf);
         printf("Created force.\n");
 		key_state[GLFW_KEY_Q] = false;
+		*/
 	}
 	if (key_state[GLFW_KEY_1]) {
         is_mouse_bound_to_entity_movement = true;
@@ -204,28 +190,28 @@ void core_mouse_change_process(boolean reset, r64 x_pos, r64 y_pos)
 
 	if (reset) return;
 
-	if (is_mouse_bound_to_entity_movement && bound_entity != NULL)
-	{
-		// MOVE TARGET POSITIONS!
-		vec3 camera_y = camera_get_y_axis(&camera);
-		vec3 camera_x = camera_get_x_axis(&camera);
+	//if (is_mouse_bound_to_entity_movement && bound_entity != NULL)
+	//{
+	//	// MOVE TARGET POSITIONS!
+	//	vec3 camera_y = camera_get_y_axis(&camera);
+	//	vec3 camera_x = camera_get_x_axis(&camera);
 
-		static const r32 target_point_move_speed = 0.001f;
-		vec3 y_diff = gm_vec3_scalar_product(-target_point_move_speed * (r32)y_difference, camera_y);
-		vec3 x_diff = gm_vec3_scalar_product(target_point_move_speed * (r32)x_difference, camera_x);
+	//	static const r32 target_point_move_speed = 0.001f;
+	//	vec3 y_diff = gm_vec3_scalar_product(-target_point_move_speed * (r32)y_difference, camera_y);
+	//	vec3 x_diff = gm_vec3_scalar_product(target_point_move_speed * (r32)x_difference, camera_x);
 
-        vec3 position = bound_entity->world_position;
-		position = gm_vec3_add(position, y_diff);
-		position = gm_vec3_add(position, x_diff);
-        graphics_entity_set_position(bound_entity, position);
-	}
-	else
-	{
+ //       vec3 position = bound_entity->world_position;
+	//	position = gm_vec3_add(position, y_diff);
+	//	position = gm_vec3_add(position, x_diff);
+ //       graphics_entity_set_position(bound_entity, position);
+	//}
+	//else
+	//{
 		// NORMAL CAMERA MOVEMENT!
 		static const r32 camera_mouse_speed = 0.1f;
 		camera_rotate_x(&camera, camera_mouse_speed * (r32)x_difference);
 		camera_rotate_y(&camera, camera_mouse_speed * (r32)y_difference);
-	}
+	//}
 }
 
 void core_mouse_click_process(s32 button, s32 action, r64 x_pos, r64 y_pos)

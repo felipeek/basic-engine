@@ -2,6 +2,7 @@
 #include <light_array.h>
 #include <float.h>
 
+/*
 Collision_Info* collision_collect_collisions(Entity* cube, Entity* plane) {
 	Collision_Info* collision_infos = array_new(Collision_Info);
 
@@ -59,4 +60,32 @@ Collision_Point* collision_get_plane_cube_points(Entity* cube, r32 plane_y) {
 		}
 	}
 	return collision_points;
+}
+*/
+
+s32 collision_check_point_side_of_triangle(vec3 point, vec3 t1, vec3 t2, vec3 t3) {
+	vec3 v1 = gm_vec3_subtract(t2, t1);
+	vec3 v2 = gm_vec3_subtract(t3, t1);
+	vec3 plane_normal = gm_vec3_cross(v1, v2);
+	r32 k = -(plane_normal.x * t1.x + plane_normal.y * t1.y + plane_normal.z * t1.z);
+	// plane equation: plane_normal.x * x + plane_normal.y * y + plane_normal.z * z + k = 0
+
+	r32 point_applied_on_eq = plane_normal.x * point.x + plane_normal.y * point.y + plane_normal.z * point.z + k;
+	return point_applied_on_eq >= 0; // true -> "outside" | false -> "inside"
+}
+
+boolean collision_is_point_inside_with_mesh(vec3 point, Mesh m) {
+	boolean inside_mesh = true;
+
+	for (u32 i = 0; i < array_length(m.indices); i += 3) {
+		vec3 t1 = m.vertices[i + 0].position;
+		vec3 t2 = m.vertices[i + 1].position;
+		vec3 t3 = m.vertices[i + 2].position;
+
+		if (collision_check_point_side_of_triangle(point, t1, t2, t3)) {
+			inside_mesh = false;
+		}
+	}
+
+	return inside_mesh;
 }

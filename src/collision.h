@@ -27,5 +27,6 @@ typedef struct {
 
 Collision_Info* collision_collect_collisions(Entity* cube, Entity* plane);
 Collision_Point* collision_get_plane_cube_points(Entity* cube, r32 plane_y);
+boolean collision_is_point_inside_with_mesh(vec3 point, Mesh m);
 
 #endif

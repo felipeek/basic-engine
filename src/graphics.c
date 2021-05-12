@@ -6,11 +6,16 @@
 #include <stb_image_write.h>
 #include <light_array.h>
 #include <math.h>
+#include <float.h>
+#include "collision.h"
 
 #define PHONG_VERTEX_SHADER_PATH "./shaders/phong_shader.vs"
 #define PHONG_FRAGMENT_SHADER_PATH "./shaders/phong_shader.fs"
 #define BASIC_VERTEX_SHADER_PATH "./shaders/basic_shader.vs"
 #define BASIC_FRAGMENT_SHADER_PATH "./shaders/basic_shader.fs"
+
+const r32 PARTICLE_RADIUS = 0.9f;
+const r32 PARTICLE_SPACE = 4.0f * 0.02f * (0.75f);
 
 Image_Data graphics_image_load(const s8* image_path)
 {
@@ -318,40 +323,18 @@ void graphics_entity_change_color(Entity* entity, vec4 color, boolean delete_dif
 	entity->diffuse_info.diffuse_color = color;
 }
 
-mat4 graphics_entity_get_model_matrix_without_scale(const Entity* entity)
+mat4 graphics_particle_get_model_matrix(const Particle* particle)
 {
-	mat4 rotation_matrix = quaternion_get_matrix(&entity->world_rotation);
+	mat4 rotation_matrix = quaternion_get_matrix(&particle->world_rotation);
 
 	mat4 translation_matrix = (mat4) {
-		1.0f, 0.0f, 0.0f, entity->world_position.x,
-			0.0f, 1.0f, 0.0f, entity->world_position.y,
-			0.0f, 0.0f, 1.0f, entity->world_position.z,
+		1.0f, 0.0f, 0.0f, particle->world_position.x,
+			0.0f, 1.0f, 0.0f, particle->world_position.y,
+			0.0f, 0.0f, 1.0f, particle->world_position.z,
 			0.0f, 0.0f, 0.0f, 1.0f
 	};
 
 	return gm_mat4_multiply(&translation_matrix, &rotation_matrix);
-}
-
-mat4 graphics_entity_get_model_matrix(const Entity* entity)
-{
-	mat4 scale_matrix = (mat4) {
-		entity->world_scale.x, 0.0f, 0.0f, 0.0f,
-			0.0f, entity->world_scale.y, 0.0f, 0.0f,
-			0.0f, 0.0f, entity->world_scale.z, 0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f
-	};
-
-	mat4 rotation_matrix = quaternion_get_matrix(&entity->world_rotation);
-
-	mat4 translation_matrix = (mat4) {
-		1.0f, 0.0f, 0.0f, entity->world_position.x,
-			0.0f, 1.0f, 0.0f, entity->world_position.y,
-			0.0f, 0.0f, 1.0f, entity->world_position.z,
-			0.0f, 0.0f, 0.0f, 1.0f
-	};
-
-	mat4 model_matrix = gm_mat4_multiply(&rotation_matrix, &scale_matrix);
-	return gm_mat4_multiply(&translation_matrix, &model_matrix);
 }
 
 static mat3 get_symmetric_inertia_tensor_for_object(Vertex* vertices, r32 mass) {
@@ -372,61 +355,150 @@ static mat3 get_symmetric_inertia_tensor_for_object(Vertex* vertices, r32 mass) 
     return result;
 }
 
+static void create_particle(Particle* particle, vec3 world_position, r32 mass) {
+	memset(particle, 0, sizeof(Particle));
+	particle->forces = array_new(Physics_Force);
+	particle->inverse_mass = 1.0f / mass;
+	particle->world_position = world_position;
+	particle->world_rotation = quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f);
+}
+
+static boolean is_point_inside_mesh(vec3 point, Mesh m) {
+	vec3 mesh_intersection;
+	boolean inside_mesh = collision_is_point_inside_with_mesh(point, m);
+	if (!inside_mesh) {
+		return false;
+	}
+
+	return true;
+}
+
+static void add_connection(Particle_Connection** connections, Particle*** particles, u32 i1, u32 i2) {
+	Particle_Connection pc;
+	pc.p1 = (*particles)[i1];
+	pc.p2 = (*particles)[i2];
+	pc.distance = gm_vec3_length(gm_vec3_subtract(pc.p1->world_position, pc.p2->world_position));
+	array_push(*connections, pc);
+}
+
+static void create_particles_from_mesh(Mesh m, Particle*** particles, Particle_Connection** connections) {
+	vec3 max = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+	vec3 min = {FLT_MAX, FLT_MAX, FLT_MAX};
+
+	for (s32 i = 0; i < array_length(m.vertices); ++i) {
+		vec3 current = m.vertices[i].position;
+		if (current.x < min.x) {
+			min.x = current.x;
+		}
+		if (current.y < min.y) {
+			min.y = current.y;
+		}
+		if (current.z < min.z) {
+			min.z = current.z;
+		}
+		if (current.x > max.x) {
+			max.x = current.x;
+		}
+		if (current.y > max.y) {
+			max.y = current.y;
+		}
+		if (current.z > max.z) {
+			max.z = current.z;
+		}
+	}
+
+	*particles = array_new(Particle*);
+	*connections = array_new(Particle_Connection);
+
+	// @TODO: consider spacing
+	r32 x_min = ceilf(min.x / PARTICLE_RADIUS) * PARTICLE_RADIUS - PARTICLE_RADIUS;
+	u32 x_N = (u32)ceilf((max.x - x_min) / PARTICLE_RADIUS);
+	r32 y_min = ceilf(min.y / PARTICLE_RADIUS) * PARTICLE_RADIUS - PARTICLE_RADIUS;
+	u32 y_N = (u32)ceilf((max.y - y_min) / PARTICLE_RADIUS);
+	r32 z_min = ceilf(min.z / PARTICLE_RADIUS) * PARTICLE_RADIUS - PARTICLE_RADIUS;
+	u32 z_N = (u32)ceilf((max.z - z_min) / PARTICLE_RADIUS);
+
+	// Create all potential particles
+	for (u32 x = 0; x < x_N; ++x) {
+		for (u32 y = 0; y < y_N; ++y) {
+			for (u32 z = 0; z < z_N; ++z) {
+				Particle* p = malloc(sizeof(Particle));
+				vec3 sample_position = (vec3){x_min + x * PARTICLE_RADIUS, y_min + y * PARTICLE_RADIUS, z_min + z * PARTICLE_RADIUS};
+				create_particle(p, sample_position, 1.0f);
+				array_push(*particles, p);
+			}
+		}
+	}
+
+	// Create all connections
+	for (u32 x = 0; x < x_N; ++x) {
+		for (u32 y = 0; y < y_N; ++y) {
+			for (u32 z = 0; z < z_N; ++z) {
+				u32 current_index = x * y_N * z_N + y * z_N + z;
+				u32 top_index = x * y_N * z_N + (y + 1) * z_N + z;
+				u32 right_index = (x + 1) * y_N * z_N + y * z_N + z;
+				u32 top_right_index = (x + 1) * y_N * z_N + (y + 1) * z_N + z;
+				u32 back_index = x * y_N * z_N + y * z_N + (z + 1);
+				u32 back_right_index = (x + 1) * y_N * z_N + y * z_N + (z + 1);
+				u32 back_top_index = x * y_N * z_N + (y + 1) * z_N + (z + 1);
+				u32 back_top_right_index = (x + 1) * y_N * z_N + (y + 1) * z_N + (z + 1);
+
+				if (y < y_N - 1) add_connection(connections, particles, current_index, top_index);
+				if (x < x_N - 1) add_connection(connections, particles, current_index, right_index);
+				if (x < x_N - 1 && y < y_N - 1) add_connection(connections, particles, current_index, top_right_index);
+				if (z < z_N - 1) add_connection(connections, particles, current_index, back_index);
+				if (x < x_N - 1 && z < z_N - 1) add_connection(connections, particles, current_index, back_right_index);
+				if (y < y_N - 1 && z < z_N - 1) add_connection(connections, particles, current_index, back_top_index);
+				if (x < x_N - 1 && y < y_N - 1 && z < z_N - 1) add_connection(connections, particles, current_index, back_top_right_index);
+				// caution: i think some connections are missing
+			}
+		}
+	}
+
+	// Clean particles that are outside mesh
+	for (u32 i = 0; i < array_length(*particles); ++i) {
+		Particle* p = (*particles)[i];
+		if (!collision_is_point_inside_with_mesh(p->world_position, m)) {
+			for (u32 j = 0; j < array_length(*connections); ++j) {
+				Particle_Connection* conn = &(*connections)[j];
+				if (conn->p1 == p || conn->p2 == p) {
+					array_remove_ordered(*connections, j);
+					--j;
+				}
+			}
+
+			array_remove_ordered(*particles, i);
+			--i;
+			free(p);
+		}
+	}
+}
+
 void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color)
 {
 	entity->mesh = mesh;
-	entity->world_position = world_position;
-	entity->world_rotation = world_rotation;
-	entity->world_scale = world_scale;
 	entity->diffuse_info.diffuse_color = color;
 	entity->diffuse_info.use_diffuse_map = false;
-    entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
-    entity->linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
-	entity->previous_linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
-	entity->previous_angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
-    entity->inverse_mass = 0.0f;
-    entity->inertia_tensor = (mat3){0}; // this is not correct, but it shouldn't make a difference
-	entity->inverse_inertia_tensor = (mat3){0};
-	entity->forces = array_new(Physics_Force);
-	entity->fixed = true;
+	create_particles_from_mesh(mesh, &entity->particles, &entity->connections);
+	entity->center_of_mass = graphics_entity_get_center_of_mass(entity);
 }
 
 void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass)
 {
 	entity->mesh = mesh;
-	entity->world_position = world_position;
-	entity->world_rotation = world_rotation;
-	entity->world_scale = world_scale;
 	entity->diffuse_info.diffuse_color = color;
 	entity->diffuse_info.use_diffuse_map = false;
-    entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
-    entity->linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
-	entity->previous_linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
-	entity->previous_angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
-    entity->inverse_mass = 1.0f / mass;
-    entity->inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);
-	assert(gm_mat3_inverse(&entity->inertia_tensor, &entity->inverse_inertia_tensor));
-	entity->forces = array_new(Physics_Force);
-	entity->fixed = false;
+	create_particles_from_mesh(mesh, &entity->particles, &entity->connections);
+	entity->center_of_mass = graphics_entity_get_center_of_mass(entity);
 }
 
 void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass)
 {
 	entity->mesh = mesh;
-	entity->world_position = world_position;
-	entity->world_rotation = world_rotation;
-	entity->world_scale = world_scale;
 	entity->diffuse_info.diffuse_map = texture;
 	entity->diffuse_info.use_diffuse_map = true;
-    entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
-    entity->linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
-	entity->previous_linear_velocity = (vec3){0.0f, 0.0f, 0.0f};
-	entity->previous_angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
-    entity->inverse_mass = 1.0f / mass;
-    entity->inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);
-	assert(gm_mat3_inverse(&entity->inertia_tensor, &entity->inverse_inertia_tensor));
-	entity->forces = array_new(Physics_Force);
-	entity->fixed = false;
+	create_particles_from_mesh(mesh, &entity->particles, &entity->connections);
+	entity->center_of_mass = graphics_entity_get_center_of_mass(entity);
 }
 
 void graphics_entity_destroy(Entity* entity)
@@ -446,40 +518,61 @@ void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_norm
 	entity->mesh = mesh;
 }
 
-void graphics_entity_set_position(Entity* entity, vec3 world_position)
-{
-	entity->world_position = world_position;
+vec3 graphics_entity_get_center_of_mass(const Entity* entity) {
+	r32 total_mass = 0.0f;
+	vec3 center_of_mass = (vec3){0.0f, 0.0f, 0.0f};
+	for (u32 i = 0; i < array_length(entity->particles); ++i) {
+		Particle* p = entity->particles[i];
+		assert(p->inverse_mass > 0.0f);
+		r32 particle_mass = 1.0f / p->inverse_mass;
+		center_of_mass = gm_vec3_add(center_of_mass, gm_vec3_scalar_product(particle_mass, p->world_position));
+		total_mass += particle_mass;
+	}
+
+	return gm_vec3_scalar_product(1.0f / total_mass, center_of_mass);
 }
 
-void graphics_entity_set_rotation(Entity* entity, Quaternion world_rotation)
-{
-	entity->world_rotation = world_rotation;
+typedef struct {
+	Mesh sphere;
+	boolean initialized;
+} Predefined_Meshes;
+
+static Predefined_Meshes predefined_meshes;
+
+static void init_predefined_meshes() {
+	if (!predefined_meshes.initialized) {
+		predefined_meshes.sphere = graphics_mesh_create_from_obj("./res/tiny_sphere.obj", NULL);
+		predefined_meshes.initialized = true;
+	}
 }
 
-void graphics_entity_set_scale(Entity* entity, vec3 world_scale)
-{
-	entity->world_scale = world_scale;
-}
-
-void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const Entity* entity)
+static void particle_render_basic_shader(const Perspective_Camera* camera, const Particle* particle)
 {
 	init_predefined_shaders();
+	init_predefined_meshes();
 	Shader shader = predefined_shaders.basic_shader;
 	glUseProgram(shader);
 	GLint model_matrix_location = glGetUniformLocation(shader, "model_matrix");
 	GLint view_matrix_location = glGetUniformLocation(shader, "view_matrix");
 	GLint projection_matrix_location = glGetUniformLocation(shader, "projection_matrix");
-	mat4 model_matrix = graphics_entity_get_model_matrix(entity);
+	mat4 model_matrix = graphics_particle_get_model_matrix(particle);
 	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)model_matrix.data);
 	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)camera->view_matrix.data);
 	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)camera->projection_matrix.data);
-	graphics_mesh_render(shader, entity->mesh);
+	graphics_mesh_render(shader, predefined_meshes.sphere);
 	glUseProgram(0);
 }
 
-void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const Entity* entity, const Light* lights)
+void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const Entity* entity)
 {
+	for (u32 i = 0; i < array_length(entity->particles); ++i) {
+		particle_render_basic_shader(camera, entity->particles[i]);
+	}
+}
+
+void particle_render_phong_shader(const Perspective_Camera* camera, const Particle* particle, const Light* lights, const Diffuse_Info* diffuse_info) {
 	init_predefined_shaders();
+	init_predefined_meshes();
 	Shader shader = predefined_shaders.phong_shader;
 	glUseProgram(shader);
 	light_update_uniforms(lights, shader);
@@ -490,13 +583,20 @@ void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const
 	GLint projection_matrix_location = glGetUniformLocation(shader, "projection_matrix");
 	glUniform3f(camera_position_location, camera->position.x, camera->position.y, camera->position.z);
 	glUniform1f(shineness_location, 128.0f);
-	mat4 model_matrix = graphics_entity_get_model_matrix(entity);
+	mat4 model_matrix = graphics_particle_get_model_matrix(particle);
 	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)model_matrix.data);
 	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)camera->view_matrix.data);
 	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)camera->projection_matrix.data);
-	diffuse_update_uniforms(&entity->diffuse_info, shader);
-	graphics_mesh_render(shader, entity->mesh);
+	diffuse_update_uniforms(diffuse_info, shader);
+	graphics_mesh_render(shader, predefined_meshes.sphere);
 	glUseProgram(0);
+}
+
+void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const Entity* entity, const Light* lights)
+{
+	for (u32 i = 0; i < array_length(entity->particles); ++i) {
+		particle_render_phong_shader(camera, entity->particles[i], lights, &entity->diffuse_info);
+	}
 }
 
 u32 graphics_texture_create_from_data(const Image_Data* image_data)

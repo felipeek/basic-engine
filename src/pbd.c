@@ -3,111 +3,118 @@
 #include <assert.h>
 #include "collision.h"
 
-#define NUM_SUBSTEPS 20
+#define NUM_SUBSTEPS 1
 #define NUM_POS_ITERS 1
 
 // Calculate the sum of all external forces acting on an entity
-static vec3 calculate_external_force(Entity* e) {
+static vec3 calculate_external_force(Particle* p) {
     const vec3 center_of_mass = (vec3){0.0f, 0.0f, 0.0f};
     vec3 total_force = (vec3){0.0f, 0.0f, 0.0f};
-    for (u32 i = 0; e->forces && i < array_length(e->forces); ++i) {
-        total_force = gm_vec3_add(total_force, e->forces[i].force);
+    for (u32 i = 0; p->forces && i < array_length(p->forces); ++i) {
+        total_force = gm_vec3_add(total_force, p->forces[i].force);
     }
 	return total_force;
 }
 
 // Calculate the sum of all external torques acting on an entity
-static vec3 calculate_external_torque(Entity* e) {
+static vec3 calculate_external_torque(Particle* p) {
     const vec3 center_of_mass = (vec3){0.0f, 0.0f, 0.0f};
     vec3 total_torque = (vec3){0.0f, 0.0f, 0.0f};
-    for (u32 i = 0; e->forces && i < array_length(e->forces); ++i) {
-        vec3 distance = gm_vec3_subtract(e->forces[i].position, center_of_mass);
-        total_torque = gm_vec3_add(total_torque, gm_vec3_cross(distance, e->forces[i].force));
+    for (u32 i = 0; p->forces && i < array_length(p->forces); ++i) {
+        vec3 distance = gm_vec3_subtract(p->forces[i].position, center_of_mass);
+        total_torque = gm_vec3_add(total_torque, gm_vec3_cross(distance, p->forces[i].force));
     }
 	return total_torque;
 }
 
 // Calculate the dynamic inertia tensor of an entity, i.e., the inertia tensor transformed considering entity's rotation
-static mat3 get_dynamic_inertia_tensor(Entity* e) {
-    mat4 rotation_matrix = quaternion_get_matrix(&e->world_rotation);
-    mat3 rotation_matrix_m3 = gm_mat4_to_mat3(&rotation_matrix);
-    mat3 transposed_rotation_matrix = gm_mat3_transpose(&rotation_matrix_m3);
-    mat3 aux = gm_mat3_multiply(&rotation_matrix_m3, &e->inertia_tensor);
-    return gm_mat3_multiply(&aux, &transposed_rotation_matrix);
+static mat3 get_dynamic_inertia_tensor(Particle* p) {
+	return gm_mat3_identity();
+    //mat4 rotation_matrix = quaternion_get_matrix(&p->world_rotation);
+    //mat3 rotation_matrix_m3 = gm_mat4_to_mat3(&rotation_matrix);
+    //mat3 transposed_rotation_matrix = gm_mat3_transpose(&rotation_matrix_m3);
+    //mat3 aux = gm_mat3_multiply(&rotation_matrix_m3, &p->inertia_tensor);
+    //return gm_mat3_multiply(&aux, &transposed_rotation_matrix);
 }
 
 // Calculate the dynamic inverse inertia tensor of an entity, i.e., the inverse inertia tensor transformed considering entity's rotation
-static mat3 get_dynamic_inverse_inertia_tensor(Entity* e) {
-    mat4 rotation_matrix = quaternion_get_matrix(&e->world_rotation);
-    mat3 rotation_matrix_m3 = gm_mat4_to_mat3(&rotation_matrix);
-    mat3 transposed_rotation_matrix = gm_mat3_transpose(&rotation_matrix_m3);
-    mat3 aux = gm_mat3_multiply(&rotation_matrix_m3, &e->inverse_inertia_tensor);
-    return gm_mat3_multiply(&aux, &transposed_rotation_matrix);
+static mat3 get_dynamic_inverse_inertia_tensor(Particle* p) {
+	return gm_mat3_identity();
+    //mat4 rotation_matrix = quaternion_get_matrix(&p->world_rotation);
+    //mat3 rotation_matrix_m3 = gm_mat4_to_mat3(&rotation_matrix);
+    //mat3 transposed_rotation_matrix = gm_mat3_transpose(&rotation_matrix_m3);
+    //mat3 aux = gm_mat3_multiply(&rotation_matrix_m3, &p->inverse_inertia_tensor);
+    //return gm_mat3_multiply(&aux, &transposed_rotation_matrix);
 }
 
 // Solves the positional constraint, updating the position and orientation of the entities accordingly
 static void solve_positional_constraint(Constraint* constraint, r32 h) {
 	assert(constraint->type == POSITIONAL_CONSTRAINT);
 
-	Entity* e1 = constraint->positional_constraint.e1;
-	Entity* e2 = constraint->positional_constraint.e2;
-	mat3 e1_rot = quaternion_get_matrix3(&e1->world_rotation);
-	mat3 e2_rot = quaternion_get_matrix3(&e2->world_rotation);
+	Particle* p1 = constraint->positional_constraint.p1;
+	Particle* p2 = constraint->positional_constraint.p2;
+	mat3 p1_rot = quaternion_get_matrix3(&p1->world_rotation);
+	mat3 p2_rot = quaternion_get_matrix3(&p2->world_rotation);
 	vec3 r1 = constraint->positional_constraint.r1;	// in world coordinates
 	vec3 r2 = constraint->positional_constraint.r2; // in world coordinates
-	r32 lambda = *constraint->positional_constraint.lambda;
+	r32 lambda = constraint->positional_constraint.lambda;
 	r32 compliance = constraint->positional_constraint.compliance;
-	vec3 delta_x = constraint->positional_constraint.delta_x;
+	//vec3 delta_x = constraint->positional_constraint.delta_x;
+	r32 delta_x = constraint->positional_constraint.delta_x;
 
-	mat3 e1_inverse_inertia_tensor = get_dynamic_inverse_inertia_tensor(e1);
-	mat3 e2_inverse_inertia_tensor = get_dynamic_inverse_inertia_tensor(e2);
+	mat3 p1_inverse_inertia_tensor = get_dynamic_inverse_inertia_tensor(p1);
+	mat3 p2_inverse_inertia_tensor = get_dynamic_inverse_inertia_tensor(p2);
 
 	// split delta_x into n and c.
-	vec3 n = gm_vec3_normalize(delta_x);
-	r32 c = gm_vec3_length(delta_x);
+	//vec3 n = gm_vec3_normalize(delta_x);
+	//r32 c = gm_vec3_length(delta_x);
+	
+	vec3 particle_distance = gm_vec3_subtract(p2->world_position, p1->world_position);
+	vec3 n = gm_vec3_normalize(particle_distance);
+	r32 c = delta_x - gm_vec3_length(particle_distance);
 
 	// calculate the inverse masses of both entities
-	r32 w1 = e1->inverse_mass + gm_vec3_dot(gm_vec3_cross(r1, n), gm_mat3_multiply_vec3(&e1_inverse_inertia_tensor, gm_vec3_cross(r1, n)));
-	r32 w2 = e2->inverse_mass + gm_vec3_dot(gm_vec3_cross(r2, n), gm_mat3_multiply_vec3(&e2_inverse_inertia_tensor, gm_vec3_cross(r2, n)));
+	r32 w1 = p1->inverse_mass + gm_vec3_dot(gm_vec3_cross(r1, n), gm_mat3_multiply_vec3(&p1_inverse_inertia_tensor, gm_vec3_cross(r1, n)));
+	r32 w2 = p2->inverse_mass + gm_vec3_dot(gm_vec3_cross(r2, n), gm_mat3_multiply_vec3(&p2_inverse_inertia_tensor, gm_vec3_cross(r2, n)));
 
 	// calculate the delta_lambda (XPBD) and updates the constraint
 	r32 til_compliance = compliance / (h * h);
 	r32 delta_lambda = (- c - til_compliance * lambda) / (w1 + w2 + til_compliance);
-	*constraint->positional_constraint.lambda += delta_lambda;
+	constraint->positional_constraint.lambda += delta_lambda;
 
 	// calculates the positional impulse
 	vec3 positional_impulse = gm_vec3_scalar_product(delta_lambda, n);
 
 	// updates the position of the entities based on eq (6) and (7)
-	if (!e1->fixed) {
-		e1->world_position = gm_vec3_add(e1->world_position, gm_vec3_scalar_product(e1->inverse_mass, positional_impulse));
+	if (!p1->fixed) {
+		p1->world_position = gm_vec3_add(p1->world_position, gm_vec3_scalar_product(p1->inverse_mass, positional_impulse));
 	}
-	if (!e2->fixed) {
-		e2->world_position = gm_vec3_add(e2->world_position, gm_vec3_scalar_product(-e2->inverse_mass, positional_impulse));
+	if (!p2->fixed) {
+		p2->world_position = gm_vec3_add(p2->world_position, gm_vec3_scalar_product(-p2->inverse_mass, positional_impulse));
 	}
 
 	// updates the rotation of the entities based on eq (8) and (9)
-	vec3 aux1 = gm_mat3_multiply_vec3(&e1_inverse_inertia_tensor, gm_vec3_cross(r1, positional_impulse));
-	vec3 aux2 = gm_mat3_multiply_vec3(&e2_inverse_inertia_tensor, gm_vec3_cross(r2, positional_impulse));
+	vec3 aux1 = gm_mat3_multiply_vec3(&p1_inverse_inertia_tensor, gm_vec3_cross(r1, positional_impulse));
+	vec3 aux2 = gm_mat3_multiply_vec3(&p2_inverse_inertia_tensor, gm_vec3_cross(r2, positional_impulse));
 	Quaternion aux_q1 = (Quaternion){aux1.x, aux1.y, aux1.z, 0.0f};
 	Quaternion aux_q2 = (Quaternion){aux2.x, aux2.y, aux2.z, 0.0f};
-	Quaternion q1 = quaternion_product(&aux_q1, &e1->world_rotation);
-	Quaternion q2 = quaternion_product(&aux_q2, &e2->world_rotation);
-	if (!e1->fixed) {
-		e1->world_rotation.x = e1->world_rotation.x + 0.5f * q1.x;
-		e1->world_rotation.y = e1->world_rotation.y + 0.5f * q1.y;
-		e1->world_rotation.z = e1->world_rotation.z + 0.5f * q1.z;
-		e1->world_rotation.w = e1->world_rotation.w + 0.5f * q1.w;
+	Quaternion q1 = quaternion_product(&aux_q1, &p1->world_rotation);
+	Quaternion q2 = quaternion_product(&aux_q2, &p2->world_rotation);
+	if (!p1->fixed) {
+		p1->world_rotation.x = p1->world_rotation.x + 0.5f * q1.x;
+		p1->world_rotation.y = p1->world_rotation.y + 0.5f * q1.y;
+		p1->world_rotation.z = p1->world_rotation.z + 0.5f * q1.z;
+		p1->world_rotation.w = p1->world_rotation.w + 0.5f * q1.w;
 		// should we normalize?
-		e1->world_rotation = quaternion_normalize(&e1->world_rotation);
+		p1->world_rotation = quaternion_normalize(&p1->world_rotation);
 	}
-	if (!e2->fixed) {
-		e2->world_rotation.x = e2->world_rotation.x - 0.5f * q2.x;
-		e2->world_rotation.y = e2->world_rotation.y - 0.5f * q2.y;
-		e2->world_rotation.z = e2->world_rotation.z - 0.5f * q2.z;
-		e2->world_rotation.w = e2->world_rotation.w - 0.5f * q2.w;
+	if (!p2->fixed) {
+		p2->world_rotation.x = p2->world_rotation.x - 0.5f * q2.x;
+		p2->world_rotation.y = p2->world_rotation.y - 0.5f * q2.y;
+		p2->world_rotation.z = p2->world_rotation.z - 0.5f * q2.z;
+		p2->world_rotation.w = p2->world_rotation.w - 0.5f * q2.w;
 		// should we normalize?
-		e2->world_rotation = quaternion_normalize(&e2->world_rotation);
+		p2->world_rotation = quaternion_normalize(&p2->world_rotation);
 	}
 }
 
@@ -122,13 +129,37 @@ static void solve_constraint(Constraint* constraint, r32 h) {
 	assert(0);
 }
 
+static void create_constraints_for_particles(Particle_Connection* connections, Constraint** constraints, vec3 center_of_mass) {
+	for (u32 i = 0; i < array_length(connections); ++i) {
+		Particle_Connection* conn = &connections[i];
+		Particle* p1 = conn->p1;
+		Particle* p2 = conn->p2;
+		vec3 r1 = gm_vec3_subtract(p1->world_position, center_of_mass);
+		vec3 r2 = gm_vec3_subtract(p2->world_position, center_of_mass);
+		r32 delta_x = conn->distance;
+
+		Constraint c;
+		c.type = POSITIONAL_CONSTRAINT;
+		c.positional_constraint.p1 = p1;
+		c.positional_constraint.p2 = p2;
+		c.positional_constraint.r1 = r1;
+		c.positional_constraint.r2 = r2;
+		c.positional_constraint.lambda = 0.0f;
+		c.positional_constraint.compliance = 0.0f;
+		c.positional_constraint.delta_x = delta_x;
+
+		array_push(*constraints, c);
+	}
+}
+
+/*
 // Create 'artificial' position constraints for a given collision that was detected in the simulation
 static void create_constraints_for_collision(Collision_Info* ci, Constraint** constraints) {
 	Constraint constraint = {0};
 	constraint.type = POSITIONAL_CONSTRAINT;
 	constraint.positional_constraint.compliance = 0.0f; // as stated in sec 3.5, compliance is 0 for collision constraints
-	constraint.positional_constraint.e1 = ci->e1;
-	constraint.positional_constraint.e2 = ci->e2;
+	constraint.positional_constraint.p1 = ci->e1;
+	constraint.positional_constraint.p2 = ci->e2;
 	// we make lambda a reference to the value stored in the collision_info, so we can accumulate per iteration
 	constraint.positional_constraint.lambda = &ci->lambda_n;
 	constraint.positional_constraint.r1 = ci->r1_wc;
@@ -166,59 +197,70 @@ static void create_constraints_for_collision(Collision_Info* ci, Constraint** co
 		}
 	}
 }
+*/
 
 void pbd_simulate(r32 dt, Entity* entities) {
 	if (dt <= 0.0f) return;
 	r32 h = dt / NUM_SUBSTEPS;
-	//r32 h = 0.01f;
+	//r32 h = 0.001f;
 
 	// The main loop of the PBD simulation
 	for (u32 i = 0; i < NUM_SUBSTEPS; ++i) {
 		for (u32 j = 0; j < array_length(entities); ++j) {
 			Entity* e = &entities[j];
-			if (e->fixed) continue;	
+			e->center_of_mass = graphics_entity_get_center_of_mass(e);
 
-			// Calculate the external force and torque of the entity
-			vec3 external_force = calculate_external_force(e);
-			vec3 external_torque = calculate_external_torque(e);
+			for (u32 k = 0; k < array_length(e->particles); ++k) {
+				Particle* p = e->particles[k];
+				if (p->fixed) continue;	
 
-			// Stores the previous position and orientation of the entity
-			e->previous_world_position = e->world_position;
-			e->previous_world_rotation = e->world_rotation;
+				// Calculate the external force and torque of the entity
+				vec3 external_force = calculate_external_force(p);
+				vec3 external_torque = calculate_external_torque(p);
 
-			// Update the entity position and linear velocity based on the current velocity and applied forces
-			e->linear_velocity = gm_vec3_add(e->linear_velocity, gm_vec3_scalar_product(h * e->inverse_mass, external_force));
-			e->world_position = gm_vec3_add(e->world_position, gm_vec3_scalar_product(h, e->linear_velocity));
+				// Stores the previous position and orientation of the entity
+				p->previous_world_position = p->world_position;
+				p->previous_world_rotation = p->world_rotation;
 
-			// Update the entity orientation and angular velocity based on the current velocity and applied forces
-			mat3 e_inverse_inertia_tensor = get_dynamic_inverse_inertia_tensor(e);
-			mat3 e_inertia_tensor = get_dynamic_inertia_tensor(e);
-			e->angular_velocity = gm_vec3_add(e->angular_velocity, gm_vec3_scalar_product(h, 
-				gm_mat3_multiply_vec3(&e_inverse_inertia_tensor, gm_vec3_subtract(external_torque,
-				gm_vec3_cross(e->angular_velocity, gm_mat3_multiply_vec3(&e_inertia_tensor, e->angular_velocity))))));
-			Quaternion aux = (Quaternion){e->angular_velocity.x, e->angular_velocity.y, e->angular_velocity.z, 0.0f};
-			Quaternion q = quaternion_product(&aux, &e->world_rotation);
-			e->world_rotation.x = e->world_rotation.x + h * 0.5f * q.x;
-			e->world_rotation.y = e->world_rotation.y + h * 0.5f * q.y;
-			e->world_rotation.z = e->world_rotation.z + h * 0.5f * q.z;
-			e->world_rotation.w = e->world_rotation.w + h * 0.5f * q.w;
-			// should we normalize?
-			e->world_rotation = quaternion_normalize(&e->world_rotation);
+				// Update the entity position and linear velocity based on the current velocity and applied forces
+				p->linear_velocity = gm_vec3_add(p->linear_velocity, gm_vec3_scalar_product(h * p->inverse_mass, external_force));
+				p->world_position = gm_vec3_add(p->world_position, gm_vec3_scalar_product(h, p->linear_velocity));
+
+				// Update the entity orientation and angular velocity based on the current velocity and applied forces
+				mat3 e_inverse_inertia_tensor = get_dynamic_inverse_inertia_tensor(p);
+				mat3 e_inertia_tensor = get_dynamic_inertia_tensor(p);
+				p->angular_velocity = gm_vec3_add(p->angular_velocity, gm_vec3_scalar_product(h, 
+					gm_mat3_multiply_vec3(&e_inverse_inertia_tensor, gm_vec3_subtract(external_torque,
+					gm_vec3_cross(p->angular_velocity, gm_mat3_multiply_vec3(&e_inertia_tensor, p->angular_velocity))))));
+				Quaternion aux = (Quaternion){p->angular_velocity.x, p->angular_velocity.y, p->angular_velocity.z, 0.0f};
+				Quaternion q = quaternion_product(&aux, &p->world_rotation);
+				p->world_rotation.x = p->world_rotation.x + h * 0.5f * q.x;
+				p->world_rotation.y = p->world_rotation.y + h * 0.5f * q.y;
+				p->world_rotation.z = p->world_rotation.z + h * 0.5f * q.z;
+				p->world_rotation.w = p->world_rotation.w + h * 0.5f * q.w;
+				// should we normalize?
+				p->world_rotation = quaternion_normalize(&p->world_rotation);
+			}
 		}
 
 		// As explained in sec 3.5, in each substep we need to check for collisions
 		// (I am not pre-collecting potential collision pairs.)
 		// Here we just check the plane-cube collision and collect the intersections.
-		Collision_Info* collision_infos = collision_collect_collisions(&entities[0], &entities[1]);
+		//Collision_Info* collision_infos = collision_collect_collisions(&entities[0], &entities[1]);
 
 		// Now we run the PBD solver with NUM_POS_ITERS iterations
 		Constraint* constraints = array_new(Constraint);
 		for (u32 j = 0; j < NUM_POS_ITERS; ++j) {
 
-			// Before solving the constraints, we need to generate additional constraints if we detected collisions
-			for (u32 k = 0; k < array_length(collision_infos); ++k) {
-				Collision_Info* ci = &collision_infos[k];
-				create_constraints_for_collision(ci, &constraints);
+			//// Before solving the constraints, we need to generate additional constraints if we detected collisions
+			//for (u32 k = 0; k < array_length(collision_infos); ++k) {
+			//	Collision_Info* ci = &collision_infos[k];
+			//	create_constraints_for_collision(ci, &constraints);
+			//}
+
+			for (u32 k = 0; k < array_length(entities); ++k) {
+				Entity* e = &entities[k];
+				create_constraints_for_particles(e->connections, &constraints, e->center_of_mass);
 			}
 
 			// Now, solve the constraints
@@ -234,25 +276,29 @@ void pbd_simulate(r32 dt, Entity* entities) {
 		// The PBD velocity update
 		for (u32 j = 0; j < array_length(entities); ++j) {
 			Entity* e = &entities[j];
-			if (e->fixed) continue;
-			
-			// We start by storing the current velocities (this is needed for the velocity solver that comes at the end of the loop)
-			e->previous_linear_velocity = e->linear_velocity;
-			e->previous_angular_velocity = e->angular_velocity;
+			for (u32 k = 0; k < array_length(entities->particles); ++k) {
+				Particle* p = entities->particles[k];
+				if (p->fixed) continue;
+				
+				// We start by storing the current velocities (this is needed for the velocity solver that comes at the end of the loop)
+				p->previous_linear_velocity = p->linear_velocity;
+				p->previous_angular_velocity = p->angular_velocity;
 
-			// Update the linear velocity based on the position difference
-			e->linear_velocity = gm_vec3_scalar_product(1.0f / h, gm_vec3_subtract(e->world_position, e->previous_world_position));
+				// Update the linear velocity based on the position difference
+				p->linear_velocity = gm_vec3_scalar_product(1.0f / h, gm_vec3_subtract(p->world_position, p->previous_world_position));
 
-			// Update the angular velocity based on the orientation difference
-			Quaternion inv = quaternion_inverse(&e->previous_world_rotation);
-			Quaternion delta_q = quaternion_product(&e->world_rotation, &inv);
-			if (delta_q.w >= 0.0f) {
-				e->angular_velocity = gm_vec3_scalar_product(2.0f / h, (vec3){delta_q.x, delta_q.y, delta_q.z});
-			} else {
-				e->angular_velocity = gm_vec3_scalar_product(-2.0f / h, (vec3){delta_q.x, delta_q.y, delta_q.z});
+				// Update the angular velocity based on the orientation difference
+				Quaternion inv = quaternion_inverse(&p->previous_world_rotation);
+				Quaternion delta_q = quaternion_product(&p->world_rotation, &inv);
+				if (delta_q.w >= 0.0f) {
+					p->angular_velocity = gm_vec3_scalar_product(2.0f / h, (vec3){delta_q.x, delta_q.y, delta_q.z});
+				} else {
+					p->angular_velocity = gm_vec3_scalar_product(-2.0f / h, (vec3){delta_q.x, delta_q.y, delta_q.z});
+				}
 			}
 		}
 
+/*
 		// The velocity solver - we run this additional solver for every collision that we found
 		for (u32 j = 0; j < array_length(collision_infos); ++j) {
 			Collision_Info* ci = &collision_infos[j];
@@ -314,8 +360,9 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				e2->angular_velocity = gm_vec3_subtract(e2->angular_velocity, gm_mat3_multiply_vec3(&e2_inverse_inertia_tensor, gm_vec3_cross(r2_wc, p)));
 			}
 		}
+*/
 
 		array_free(constraints);
-		array_free(collision_infos);
+		//array_free(collision_infos);
 	}
 }
