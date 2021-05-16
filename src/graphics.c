@@ -355,12 +355,32 @@ static mat3 get_symmetric_inertia_tensor_for_object(Vertex* vertices, r32 mass) 
     return result;
 }
 
-static void create_particle(Particle* particle, vec3 world_position, r32 mass) {
+mat3 graphics_get_symmetric_dynamic_inertia_tensor_for_particles(Particle** particles) {
+    mat3 result = {0};
+    for (u32 i = 0; i < array_length(particles); ++i) {
+        Particle* p = particles[i];
+		r32 particle_mass = 1.0f / p->inverse_mass;
+		vec3 particle_position = p->world_position;
+        result.data[0][0] += particle_mass * (particle_position.y * particle_position.y + particle_position.z * particle_position.z);
+        result.data[0][1] += particle_mass * particle_position.x * particle_position.y;
+        result.data[0][2] += particle_mass * particle_position.x * particle_position.z;
+        result.data[1][0] += particle_mass * particle_position.x * particle_position.y;
+        result.data[1][1] += particle_mass * (particle_position.x * particle_position.x + particle_position.z * particle_position.z);
+        result.data[1][2] += particle_mass * particle_position.y * particle_position.z;
+        result.data[2][0] += particle_mass * particle_position.x * particle_position.z;
+        result.data[2][1] += particle_mass * particle_position.y * particle_position.z;
+        result.data[2][2] += particle_mass * (particle_position.x * particle_position.x + particle_position.y * particle_position.y);
+    }
+    return result;
+}
+
+static void create_particle(Particle* particle, vec3 world_position, r32 mass, boolean fixed) {
 	memset(particle, 0, sizeof(Particle));
 	particle->forces = array_new(Physics_Force);
 	particle->inverse_mass = 1.0f / mass;
 	particle->world_position = world_position;
 	particle->world_rotation = quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f);
+	particle->fixed = fixed;
 }
 
 static boolean is_point_inside_mesh(vec3 point, Mesh m) {
@@ -424,7 +444,7 @@ static void create_particles_from_mesh(Mesh m, Particle*** particles, Particle_C
 			for (u32 z = 0; z < z_N; ++z) {
 				Particle* p = malloc(sizeof(Particle));
 				vec3 sample_position = (vec3){x_min + x * PARTICLE_RADIUS, y_min + y * PARTICLE_RADIUS, z_min + z * PARTICLE_RADIUS};
-				create_particle(p, sample_position, 1.0f);
+				create_particle(p, sample_position, 1.0f, false);
 				array_push(*particles, p);
 			}
 		}
@@ -472,6 +492,21 @@ static void create_particles_from_mesh(Mesh m, Particle*** particles, Particle_C
 			free(p);
 		}
 	}
+
+	// Set some particles to be fixed
+	//r32 smallest_x = FLT_MAX;
+	//for (u32 i = 0; i < array_length(*particles); ++i) {
+	//	Particle* p = (*particles)[i];
+	//	if (p->world_position.x < smallest_x) {
+	//		smallest_x = p->world_position.x;
+	//	}
+	//}
+	//for (u32 i = 0; i < array_length(*particles); ++i) {
+	//	Particle* p = (*particles)[i];
+	//	if (p->world_position.x == smallest_x) {
+	//		p->fixed = true;
+	//	}
+	//}
 }
 
 void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color)
@@ -481,6 +516,9 @@ void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 wor
 	entity->diffuse_info.use_diffuse_map = false;
 	create_particles_from_mesh(mesh, &entity->particles, &entity->connections);
 	entity->center_of_mass = graphics_entity_get_center_of_mass(entity);
+	entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
+    entity->inertia_tensor = (mat3){0}; // this is not correct, but it shouldn't make a difference
+	entity->inverse_inertia_tensor = (mat3){0};
 }
 
 void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass)
@@ -490,6 +528,9 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_pos
 	entity->diffuse_info.use_diffuse_map = false;
 	create_particles_from_mesh(mesh, &entity->particles, &entity->connections);
 	entity->center_of_mass = graphics_entity_get_center_of_mass(entity);
+	entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
+	entity->inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);
+	assert(gm_mat3_inverse(&entity->inertia_tensor, &entity->inverse_inertia_tensor));
 }
 
 void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass)
@@ -499,6 +540,9 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_p
 	entity->diffuse_info.use_diffuse_map = true;
 	create_particles_from_mesh(mesh, &entity->particles, &entity->connections);
 	entity->center_of_mass = graphics_entity_get_center_of_mass(entity);
+	entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
+	entity->inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);
+	assert(gm_mat3_inverse(&entity->inertia_tensor, &entity->inverse_inertia_tensor));
 }
 
 void graphics_entity_destroy(Entity* entity)

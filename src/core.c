@@ -13,7 +13,7 @@
 
 static Perspective_Camera camera;
 static Light* lights;
-static Entity* entities;
+Entity* entities;
 
 // Mouse binding to target positions
 static boolean is_mouse_bound_to_entity_movement;
@@ -87,10 +87,10 @@ void core_update(r32 delta_time)
 	array_push(entities[0].forces, pf);
 	*/
 
-	Physics_Force pf;
-	pf.force = (vec3){0.0f, 2.0f, 0.0f};
-	pf.position = (vec3){0.0f, 0.0f, 0.0f};
-	array_push(entities[0].particles[0]->forces, pf);
+	//Physics_Force pf;
+	//pf.force = (vec3){0.0f, 2.0f, 0.0f};
+	//pf.position = (vec3){0.0f, 0.0f, 0.0f};
+	//array_push(entities[0].particles[0]->forces, pf);
     pbd_simulate(delta_time, entities);
     for (u32 i = 0; i < array_length(entities); ++i) {
 		for (u32 j = 0; j < array_length(entities->particles); ++j) {
@@ -161,14 +161,9 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		key_state[GLFW_KEY_L] = false;
 	}
 	if (key_state[GLFW_KEY_Q]) {
-		/*
-        Physics_Force pf;
-        pf.force = (vec3) {0.0f, -100.0f, 0.0f};
-        pf.position = (vec3) {-1.0f, -1.0f, 1.0f};
-        array_push(entities[0].forces, pf);
-        printf("Created force.\n");
-		key_state[GLFW_KEY_Q] = false;
-		*/
+		Physics_Force pf;
+		pf.force = (vec3){150.0f, 10.0f, 5.0f};
+		array_push(entities[0].particles[0]->forces, pf);
 	}
 	if (key_state[GLFW_KEY_1]) {
         is_mouse_bound_to_entity_movement = true;

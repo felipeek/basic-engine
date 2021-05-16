@@ -37,7 +37,6 @@ typedef struct
 } Mesh;
 
 typedef struct {
-	vec3 position;
 	vec3 force;
 } Physics_Force;
 
@@ -45,12 +44,10 @@ typedef struct {
 	vec3 previous_world_position;
 	Quaternion previous_world_rotation;
 	vec3 previous_linear_velocity;
-	vec3 previous_angular_velocity;
 
 	vec3 world_position;		// the absolute position of the particle, in world coordinates.
 	Quaternion world_rotation;	// the rotation of the particle w/ relation to the center of mass of the entity it is part of
 	vec3 linear_velocity;		// the linear velocity of the particle
-	vec3 angular_velocity;		// the angular velocity of the particle
 
 	r32 inverse_mass;
 
@@ -74,6 +71,11 @@ typedef struct
 	Particle_Connection* connections;
 
 	vec3 center_of_mass; // dynamic
+	vec3 previous_angular_velocity;
+	vec3 angular_velocity;
+
+	mat3 inertia_tensor;
+	mat3 inverse_inertia_tensor;
 } Entity;
 
 typedef struct
@@ -111,6 +113,7 @@ void graphics_mesh_render(Shader shader, Mesh mesh);
 void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color);
 void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass);
 void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass);
+mat3 graphics_get_symmetric_dynamic_inertia_tensor_for_particles(Particle** particles);
 void graphics_entity_destroy(Entity* entity);
 // If entity already has a diffuse map, the older diffuse map will be deleted if delete_diffuse_map is true.
 // If entity has a color instead of a diffuse map, the mesh will lose the color and be set to use the diffuse map.
