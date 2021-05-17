@@ -8,9 +8,9 @@
 
 extern Entity* entities;
 
-static r32 get_angle_between_two_vectors(vec3 a, vec3 b) {
-	r32 cos_angle = gm_vec3_dot(a, b) / (gm_vec3_length(a) * gm_vec3_length(b));
-	return acosf(MIN(1.0f, MAX(-1.0f, cos_angle)));
+static r64 get_angle_between_two_vectors(xvec3 a, xvec3 b) {
+	r64 cos_angle = gm_xvec3_dot(a, b) / (gm_xvec3_length(a) * gm_xvec3_length(b));
+	return acos(MIN(1.0, MAX(-1.0, cos_angle)));
 }
 
 // Calculate the sum of all external forces acting on an entity
@@ -128,7 +128,7 @@ static void create_constraints_for_particles(Particle_Connection* connections, C
 		c.positional_constraint.r1 = r1;
 		c.positional_constraint.r2 = r2;
 		c.positional_constraint.lambda = 0.0f;
-		c.positional_constraint.compliance = 0.0f;
+		c.positional_constraint.compliance = 0.01f;
 		c.positional_constraint.delta_x = delta_x;
 
 		array_push(*constraints, c);
@@ -151,7 +151,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				Particle* p = e->particles[k];
 				if (p->fixed) continue;	
 
-				vec3 external_torque = calculate_external_torque(p, e->center_of_mass, p->world_position);
+				vec3 external_torque = calculate_external_torque(p, gm_xvec3_to_vec3(e->center_of_mass), p->world_position);
 					
 				total_torque = gm_vec3_add(total_torque, external_torque);
 			}
@@ -164,7 +164,8 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				gm_vec3_cross(e->angular_velocity, gm_mat3_multiply_vec3(&e_inertia_tensor, e->angular_velocity))))));
 
 			// Calculate the rotation to be applied to the particles
-			Quaternion rotation = quaternion_new_radians(gm_vec3_normalize(e->angular_velocity), gm_vec3_length(e->angular_velocity) * h);
+			r32 angular_velocity_length = gm_vec3_length(e->angular_velocity);
+			Quaternion rotation = quaternion_new_radians(gm_vec3_normalize(e->angular_velocity), angular_velocity_length * h);
 			mat3 rot_matrix = quaternion_get_matrix3(&rotation);
 
 			// Apply the rotation to each particle
@@ -173,12 +174,17 @@ void pbd_simulate(r32 dt, Entity* entities) {
 
 				if (p->fixed) continue;	
 
-				vec3 r = gm_vec3_subtract(p->world_position, e->center_of_mass);
-				vec3 r_rotated = gm_mat3_multiply_vec3(&rot_matrix, r);
-				p->world_position = gm_vec3_add(e->center_of_mass, r_rotated);
+				xvec3 r = gm_xvec3_subtract(gm_vec3_to_xvec3(p->world_position), e->center_of_mass);
+				if (angular_velocity_length > 0.000000001f) {
+					xvec3 r_rotated = gm_mat3_multiply_xvec3(&rot_matrix, r);
+					p->world_position = gm_vec3_add(gm_xvec3_to_vec3(e->center_of_mass), gm_xvec3_to_vec3(r_rotated));
 
-				p->r_before_rotation = r;
-				p->r_after_rotation = r_rotated;
+					p->r_before_rotation = r;
+					p->r_after_rotation = r_rotated;
+				} else {
+					p->r_before_rotation = r;
+					p->r_after_rotation = r;
+				}
 			}
 
 			// Linear velocity and position update
@@ -194,7 +200,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 
 				// Update the entity position and linear velocity based on the current velocity and applied forces
 				p->linear_velocity = gm_vec3_add(p->linear_velocity, gm_vec3_scalar_product(h * p->inverse_mass, external_force));
-				//p->world_position = gm_vec3_add(p->world_position, gm_vec3_scalar_product(h, p->linear_velocity));
+				p->world_position = gm_vec3_add(p->world_position, gm_vec3_scalar_product(h, p->linear_velocity));
 			}
 		}
 
@@ -215,7 +221,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 
 			for (u32 k = 0; k < array_length(entities); ++k) {
 				Entity* e = &entities[k];
-				create_constraints_for_particles(e->connections, &constraints, e->center_of_mass);
+				create_constraints_for_particles(e->connections, &constraints, gm_xvec3_to_vec3(e->center_of_mass));
 			}
 
 			// Now, solve the constraints
@@ -232,11 +238,11 @@ void pbd_simulate(r32 dt, Entity* entities) {
 		for (u32 j = 0; j < array_length(entities); ++j) {
 			Entity* e = &entities[j];
 
-			vec3 initial_center_of_mass = e->center_of_mass;
-			vec3 new_center_of_mass = graphics_entity_get_center_of_mass(e);
+			xvec3 initial_center_of_mass = e->center_of_mass;
+			xvec3 new_center_of_mass = graphics_entity_get_center_of_mass(e);
 
-			r32 angular_velocity_multiplier = 0.0f;
-			r32 angular_velocity_diff = 0.0f;
+			r64 angular_velocity_multiplier = 0.0f;
+			r64 angular_velocity_diff = 0.0f;
 			u32 num = 0;
 
 			for (u32 k = 0; k < array_length(e->particles); ++k) {
@@ -249,50 +255,59 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				// Update the linear velocity based on the position difference
 				p->linear_velocity = gm_vec3_scalar_product(1.0f / h, gm_vec3_subtract(p->world_position, p->previous_world_position));
 
-				vec3 current_r = gm_vec3_subtract(p->world_position, new_center_of_mass);
+				xvec3 current_r = gm_xvec3_subtract(gm_vec3_to_xvec3(p->world_position), new_center_of_mass);
 
 				const r32 EPSILON = 0.00001f;
-				if (gm_vec3_length(p->r_before_rotation) < EPSILON) {
+				if (gm_xvec3_length(p->r_before_rotation) < EPSILON) {
 					// particle in the middle of the cube matches the center of mass so the radius is defined by floating pointing errors
 					continue;
 				}
 
-				vec3 p1 = (vec3){0.0f, 0.0f, 0.0f};
-				vec3 p2 = p->r_before_rotation;
-				vec3 p3 = p->r_after_rotation;
+				xvec3 p1 = (xvec3){0.0, 0.0, 0.0};
+				xvec3 p2 = p->r_before_rotation;
+				xvec3 p3 = p->r_after_rotation;
 
-				vec3 plane_normal = gm_vec3_normalize(gm_vec3_cross(gm_vec3_subtract(p2, p1), gm_vec3_subtract(p3, p1)));
-				vec3 projected_current_r = collision_project_point_onto_plane(current_r, plane_normal, p1);
+				xvec3 plane_normal = gm_xvec3_normalize(gm_xvec3_cross(gm_xvec3_subtract(p2, p1), gm_xvec3_subtract(p3, p1)));
+				xvec3 projected_current_r = collision_project_point_onto_plane(current_r, plane_normal, p1);
 
 				++num;
 
-				r32 diff = gm_vec3_length(gm_vec3_subtract(projected_current_r, p->r_after_rotation));
-				//printf("diff: %f\n", diff);
-				if (diff < EPSILON) {
-					continue;
-				}
+				//r32 diff = gm_vec3_length(gm_vec3_subtract(projected_current_r, p->r_after_rotation));
+				////printf("diff: %f\n", diff);
+				//if (diff < EPSILON) {
+				//	continue;
+				//}
 				
-				r32 orig_angle = get_angle_between_two_vectors(p->r_after_rotation, p->r_before_rotation);
-				r32 new_angle = get_angle_between_two_vectors(projected_current_r, p->r_before_rotation);
+				r64 orig_angle = get_angle_between_two_vectors(p->r_after_rotation, p->r_before_rotation);
+				r64 new_angle = get_angle_between_two_vectors(projected_current_r, p->r_before_rotation);
 
 				if (orig_angle != new_angle) {
 					//printf("AJSdoasjdas");
 				}
 					
-				r32 angle_diff = new_angle - orig_angle;
-				angular_velocity_multiplier += MIN(1.0f, (new_angle / orig_angle));
-				angular_velocity_diff += MAX(angle_diff, 0.0f);
-				//angular_velocity_multiplier += MIN(1.0f, (new_angle / orig_angle));
+				r64 angle_diff = orig_angle - new_angle;
+				angular_velocity_diff += MAX(0.0, angle_diff);
+
+
+				//if (MIN(1.0, (new_angle / orig_angle)) < 0.99) {
+				//	//printf("ksadjas");
+				//}
+				//if (orig_angle != 0.0f) {
+				//	angular_velocity_multiplier += MIN(1.0, (new_angle / orig_angle));
+				//} else {
+				//	angular_velocity_multiplier += 1.0f;
+				//}
 
 				//printf("Orig angle: %f\nNew Angle: %f\n", orig_angle, new_angle);
 			}
 
 			//angular_velocity_multiplier /= num;
 			angular_velocity_diff /= num;
-			//printf("multipler: %f\n", angular_velocity_diff);
 			//e->angular_velocity = gm_vec3_scalar_product(angular_velocity_multiplier, e->angular_velocity);
-			e->angular_velocity = gm_vec3_scalar_product(1.0f - angular_velocity_diff, e->angular_velocity);
+			//printf("multipler: %f\n", angular_velocity_multiplier);
+			e->angular_velocity = gm_vec3_scalar_product(1.0f - angular_velocity_diff / h, e->angular_velocity);
 			printf("angular velocity: <%.5f, %.5f, %.5f>\n", e->angular_velocity.x, e->angular_velocity.y, e->angular_velocity.z);
+			//printf("angular_velocity_diff: %lf\n", angular_velocity_diff);
 		}
 
 		array_free(constraints);

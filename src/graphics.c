@@ -559,19 +559,19 @@ void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_norm
 	entity->mesh = mesh;
 }
 
-vec3 graphics_entity_get_center_of_mass(const Entity* entity) {
-	//return (vec3){0.0f, 0.0f, 0.0f};
-	r32 total_mass = 0.0f;
-	vec3 center_of_mass = (vec3){0.0f, 0.0f, 0.0f};
+xvec3 graphics_entity_get_center_of_mass(const Entity* entity) {
+	//return (xvec3){0.0, 0.0, 0.0};
+	r64 total_mass = 0.0;
+	xvec3 center_of_mass = (xvec3){0.0, 0.0, 0.0};
 	for (u32 i = 0; i < array_length(entity->particles); ++i) {
 		Particle* p = entity->particles[i];
 		assert(p->inverse_mass > 0.0f);
 		r32 particle_mass = 1.0f / p->inverse_mass;
-		center_of_mass = gm_vec3_add(center_of_mass, gm_vec3_scalar_product(particle_mass, p->world_position));
+		center_of_mass = gm_xvec3_add(center_of_mass, gm_vec3_to_xvec3(gm_vec3_scalar_product(particle_mass, p->world_position)));
 		total_mass += particle_mass;
 	}
 
-	return gm_vec3_scalar_product(1.0f / total_mass, center_of_mass);
+	return gm_xvec3_scalar_product(1.0 / total_mass, center_of_mass);
 }
 
 typedef struct {

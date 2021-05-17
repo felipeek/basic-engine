@@ -57,6 +57,20 @@ typedef union
 #pragma pack(pop)
 
 #pragma pack(push, 1)
+typedef union
+{
+	struct
+	{
+		r64 x, y, z;
+	};
+	struct
+	{
+		r64 r, g, b;
+	};
+} xvec3;
+#pragma pack(pop)
+
+#pragma pack(push, 1)
 typedef struct
 {
 	r32 x, y;
@@ -118,6 +132,7 @@ mat3  gm_mat4_to_mat3(const mat4* m);
 int   gm_mat3_inverse(const mat3* m, mat3* out);
 mat3  gm_mat3_multiply(const mat3* m1, const mat3* m2);
 vec3  gm_mat3_multiply_vec3(const mat3* m, vec3 v);
+xvec3 gm_mat3_multiply_xvec3(const mat3* m, xvec3 v);
 mat3  gm_mat3_transpose(const mat3* m);
 mat3  gm_mat3_scalar_product(r32 scalar, const mat3* m);
 mat3  gm_mat3_identity(void);
@@ -154,6 +169,18 @@ vec3  gm_vec3_cross(vec3 v1, vec3 v2);
 char* gm_vec3_to_string(char* buffer, vec3 v);
 vec3  gm_vec4_to_vec3(vec4 v);
 vec3  gm_vec3_negative(vec3 v);
+
+// xvec3
+xvec3  gm_xvec3_scalar_product(r64 scalar, xvec3 v);
+xvec3  gm_xvec3_normalize(xvec3 v);
+r64   gm_xvec3_length(xvec3 v);
+xvec3  gm_xvec3_add(xvec3 v1, xvec3 v2);
+xvec3  gm_xvec3_subtract(xvec3 v1, xvec3 v2);
+r64   gm_xvec3_dot(xvec3 v1, xvec3 v2);
+xvec3  gm_xvec3_cross(xvec3 v1, xvec3 v2);
+
+xvec3  gm_vec3_to_xvec3(vec3 v);
+vec3  gm_xvec3_to_vec3(xvec3 v);
 
 // vec2
 vec2  gm_vec2_add(vec2 v1, vec2 v2);
@@ -426,6 +453,14 @@ vec3 gm_mat3_multiply_vec3(const mat3* m, vec3 v) {
 	return result;
 }
 
+xvec3 gm_mat3_multiply_xvec3(const mat3* m, xvec3 v) {
+	xvec3 result;
+	result.x = (r64)m->data[0][0] * v.x + (r64)m->data[0][1] * v.y + (r64)m->data[0][2] * v.z;
+	result.y = (r64)m->data[1][0] * v.x + (r64)m->data[1][1] * v.y + (r64)m->data[1][2] * v.z;
+	result.z = (r64)m->data[2][0] * v.x + (r64)m->data[2][1] * v.y + (r64)m->data[2][2] * v.z;
+	return result;
+}
+
 mat4 gm_mat3_to_mat4(const mat3* m) {
 	mat4 result;
 	result.data[0][0] = m->data[0][0];
@@ -624,6 +659,11 @@ vec3 gm_vec3_scalar_product(r32 scalar, vec3 v)
 	return (vec3) { scalar * v.x, scalar * v.y, scalar * v.z };
 }
 
+xvec3 gm_xvec3_scalar_product(r64 scalar, xvec3 v)
+{
+	return (xvec3) { scalar * v.x, scalar * v.y, scalar * v.z };
+}
+
 vec2 gm_vec2_scalar_product(r32 scalar, vec2 v)
 {
 	return (vec2) { scalar * v.x, scalar * v.y };
@@ -647,6 +687,15 @@ vec3 gm_vec3_normalize(vec3 v)
 	return (vec3) { v.x / vector_length, v.y / vector_length, v.z / vector_length };
 }
 
+xvec3 gm_xvec3_normalize(xvec3 v)
+{
+	if (!(v.x != 0.0 || v.y != 0.0 || v.z != 0.0)) {
+		return (xvec3) { 0.0, 0.0, 0.0 };
+	}
+	r64 vector_length = gm_xvec3_length(v);
+	return (xvec3) { v.x / vector_length, v.y / vector_length, v.z / vector_length };
+}
+
 vec2 gm_vec2_normalize(vec2 v)
 {
 	if (!(v.x != 0.0f || v.y != 0.0f)) {
@@ -666,6 +715,11 @@ r32 gm_vec3_length(vec3 v)
 	return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
 }
 
+r64 gm_xvec3_length(xvec3 v)
+{
+	return sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+
 r32 gm_vec2_length(vec2 v)
 {
 	return sqrtf(v.x * v.x + v.y * v.y);
@@ -679,6 +733,11 @@ vec4 gm_vec4_add(vec4 v1, vec4 v2)
 vec3 gm_vec3_add(vec3 v1, vec3 v2)
 {
 	return (vec3) { v1.x + v2.x, v1.y + v2.y, v1.z + v2.z };
+}
+
+xvec3 gm_xvec3_add(xvec3 v1, xvec3 v2)
+{
+	return (xvec3) { v1.x + v2.x, v1.y + v2.y, v1.z + v2.z };
 }
 
 vec2 gm_vec2_add(vec2 v1, vec2 v2)
@@ -696,6 +755,11 @@ vec3 gm_vec3_subtract(vec3 v1, vec3 v2)
 	return (vec3) { v1.x - v2.x, v1.y - v2.y, v1.z - v2.z };
 }
 
+xvec3 gm_xvec3_subtract(xvec3 v1, xvec3 v2)
+{
+	return (xvec3) { v1.x - v2.x, v1.y - v2.y, v1.z - v2.z };
+}
+
 vec2 gm_vec2_subtract(vec2 v1, vec2 v2)
 {
 	return (vec2) { v1.x - v2.x, v1.y - v2.y };
@@ -707,6 +771,11 @@ r32 gm_vec4_dot(vec4 v1, vec4 v2)
 }
 
 r32 gm_vec3_dot(vec3 v1, vec3 v2)
+{
+	return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+}
+
+r64 gm_xvec3_dot(xvec3 v1, xvec3 v2)
 {
 	return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
 }
@@ -747,6 +816,17 @@ vec4 gm_vec4_cross(vec4 v1, vec4 v2)
 vec3 gm_vec3_cross(vec3 v1, vec3 v2)
 {
 	vec3 result;
+
+	result.x = v1.y * v2.z - v1.z * v2.y;
+	result.y = v1.z * v2.x - v1.x * v2.z;
+	result.z = v1.x * v2.y - v1.y * v2.x;
+
+	return result;
+}
+
+xvec3 gm_xvec3_cross(xvec3 v1, xvec3 v2)
+{
+	xvec3 result;
 
 	result.x = v1.y * v2.z - v1.z * v2.y;
 	result.y = v1.z * v2.x - v1.x * v2.z;
@@ -807,6 +887,14 @@ char* gm_vec2_to_string(char* buffer, vec2 v)
 
 vec3 gm_vec4_to_vec3(vec4 v) {
 	return (vec3) { v.x, v.y, v.z };
+}
+
+xvec3 gm_vec3_to_xvec3(vec3 v) {
+	return (xvec3){(r64)v.x, (r64)v.y, (r64)v.z};
+}
+
+vec3 gm_xvec3_to_vec3(xvec3 v) {
+	return (vec3){(r32)v.x, (r32)v.y, (r32)v.z};
 }
 #endif
 #endif

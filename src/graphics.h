@@ -41,8 +41,8 @@ typedef struct {
 } Physics_Force;
 
 typedef struct {
-	vec3 r_before_rotation;
-	vec3 r_after_rotation;
+	xvec3 r_before_rotation;
+	xvec3 r_after_rotation;
 
 	vec3 previous_world_position;
 	vec3 previous_linear_velocity;
@@ -72,7 +72,7 @@ typedef struct
 	Particle** particles;
 	Particle_Connection* connections;
 
-	vec3 center_of_mass; // dynamic
+	xvec3 center_of_mass; // dynamic
 	vec3 previous_angular_velocity;
 	vec3 angular_velocity;
 
@@ -128,7 +128,7 @@ void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_norm
 mat4 graphics_particle_get_model_matrix(const Particle* particle);
 void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const Entity* entity);
 void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const Entity* entity, const Light* lights);
-vec3 graphics_entity_get_center_of_mass(const Entity* entity);
+xvec3 graphics_entity_get_center_of_mass(const Entity* entity);
 void graphics_light_create(Light* light, vec3 position, vec4 ambient_color, vec4 diffuse_color, vec4 specular_color);
 u32 graphics_texture_create(const s8* texture_path);
 u32 graphics_texture_create_from_data(const Image_Data* image_data);
