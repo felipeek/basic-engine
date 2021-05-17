@@ -8,6 +8,11 @@
 
 extern Entity* entities;
 
+static r32 get_angle_between_two_vectors(vec3 a, vec3 b) {
+	r32 cos_angle = gm_vec3_dot(a, b) / (gm_vec3_length(a) * gm_vec3_length(b));
+	return acosf(MIN(1.0f, MAX(-1.0f, cos_angle)));
+}
+
 // Calculate the sum of all external forces acting on an entity
 static vec3 calculate_external_force(Particle* p) {
     const vec3 center_of_mass = (vec3){0.0f, 0.0f, 0.0f};
@@ -48,8 +53,6 @@ static void solve_positional_constraint(Constraint* constraint, r32 h) {
 
 	Particle* p1 = constraint->positional_constraint.p1;
 	Particle* p2 = constraint->positional_constraint.p2;
-	mat3 p1_rot = quaternion_get_matrix3(&p1->world_rotation);
-	mat3 p2_rot = quaternion_get_matrix3(&p2->world_rotation);
 	//vec3 r1 = (vec3){0.0f, 0.0f, 0.0f};
 	//vec3 r2 = (vec3){0.0f, 0.0f, 0.0f};
 	vec3 r1 = constraint->positional_constraint.r1;	// in world coordinates
@@ -125,7 +128,7 @@ static void create_constraints_for_particles(Particle_Connection* connections, C
 		c.positional_constraint.r1 = r1;
 		c.positional_constraint.r2 = r2;
 		c.positional_constraint.lambda = 0.0f;
-		c.positional_constraint.compliance = 0.01f;
+		c.positional_constraint.compliance = 0.0f;
 		c.positional_constraint.delta_x = delta_x;
 
 		array_push(*constraints, c);
@@ -167,28 +170,31 @@ void pbd_simulate(r32 dt, Entity* entities) {
 			// Apply the rotation to each particle
 			for (u32 k = 0; k < array_length(e->particles); ++k) {
 				Particle* p = e->particles[k];
+
 				if (p->fixed) continue;	
 
 				vec3 r = gm_vec3_subtract(p->world_position, e->center_of_mass);
 				vec3 r_rotated = gm_mat3_multiply_vec3(&rot_matrix, r);
 				p->world_position = gm_vec3_add(e->center_of_mass, r_rotated);
+
+				p->r_before_rotation = r;
+				p->r_after_rotation = r_rotated;
 			}
 
 			// Linear velocity and position update
 			for (u32 k = 0; k < array_length(e->particles); ++k) {
 				Particle* p = e->particles[k];
+
+				p->previous_world_position = p->world_position;
+
 				if (p->fixed) continue;	
 
 				// Calculate the external force and torque of the entity
 				vec3 external_force = calculate_external_force(p);
 
-				// Stores the previous position and orientation of the entity
-				p->previous_world_position = p->world_position;
-				p->previous_world_rotation = p->world_rotation;
-
 				// Update the entity position and linear velocity based on the current velocity and applied forces
 				p->linear_velocity = gm_vec3_add(p->linear_velocity, gm_vec3_scalar_product(h * p->inverse_mass, external_force));
-				p->world_position = gm_vec3_add(p->world_position, gm_vec3_scalar_product(h, p->linear_velocity));
+				//p->world_position = gm_vec3_add(p->world_position, gm_vec3_scalar_product(h, p->linear_velocity));
 			}
 		}
 
@@ -225,8 +231,16 @@ void pbd_simulate(r32 dt, Entity* entities) {
 		// The PBD velocity update
 		for (u32 j = 0; j < array_length(entities); ++j) {
 			Entity* e = &entities[j];
-			for (u32 k = 0; k < array_length(entities->particles); ++k) {
-				Particle* p = entities->particles[k];
+
+			vec3 initial_center_of_mass = e->center_of_mass;
+			vec3 new_center_of_mass = graphics_entity_get_center_of_mass(e);
+
+			r32 angular_velocity_multiplier = 0.0f;
+			r32 angular_velocity_diff = 0.0f;
+			u32 num = 0;
+
+			for (u32 k = 0; k < array_length(e->particles); ++k) {
+				Particle* p = e->particles[k];
 				if (p->fixed) continue;
 				
 				// We start by storing the current velocities (this is needed for the velocity solver that comes at the end of the loop)
@@ -234,7 +248,51 @@ void pbd_simulate(r32 dt, Entity* entities) {
 
 				// Update the linear velocity based on the position difference
 				p->linear_velocity = gm_vec3_scalar_product(1.0f / h, gm_vec3_subtract(p->world_position, p->previous_world_position));
+
+				vec3 current_r = gm_vec3_subtract(p->world_position, new_center_of_mass);
+
+				const r32 EPSILON = 0.00001f;
+				if (gm_vec3_length(p->r_before_rotation) < EPSILON) {
+					// particle in the middle of the cube matches the center of mass so the radius is defined by floating pointing errors
+					continue;
+				}
+
+				vec3 p1 = (vec3){0.0f, 0.0f, 0.0f};
+				vec3 p2 = p->r_before_rotation;
+				vec3 p3 = p->r_after_rotation;
+
+				vec3 plane_normal = gm_vec3_normalize(gm_vec3_cross(gm_vec3_subtract(p2, p1), gm_vec3_subtract(p3, p1)));
+				vec3 projected_current_r = collision_project_point_onto_plane(current_r, plane_normal, p1);
+
+				++num;
+
+				r32 diff = gm_vec3_length(gm_vec3_subtract(projected_current_r, p->r_after_rotation));
+				//printf("diff: %f\n", diff);
+				if (diff < EPSILON) {
+					continue;
+				}
+				
+				r32 orig_angle = get_angle_between_two_vectors(p->r_after_rotation, p->r_before_rotation);
+				r32 new_angle = get_angle_between_two_vectors(projected_current_r, p->r_before_rotation);
+
+				if (orig_angle != new_angle) {
+					//printf("AJSdoasjdas");
+				}
+					
+				r32 angle_diff = new_angle - orig_angle;
+				angular_velocity_multiplier += MIN(1.0f, (new_angle / orig_angle));
+				angular_velocity_diff += MAX(angle_diff, 0.0f);
+				//angular_velocity_multiplier += MIN(1.0f, (new_angle / orig_angle));
+
+				//printf("Orig angle: %f\nNew Angle: %f\n", orig_angle, new_angle);
 			}
+
+			//angular_velocity_multiplier /= num;
+			angular_velocity_diff /= num;
+			//printf("multipler: %f\n", angular_velocity_diff);
+			//e->angular_velocity = gm_vec3_scalar_product(angular_velocity_multiplier, e->angular_velocity);
+			e->angular_velocity = gm_vec3_scalar_product(1.0f - angular_velocity_diff, e->angular_velocity);
+			printf("angular velocity: <%.5f, %.5f, %.5f>\n", e->angular_velocity.x, e->angular_velocity.y, e->angular_velocity.z);
 		}
 
 		array_free(constraints);

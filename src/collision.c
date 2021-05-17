@@ -89,3 +89,9 @@ boolean collision_is_point_inside_with_mesh(vec3 point, Mesh m) {
 
 	return inside_mesh;
 }
+
+vec3 collision_project_point_onto_plane(vec3 p, vec3 plane_normal, vec3 plane_point) {
+	plane_normal = gm_vec3_normalize(plane_normal);
+	r32 d = -gm_vec3_dot(plane_normal, plane_point);
+	return gm_vec3_subtract(p, gm_vec3_scalar_product(gm_vec3_dot(plane_normal, p) + d, plane_normal));
+}

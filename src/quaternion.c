@@ -301,3 +301,31 @@ void quaternion_to_axis_angle(Quaternion* q, vec3* axis, r32* angle) {
 		axis->z = q1.z / s;
 	}
 }
+
+
+Quaternion quaternion_from_vector_rotation(vec3 u, vec3 v)
+{
+  // It is important that the inputs are of equal length when
+  // calculating the half-way vector.
+  u = gm_vec3_normalize(u);
+  v = gm_vec3_normalize(v);
+
+#if 0
+  // Unfortunately, we have to check for when u == -v, as u + v
+  // in this case will be (0, 0, 0), which cannot be normalized.
+  if (u == -v)
+  {
+    // 180 degree rotation around any orthogonal vector
+    return Quaternion(0, normalized(orthogonal(u)));
+  }
+#endif
+
+  vec3 half = gm_vec3_normalize(gm_vec3_add(u, v));
+  Quaternion result;
+  result.w = gm_vec3_dot(u, half);
+	vec3 cross = gm_vec3_cross(u, half);
+	result.x = cross.x;
+	result.y = cross.y;
+	result.z = cross.z;
+	return result;
+}

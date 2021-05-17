@@ -41,12 +41,14 @@ typedef struct {
 } Physics_Force;
 
 typedef struct {
+	vec3 r_before_rotation;
+	vec3 r_after_rotation;
+
 	vec3 previous_world_position;
-	Quaternion previous_world_rotation;
 	vec3 previous_linear_velocity;
+	r32 delta_angle;
 
 	vec3 world_position;		// the absolute position of the particle, in world coordinates.
-	Quaternion world_rotation;	// the rotation of the particle w/ relation to the center of mass of the entity it is part of
 	vec3 linear_velocity;		// the linear velocity of the particle
 
 	r32 inverse_mass;

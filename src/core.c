@@ -162,8 +162,8 @@ void core_input_process(boolean* key_state, r32 delta_time)
 	}
 	if (key_state[GLFW_KEY_Q]) {
 		Physics_Force pf;
-		pf.force = (vec3){150.0f, 10.0f, 5.0f};
-		array_push(entities[0].particles[0]->forces, pf);
+		pf.force = (vec3){0.0f, 10.0f, 0.0f};
+		array_push(entities[0].particles[19]->forces, pf);
 	}
 	if (key_state[GLFW_KEY_1]) {
         is_mouse_bound_to_entity_movement = true;

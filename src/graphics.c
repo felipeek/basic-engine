@@ -325,8 +325,6 @@ void graphics_entity_change_color(Entity* entity, vec4 color, boolean delete_dif
 
 mat4 graphics_particle_get_model_matrix(const Particle* particle)
 {
-	mat4 rotation_matrix = quaternion_get_matrix(&particle->world_rotation);
-
 	mat4 translation_matrix = (mat4) {
 		1.0f, 0.0f, 0.0f, particle->world_position.x,
 			0.0f, 1.0f, 0.0f, particle->world_position.y,
@@ -334,7 +332,7 @@ mat4 graphics_particle_get_model_matrix(const Particle* particle)
 			0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	return gm_mat4_multiply(&translation_matrix, &rotation_matrix);
+	return translation_matrix;
 }
 
 static mat3 get_symmetric_inertia_tensor_for_object(Vertex* vertices, r32 mass) {
@@ -379,7 +377,6 @@ static void create_particle(Particle* particle, vec3 world_position, r32 mass, b
 	particle->forces = array_new(Physics_Force);
 	particle->inverse_mass = 1.0f / mass;
 	particle->world_position = world_position;
-	particle->world_rotation = quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f);
 	particle->fixed = fixed;
 }
 
@@ -494,19 +491,19 @@ static void create_particles_from_mesh(Mesh m, Particle*** particles, Particle_C
 	}
 
 	// Set some particles to be fixed
-	//r32 smallest_x = FLT_MAX;
-	//for (u32 i = 0; i < array_length(*particles); ++i) {
-	//	Particle* p = (*particles)[i];
-	//	if (p->world_position.x < smallest_x) {
-	//		smallest_x = p->world_position.x;
-	//	}
-	//}
-	//for (u32 i = 0; i < array_length(*particles); ++i) {
-	//	Particle* p = (*particles)[i];
-	//	if (p->world_position.x == smallest_x) {
-	//		p->fixed = true;
-	//	}
-	//}
+	r32 smallest_x = FLT_MAX;
+	for (u32 i = 0; i < array_length(*particles); ++i) {
+		Particle* p = (*particles)[i];
+		if (p->world_position.x < smallest_x) {
+			smallest_x = p->world_position.x;
+		}
+	}
+	for (u32 i = 0; i < array_length(*particles); ++i) {
+		Particle* p = (*particles)[i];
+		if (p->world_position.x == smallest_x) {
+			p->fixed = true;
+		}
+	}
 }
 
 void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color)
@@ -563,6 +560,7 @@ void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_norm
 }
 
 vec3 graphics_entity_get_center_of_mass(const Entity* entity) {
+	//return (vec3){0.0f, 0.0f, 0.0f};
 	r32 total_mass = 0.0f;
 	vec3 center_of_mass = (vec3){0.0f, 0.0f, 0.0f};
 	for (u32 i = 0; i < array_length(entity->particles); ++i) {
