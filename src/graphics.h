@@ -64,6 +64,13 @@ typedef struct {
 	r32 distance;
 } Particle_Connection;
 
+typedef struct {
+	Particle* p1;
+	Particle* p2;
+	Particle* p3;
+	Particle* p4;
+} Particle_Quad;
+
 typedef struct
 {
 	Mesh mesh;
@@ -78,6 +85,8 @@ typedef struct
 
 	mat3 inertia_tensor;
 	mat3 inverse_inertia_tensor;
+
+	Particle_Quad* quads;
 } Entity;
 
 typedef struct

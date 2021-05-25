@@ -22,7 +22,7 @@ static Entity* bound_entity;
 static Perspective_Camera create_camera()
 {
 	Perspective_Camera camera;
-	vec3 camera_position = (vec3) { 0.0f, -1.0f, 5.0f };
+	vec3 camera_position = (vec3) { 0.0f, 2.0f, 5.0f };
 	r32 camera_near_plane = -0.01f;
 	r32 camera_far_plane = -1000.0f;
 	r32 camera_fov = 45.0f;
@@ -59,7 +59,7 @@ int core_init()
 
     Entity e;
     entities = array_new(Entity);
-	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	Mesh m = graphics_mesh_create_from_obj("./res/big_cube.obj", 0);
 	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 5.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
 	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
@@ -122,13 +122,13 @@ void core_render()
 	*/
 
 	Entity* cube = &entities[0];
-	for (u32 i = 0; i < array_length(cube->connections); ++i) {
-		Particle_Connection* conn = &cube->connections[i];
-		Particle* p1 = conn->p1;
-		Particle* p2 = conn->p2;
-		graphics_renderer_debug_vector(p1->world_position, p2->world_position, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
-	}
-    graphics_renderer_primitives_flush(&camera);
+	//for (u32 i = 0; i < array_length(cube->connections); ++i) {
+	//	Particle_Connection* conn = &cube->connections[i];
+	//	Particle* p1 = conn->p1;
+	//	Particle* p2 = conn->p2;
+	//	graphics_renderer_debug_vector(p1->world_position, p2->world_position, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+	//}
+ //   graphics_renderer_primitives_flush(&camera);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
@@ -162,8 +162,11 @@ void core_input_process(boolean* key_state, r32 delta_time)
 	}
 	if (key_state[GLFW_KEY_Q]) {
 		Physics_Force pf;
-		pf.force = (vec3){0.0f, 10.0f, 0.0f};
-		array_push(entities[0].particles[19]->forces, pf);
+		pf.force = (vec3){0.0f, 25.0f, 0.0f};
+		// bottom-right-front particle
+		//array_push(entities[0].particles[300]->forces, pf);
+		// bottom-right-middle particle
+		array_push(entities[0].particles[297]->forces, pf);
 	}
 	if (key_state[GLFW_KEY_1]) {
         is_mouse_bound_to_entity_movement = true;

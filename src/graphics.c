@@ -14,7 +14,7 @@
 #define BASIC_VERTEX_SHADER_PATH "./shaders/basic_shader.vs"
 #define BASIC_FRAGMENT_SHADER_PATH "./shaders/basic_shader.fs"
 
-const r32 PARTICLE_RADIUS = 0.9f;
+const r32 PARTICLE_RADIUS = 0.5f;
 const r32 PARTICLE_SPACE = 4.0f * 0.02f * (0.75f);
 
 Image_Data graphics_image_load(const s8* image_path)
@@ -325,6 +325,14 @@ void graphics_entity_change_color(Entity* entity, vec4 color, boolean delete_dif
 
 mat4 graphics_particle_get_model_matrix(const Particle* particle)
 {
+	const r32 PARTICLE_SCALE = 1.5f;
+	mat4 scale_matrix = (mat4) {
+		PARTICLE_SCALE, 0.0f, 0.0f, 0.0f,
+			0.0f, PARTICLE_SCALE, 0.0f, 0.0f,
+			0.0f, 0.0f, PARTICLE_SCALE, 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f
+	};
+
 	mat4 translation_matrix = (mat4) {
 		1.0f, 0.0f, 0.0f, particle->world_position.x,
 			0.0f, 1.0f, 0.0f, particle->world_position.y,
@@ -332,8 +340,8 @@ mat4 graphics_particle_get_model_matrix(const Particle* particle)
 			0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	return translation_matrix;
-}
+	return gm_mat4_multiply(&translation_matrix, &scale_matrix);
+}                          
 
 static mat3 get_symmetric_inertia_tensor_for_object(Vertex* vertices, r32 mass) {
     r32 mass_per_vertex = mass / array_length(vertices);
@@ -390,6 +398,15 @@ static boolean is_point_inside_mesh(vec3 point, Mesh m) {
 	return true;
 }
 
+static void add_quad(Particle_Quad** quads, Particle*** particles, u32 i1, u32 i2, u32 i3, u32 i4) {
+	Particle_Quad pq;
+	pq.p1 = (*particles)[i1];
+	pq.p2 = (*particles)[i2];
+	pq.p3 = (*particles)[i3];
+	pq.p4 = (*particles)[i4];
+	array_push(*quads, pq);
+}
+
 static void add_connection(Particle_Connection** connections, Particle*** particles, u32 i1, u32 i2) {
 	Particle_Connection pc;
 	pc.p1 = (*particles)[i1];
@@ -398,7 +415,7 @@ static void add_connection(Particle_Connection** connections, Particle*** partic
 	array_push(*connections, pc);
 }
 
-static void create_particles_from_mesh(Mesh m, Particle*** particles, Particle_Connection** connections) {
+static void create_particles_from_mesh(Mesh m, Particle*** particles, Particle_Connection** connections, Particle_Quad** quads) {
 	vec3 max = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
 	vec3 min = {FLT_MAX, FLT_MAX, FLT_MAX};
 
@@ -468,7 +485,7 @@ static void create_particles_from_mesh(Mesh m, Particle*** particles, Particle_C
 				if (y < y_N - 1 && z < z_N - 1) add_connection(connections, particles, current_index, back_top_index);
 				if (x < x_N - 1 && y < y_N - 1 && z < z_N - 1) add_connection(connections, particles, current_index, back_top_right_index);
 				// caution: i think some connections are missing
-			}
+				}
 		}
 	}
 
@@ -490,7 +507,26 @@ static void create_particles_from_mesh(Mesh m, Particle*** particles, Particle_C
 		}
 	}
 
+#if 1
+	r32 _x_max = -FLT_MAX;
+	r32 _y_min = FLT_MAX;
+	r32 _z_max = -FLT_MAX;
+	for (u32 i = 0; i < array_length(*particles); ++i) {
+		Particle* p = (*particles)[i];
+		if (p->world_position.x > _x_max) _x_max = p->world_position.x;
+		if (p->world_position.y < _y_min) _y_min = p->world_position.y;
+		if (p->world_position.y > _z_max) _z_max = p->world_position.z;
+	}
+	for (u32 i = 0; i < array_length(*particles); ++i) {
+		Particle* p = (*particles)[i];
+		if (p->world_position.x == _x_max && p->world_position.y == _y_min && p->world_position.z == 0.0) {
+			printf("selected particle = %d\n", i);
+		}
+	}
+#endif
+
 	// Set some particles to be fixed
+#if 0
 	r32 smallest_x = FLT_MAX;
 	for (u32 i = 0; i < array_length(*particles); ++i) {
 		Particle* p = (*particles)[i];
@@ -504,6 +540,7 @@ static void create_particles_from_mesh(Mesh m, Particle*** particles, Particle_C
 			p->fixed = true;
 		}
 	}
+#endif
 }
 
 void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color)
@@ -511,7 +548,7 @@ void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 wor
 	entity->mesh = mesh;
 	entity->diffuse_info.diffuse_color = color;
 	entity->diffuse_info.use_diffuse_map = false;
-	create_particles_from_mesh(mesh, &entity->particles, &entity->connections);
+	create_particles_from_mesh(mesh, &entity->particles, &entity->connections, &entity->quads);
 	entity->center_of_mass = graphics_entity_get_center_of_mass(entity);
 	entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
     entity->inertia_tensor = (mat3){0}; // this is not correct, but it shouldn't make a difference
@@ -523,7 +560,7 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_pos
 	entity->mesh = mesh;
 	entity->diffuse_info.diffuse_color = color;
 	entity->diffuse_info.use_diffuse_map = false;
-	create_particles_from_mesh(mesh, &entity->particles, &entity->connections);
+	create_particles_from_mesh(mesh, &entity->particles, &entity->connections, &entity->quads);
 	entity->center_of_mass = graphics_entity_get_center_of_mass(entity);
 	entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
 	entity->inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);
@@ -535,7 +572,7 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_p
 	entity->mesh = mesh;
 	entity->diffuse_info.diffuse_map = texture;
 	entity->diffuse_info.use_diffuse_map = true;
-	create_particles_from_mesh(mesh, &entity->particles, &entity->connections);
+	create_particles_from_mesh(mesh, &entity->particles, &entity->connections, &entity->quads);
 	entity->center_of_mass = graphics_entity_get_center_of_mass(entity);
 	entity->angular_velocity = (vec3){0.0f, 0.0f, 0.0f};
 	entity->inertia_tensor = get_symmetric_inertia_tensor_for_object(mesh.vertices, mass);

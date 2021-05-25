@@ -128,7 +128,7 @@ static void create_constraints_for_particles(Particle_Connection* connections, C
 		c.positional_constraint.r1 = r1;
 		c.positional_constraint.r2 = r2;
 		c.positional_constraint.lambda = 0.0f;
-		c.positional_constraint.compliance = 0.01f;
+		c.positional_constraint.compliance = 0.0f;
 		c.positional_constraint.delta_x = delta_x;
 
 		array_push(*constraints, c);
@@ -143,7 +143,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 	for (u32 i = 0; i < NUM_SUBSTEPS; ++i) {
 		for (u32 j = 0; j < array_length(entities); ++j) {
 			Entity* e = &entities[j];
-			e->center_of_mass = graphics_entity_get_center_of_mass(e);
+			//e->center_of_mass = graphics_entity_get_center_of_mass(e);
 
 			// Calculate the total torque applied to the entity by inspecting the force applied to all particles
 			vec3 total_torque = (vec3){0.0f, 0.0f, 0.0f};
@@ -240,17 +240,13 @@ void pbd_simulate(r32 dt, Entity* entities) {
 
 			xvec3 initial_center_of_mass = e->center_of_mass;
 			xvec3 new_center_of_mass = graphics_entity_get_center_of_mass(e);
-
-			r64 angular_velocity_multiplier = 0.0f;
+			e->center_of_mass = new_center_of_mass;
 			r64 angular_velocity_diff = 0.0f;
 			u32 num = 0;
 
 			for (u32 k = 0; k < array_length(e->particles); ++k) {
 				Particle* p = e->particles[k];
 				if (p->fixed) continue;
-				
-				// We start by storing the current velocities (this is needed for the velocity solver that comes at the end of the loop)
-				p->previous_linear_velocity = p->linear_velocity;
 
 				// Update the linear velocity based on the position difference
 				p->linear_velocity = gm_vec3_scalar_product(1.0f / h, gm_vec3_subtract(p->world_position, p->previous_world_position));
