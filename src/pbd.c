@@ -209,7 +209,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 		// As explained in sec 3.5, in each substep we need to check for collisions
 		// (I am not pre-collecting potential collision pairs.)
 		// Here we just check the plane-cube collision and collect the intersections.
-		Collision_Info* collision_infos = collision_collect_collisions(&entities[0], &entities[1]);
+		Collision_Info* collision_infos = collision_get_plane_cube_points(&entities[0], &entities[1]);
 
 		// Now we run the PBD solver with NUM_POS_ITERS iterations
 		Constraint* constraints = array_new(Constraint);

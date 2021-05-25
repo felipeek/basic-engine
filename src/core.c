@@ -95,6 +95,7 @@ void core_render()
     for (u32 i = 0; i < array_length(entities); ++i) {
         graphics_entity_render_phong_shader(&camera, &entities[i], lights);
     }
+	/*
     //graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
     Collision_Point* cps = collision_get_plane_cube_points(&entities[0], PLANE_Y);
     for (u32 i = 0; i < array_length(cps); ++i) {
@@ -104,6 +105,7 @@ void core_render()
     }
     graphics_renderer_primitives_flush(&camera);
     array_free(cps);
+	*/
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
