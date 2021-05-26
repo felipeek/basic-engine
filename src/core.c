@@ -59,13 +59,17 @@ int core_init()
 
     Entity e;
     entities = array_new(Entity);
-	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 5.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
+	Mesh m = graphics_mesh_create_from_obj("./res/sphere.obj", 0);
+	u32 tex = graphics_texture_create("./res/tex.png");
+	graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 5.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
 	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
     array_push(entities, e);
 	graphics_entity_create_with_color_fixed(&e, m, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){5.0f, 0.0f, 5.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f});
+		(vec3){5.0f, 0.0f, 5.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, PLANE);
+    array_push(entities, e);
+	graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
     array_push(entities, e);
 
 	menu_register_dummy_callback(menu_dummy_callback);
@@ -84,6 +88,9 @@ void core_update(r32 delta_time)
 	pf.force = (vec3){0.0f, -GRAVITY * 1.0f / entities[0].inverse_mass, 0.0f};
 	pf.position = (vec3){0.0f, 0.0f, 0.0f};
 	array_push(entities[0].forces, pf);
+	pf.force = (vec3){0.0f, -GRAVITY * 1.0f / entities[2].inverse_mass, 0.0f};
+	pf.position = (vec3){0.0f, 0.0f, 0.0f};
+	array_push(entities[2].forces, pf);
     pbd_simulate(delta_time, entities);
     for (u32 i = 0; i < array_length(entities); ++i) {
         array_clear(entities[i].forces);
@@ -95,17 +102,26 @@ void core_render()
     for (u32 i = 0; i < array_length(entities); ++i) {
         graphics_entity_render_phong_shader(&camera, &entities[i], lights);
     }
-	/*
     //graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
-    Collision_Point* cps = collision_get_plane_cube_points(&entities[0], PLANE_Y);
-    for (u32 i = 0; i < array_length(cps); ++i) {
-        graphics_renderer_debug_points(&cps[i].collision_point, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
-        graphics_renderer_debug_vector(cps[i].collision_point,
-            gm_vec3_add(cps[i].collision_point, cps[i].normal), (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+	Collision_Info* cis = collision_get_sphere_sphere_points(&entities[0], &entities[2]);
+    for (u32 i = 0; i < array_length(cis); ++i) {
+		//vec3 collision_point1 = gm_vec3_add(entities[0].world_position, cis[i].r1_wc);
+		//vec3 collision_point2 = gm_vec3_add(entities[2].world_position, cis[i].r2_wc);
+		mat3 q1_m = quaternion_get_matrix3(&entities[0].world_rotation);
+		mat3 q2_m = quaternion_get_matrix3(&entities[2].world_rotation);
+		vec3 collision_point1 = gm_vec3_add(entities[0].world_position, gm_mat3_multiply_vec3(&q1_m, cis[i].r1_lc));
+		vec3 collision_point2 = gm_vec3_add(entities[2].world_position, gm_mat3_multiply_vec3(&q2_m, cis[i].r2_lc));
+        graphics_renderer_debug_points(&collision_point1, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+        graphics_renderer_debug_points(&collision_point2, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+        graphics_renderer_debug_vector(entities[0].world_position,
+            collision_point1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+        graphics_renderer_debug_vector(entities[2].world_position,
+            collision_point2, (vec4){0.0f, 1.0f, 1.0f, 1.0f});
+        //graphics_renderer_debug_vector(collision_point1,
+        //    gm_vec3_add(collision_point1, cis[i].normal), (vec4){1.0f, 1.0f, 1.0f, 1.0f});
     }
     graphics_renderer_primitives_flush(&camera);
-    array_free(cps);
-	*/
+    array_free(cis);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
@@ -180,7 +196,7 @@ void core_input_process(boolean* key_state, r32 delta_time)
 	if (key_state[GLFW_KEY_Q])
 	{
         Physics_Force pf;
-        pf.force = (vec3) {0.0f, -100.0f, 0.0f};
+        pf.force = (vec3) {0.0f, 100.0f, 0.0f};
         pf.position = (vec3) {-1.0f, -1.0f, 1.0f};
         array_push(entities[0].forces, pf);
         printf("Created force.\n");

@@ -3,7 +3,7 @@
 #include <assert.h>
 #include "collision.h"
 
-#define NUM_SUBSTEPS 20
+#define NUM_SUBSTEPS 1
 #define NUM_POS_ITERS 1
 
 // Calculate the sum of all external forces acting on an entity
@@ -122,6 +122,31 @@ static void solve_constraint(Constraint* constraint, r32 h) {
 	assert(0);
 }
 
+static vec3 calculate_p_til(Entity* e, vec3 r_lc) {
+	switch (e->type) {
+		case PLANE: {
+			return (vec3){0.0f, e->world_position.y, 0.0f}; // we consider an infinite plane, so we just project the cube vertex onto the plane
+		} break;
+		case SPHERE: {
+			mat3 previous_rot_matrix = quaternion_get_matrix3(&e->previous_world_rotation);
+			return gm_vec3_add(e->previous_world_position, gm_mat3_multiply_vec3(&previous_rot_matrix, r_lc));
+		} break;
+		default: assert(0);
+	}
+}
+static vec3 calculate_p(Entity* e, vec3 r_lc) {
+	switch (e->type) {
+		case PLANE: {
+			return (vec3){0.0f, e->world_position.y, 0.0f}; // we consider an infinite plane, so we just project the cube vertex onto the plane
+		} break;
+		case SPHERE: {
+			mat3 current_rot_matrix = quaternion_get_matrix3(&e->world_rotation);
+			return gm_vec3_add(e->world_position, gm_mat3_multiply_vec3(&current_rot_matrix, r_lc));
+		} break;
+		default: assert(0);
+	}
+}
+
 // Create 'artificial' position constraints for a given collision that was detected in the simulation
 static void create_constraints_for_collision(Collision_Info* ci, Constraint** constraints) {
 	Constraint constraint = {0};
@@ -135,10 +160,8 @@ static void create_constraints_for_collision(Collision_Info* ci, Constraint** co
 	constraint.positional_constraint.r2 = ci->r2_wc;
 
 	// here we calculate 'p1' and 'p2' in order to calculate 'd', as stated in sec (3.5)
-	mat3 current_rot_matrix = quaternion_get_matrix3(&ci->e2->world_rotation);
-	mat3 previous_rot_matrix = quaternion_get_matrix3(&ci->e2->previous_world_rotation);
-	vec3 p2 = gm_vec3_add(ci->e2->world_position, gm_mat3_multiply_vec3(&current_rot_matrix, ci->r2_lc));
-	vec3 p1 = (vec3){p2.x, PLANE_Y, p2.z}; // we consider an infinite plane, so we just project the cube vertex onto the plane
+	vec3 p1 = calculate_p(ci->e1, ci->r1_lc);
+	vec3 p2 = calculate_p(ci->e2, ci->r2_lc);
 	r32 d = gm_vec3_dot(gm_vec3_subtract(p1, p2), ci->normal);
 	constraint.positional_constraint.delta_x = gm_vec3_scalar_product(d, ci->normal);
 	if (d > 0.0f) {
@@ -149,8 +172,8 @@ static void create_constraints_for_collision(Collision_Info* ci, Constraint** co
 		// the problem is that if NUM_POS_ITERS is 1, lambda_t and lambda_n will always be 0.0, so this will never be used.
 		const r32 static_friction_coefficient = 0.5f;
 		if (ci->lambda_t < static_friction_coefficient * ci->lambda_n) {
-			vec3 p2_til = gm_vec3_add(ci->e2->previous_world_position, gm_mat3_multiply_vec3(&previous_rot_matrix, ci->r2_lc));
-			vec3 p1_til = (vec3){p2.x, PLANE_Y, p2.z};
+			vec3 p1_til = calculate_p_til(ci->e1, ci->r1_lc);
+			vec3 p2_til = calculate_p_til(ci->e2, ci->r2_lc);
 			vec3 delta_p = gm_vec3_subtract(gm_vec3_subtract(p1, p1_til), gm_vec3_subtract(p2, p2_til));
 			vec3 delta_p_t = gm_vec3_subtract(delta_p, gm_vec3_scalar_product(gm_vec3_dot(delta_p, ci->normal), ci->normal));
 			Constraint constraint = {0};
@@ -209,7 +232,40 @@ void pbd_simulate(r32 dt, Entity* entities) {
 		// As explained in sec 3.5, in each substep we need to check for collisions
 		// (I am not pre-collecting potential collision pairs.)
 		// Here we just check the plane-cube collision and collect the intersections.
-		Collision_Info* collision_infos = collision_get_plane_cube_points(&entities[0], &entities[1]);
+		Collision_Info* collision_infos = array_new(Collision_Info);
+		for (u32 j = 0; j < array_length(entities); ++j) {
+			for (u32 k = j + 1; k < array_length(entities); ++k) {
+				Entity* e1 = &entities[j];
+				Entity* e2 = &entities[k];
+				if (e1->type == PLANE) {
+					if (e2->type == SPHERE) {
+						Collision_Info* cis = collision_get_plane_sphere_points(e2, e1);
+						for (u32 m = 0; m < array_length(cis); ++m) {
+							array_push(collision_infos, cis[m]);
+						}
+						array_free(cis);
+					} else {
+						assert(0);
+					}
+				} else if (e1->type == SPHERE) {
+					if (e2->type == PLANE) {
+						Collision_Info* cis = collision_get_plane_sphere_points(e1, e2);
+						for (u32 m = 0; m < array_length(cis); ++m) {
+							array_push(collision_infos, cis[m]);
+						}
+						array_free(cis);
+					} else if (e2->type == SPHERE) {
+						Collision_Info* cis = collision_get_sphere_sphere_points(e1, e2);
+						for (u32 m = 0; m < array_length(cis); ++m) {
+							array_push(collision_infos, cis[m]);
+						}
+						array_free(cis);
+					} else {
+						assert(0);
+					}
+				}
+			}
+		}
 
 		// Now we run the PBD solver with NUM_POS_ITERS iterations
 		Constraint* constraints = array_new(Constraint);

@@ -372,7 +372,7 @@ static mat3 get_symmetric_inertia_tensor_for_object(Vertex* vertices, r32 mass) 
     return result;
 }
 
-void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color)
+void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, Entity_Type type)
 {
 	entity->mesh = mesh;
 	entity->world_position = world_position;
@@ -389,9 +389,10 @@ void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 wor
 	entity->inverse_inertia_tensor = (mat3){0};
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = true;
+	entity->type = type;
 }
 
-void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass)
+void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass, Entity_Type type)
 {
 	entity->mesh = mesh;
 	entity->world_position = world_position;
@@ -408,9 +409,10 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_pos
 	assert(gm_mat3_inverse(&entity->inertia_tensor, &entity->inverse_inertia_tensor));
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = false;
+	entity->type = type;
 }
 
-void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass)
+void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass, Entity_Type type)
 {
 	entity->mesh = mesh;
 	entity->world_position = world_position;
@@ -427,6 +429,7 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_p
 	assert(gm_mat3_inverse(&entity->inertia_tensor, &entity->inverse_inertia_tensor));
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = false;
+	entity->type = type;
 }
 
 void graphics_entity_destroy(Entity* entity)

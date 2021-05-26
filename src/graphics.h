@@ -41,8 +41,15 @@ typedef struct {
 	vec3 force;
 } Physics_Force;
 
+typedef enum {
+	SPHERE,
+	PLANE,
+	CUBE
+} Entity_Type;
+
 typedef struct
 {
+	Entity_Type type;
 	Mesh mesh;
 	vec3 world_position;
 	Quaternion world_rotation;
@@ -97,9 +104,9 @@ Mesh graphics_quad_create();
 Mesh graphics_mesh_create(Vertex* vertices, u32* indices, Normal_Mapping_Info* normal_info);
 Mesh graphics_mesh_create_from_obj(const s8* obj_path, Normal_Mapping_Info* normal_info);
 void graphics_mesh_render(Shader shader, Mesh mesh);
-void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color);
-void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass);
-void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass);
+void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, Entity_Type type);
+void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass, Entity_Type type);
+void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass, Entity_Type type);
 void graphics_entity_destroy(Entity* entity);
 // If entity already has a diffuse map, the older diffuse map will be deleted if delete_diffuse_map is true.
 // If entity has a color instead of a diffuse map, the mesh will lose the color and be set to use the diffuse map.
