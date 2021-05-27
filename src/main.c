@@ -15,7 +15,7 @@
 
 #define WINDOW_TITLE "basic-engine"
 
-s32 window_width = 1366;
+s32 window_width = 768;
 s32 window_height = 768;
 GLFWwindow* main_window;
 
