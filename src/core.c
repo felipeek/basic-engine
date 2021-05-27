@@ -61,14 +61,20 @@ int core_init()
     entities = array_new(Entity);
 	Mesh m = graphics_mesh_create_from_obj("./res/sphere.obj", 0);
 	u32 tex = graphics_texture_create("./res/tex.png");
-	graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 5.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
-	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
-    array_push(entities, e);
 	graphics_entity_create_with_color_fixed(&e, m, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){5.0f, 0.0f, 5.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, PLANE);
     array_push(entities, e);
 	graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
+	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
+    array_push(entities, e);
+	graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 5.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
+    array_push(entities, e);
+	graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 8.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
+    array_push(entities, e);
+	graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 11.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
     array_push(entities, e);
 
@@ -84,13 +90,12 @@ void core_destroy()
 
 void core_update(r32 delta_time)
 {
-	Physics_Force pf;
-	pf.force = (vec3){0.0f, -GRAVITY * 1.0f / entities[0].inverse_mass, 0.0f};
-	pf.position = (vec3){0.0f, 0.0f, 0.0f};
-	array_push(entities[0].forces, pf);
-	pf.force = (vec3){0.0f, -GRAVITY * 1.0f / entities[2].inverse_mass, 0.0f};
-	pf.position = (vec3){0.0f, 0.0f, 0.0f};
-	array_push(entities[2].forces, pf);
+	for (u32 i = 0; i < array_length(entities); ++i) {
+		Physics_Force pf;
+		pf.force = (vec3){0.0f, -GRAVITY * 1.0f / entities[i].inverse_mass, 0.0f};
+		pf.position = (vec3){0.0f, 0.0f, 0.0f};
+		array_push(entities[i].forces, pf);
+	}
     pbd_simulate(delta_time, entities);
     for (u32 i = 0; i < array_length(entities); ++i) {
         array_clear(entities[i].forces);
@@ -196,9 +201,9 @@ void core_input_process(boolean* key_state, r32 delta_time)
 	if (key_state[GLFW_KEY_Q])
 	{
         Physics_Force pf;
-        pf.force = (vec3) {0.0f, 100.0f, 0.0f};
-        pf.position = (vec3) {-1.0f, -1.0f, 1.0f};
-        array_push(entities[0].forces, pf);
+        pf.force = (vec3) {100.0f, 0.0f, 0.0f};
+        pf.position = (vec3) {0.0f, 0.0f, 1.0f};
+        array_push(entities[1].forces, pf);
         printf("Created force.\n");
 		key_state[GLFW_KEY_Q] = false;
 	}
