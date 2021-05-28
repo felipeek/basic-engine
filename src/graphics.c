@@ -71,6 +71,22 @@ static void init_predefined_shaders()
 	}
 }
 
+void graphics_mesh_update(Mesh m)
+{
+	glBindVertexArray(m.VAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, m.VBO);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, array_length(m.vertices) * sizeof(Vertex), m.vertices);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.EBO);
+	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, array_length(m.indices) * sizeof(u32), m.indices);
+
+	glBindVertexArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+}
+
 Mesh graphics_mesh_create(Vertex* vertices, u32* indices)
 {
 	Mesh mesh;
@@ -111,7 +127,7 @@ void graphics_mesh_render(Shader shader, Mesh mesh)
 {
 	glBindVertexArray(mesh.VAO);
 	glUseProgram(shader);
-	glDrawElements(GL_TRIANGLES, array_length(mesh.indices), GL_UNSIGNED_INT, 0);
+	glDrawElements(GL_LINES, array_length(mesh.indices), GL_UNSIGNED_INT, 0);
 	glUseProgram(0);
 	glBindVertexArray(0);
 }
@@ -129,7 +145,9 @@ void graphics_entity_render_basic_shader(const Entity* entity)
 	Shader shader = predefined_shaders.basic_shader;
 	glUseProgram(shader);
 	GLint color_location = glGetUniformLocation(shader, "color");
+	GLint world_position_location = glGetUniformLocation(shader, "world_position");
 	glUniform3fv(color_location, 1, (GLfloat*)&entity->color);
+	glUniform2fv(world_position_location, 1, (GLfloat*)&entity->world_position);
 	graphics_mesh_render(shader, entity->mesh);
 	glUseProgram(0);
 }

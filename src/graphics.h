@@ -28,6 +28,7 @@ typedef struct
 Shader graphics_shader_create(const s8* vertex_shader_path, const s8* fragment_shader_path);
 Mesh graphics_mesh_create(Vertex* vertices, u32* indices);
 void graphics_mesh_render(Shader shader, Mesh mesh);
+void graphics_mesh_update(Mesh m);
 void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec2 world_position, vec3 color);
 void graphics_entity_render_basic_shader(const Entity* entity);
 

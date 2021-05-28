@@ -9,48 +9,50 @@
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
-static Entity e;
+static Entity e1, e2;
 
 static void menu_dummy_callback()
 {
 	printf("dummy callback called!\n");
 }
 
+static u32* generate_indices_for(Vertex* vertices) {
+	u32* indices = array_new(u32);
+	for (u32 i = 1; i < array_length(vertices); ++i) {
+		array_push(indices, i - 1);
+		array_push(indices, i);
+	}
+
+	array_push(indices, array_length(vertices) - 1);
+	array_push(indices, 0);
+	return indices;
+}
+
+static void add_vertex(Vertex** vertices, r32 x, r32 y) {
+	Vertex v;
+	v.position = (vec2){x, y};
+	array_push(*vertices, v);
+}
+
 int core_init()
 {
-	Vertex* vertices = array_new(Vertex);
-	u32* indices = array_new(indices);
-	Vertex v;
-	v.position = (vec2){4.0f, 11.0f};
-	array_push(vertices, v);
-	v.position = (vec2){4.0f, 5.0f};
-	array_push(vertices, v);
-	v.position = (vec2){9.0f, 9.0f};
-	array_push(vertices, v);
-	array_push(indices, 0);
-	array_push(indices, 1);
-	array_push(indices, 2);
-	Mesh m1 = graphics_mesh_create(vertices, indices);
-	graphics_entity_create_with_color(&e, m1, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});
+	Vertex* vertices;
 
 	vertices = array_new(Vertex);
-	indices = array_new(indices);
-	v;
-	v.position = (vec2){5.0f, 7.0f};
-	array_push(vertices, v);
-	v.position = (vec2){7.0f, 3.0f};
-	array_push(vertices, v);
-	v.position = (vec2){10.0f, 2.0f};
-	array_push(vertices, v);
-	v.position = (vec2){12.0f, 7.0f};
-	array_push(vertices, v);
-	array_push(indices, 0);
-	array_push(indices, 1);
-	array_push(indices, 2);
-	Mesh m2 = graphics_mesh_create(vertices, indices);
-	graphics_entity_create_with_color(&e, m2, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});
+	add_vertex(&vertices, 0.1f, 0.1f);
+	add_vertex(&vertices, 0.8f, 0.2f);
+	add_vertex(&vertices, 0.85f, 0.6f);
+	add_vertex(&vertices, 0.3f, 0.55f);
+	Mesh m = graphics_mesh_create(vertices, generate_indices_for(vertices));
+	graphics_entity_create_with_color(&e1, m, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});	
 
-	printf("collision: %d\n", gjk(m1, m2));
+	vertices = array_new(Vertex);
+	add_vertex(&vertices, 0.1f, 0.1f);
+	add_vertex(&vertices, 0.2f, 0.2f);
+	add_vertex(&vertices, 0.3f, 0.2f);
+	add_vertex(&vertices, 0.4f, 0.15f);
+	m = graphics_mesh_create(vertices, generate_indices_for(vertices));
+	graphics_entity_create_with_color(&e2, m, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});	
 
 	menu_register_dummy_callback(menu_dummy_callback);
 
@@ -63,16 +65,48 @@ void core_destroy()
 
 void core_update(r32 delta_time)
 {
+	if (gjk(e1.mesh, e2.mesh)) {
+		e1.color = (vec3){1.0f, 0.0f, 0.0f};
+		e2.color = (vec3){1.0f, 0.0f, 0.0f};
+	} else {
+		e1.color = (vec3){0.0f, 1.0f, 0.0f};
+		e2.color = (vec3){0.0f, 1.0f, 0.0f};
+	}
 
 }
 
 void core_render()
 {
-	graphics_entity_render_basic_shader(&e);
+	graphics_entity_render_basic_shader(&e1);
+	graphics_entity_render_basic_shader(&e2);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
 {
+	if (key_state[GLFW_KEY_UP]) {
+		for (u32 i = 0; i < array_length(e2.mesh.vertices); ++i) {
+			e2.mesh.vertices[i].position.y += 0.01f;
+		}
+		graphics_mesh_update(e2.mesh);
+	}
+	if (key_state[GLFW_KEY_DOWN]) {
+		for (u32 i = 0; i < array_length(e2.mesh.vertices); ++i) {
+			e2.mesh.vertices[i].position.y -= 0.01f;
+		}
+		graphics_mesh_update(e2.mesh);
+	}
+	if (key_state[GLFW_KEY_RIGHT]) {
+		for (u32 i = 0; i < array_length(e2.mesh.vertices); ++i) {
+			e2.mesh.vertices[i].position.x += 0.01f;
+		}
+		graphics_mesh_update(e2.mesh);
+	}
+	if (key_state[GLFW_KEY_LEFT]) {
+		for (u32 i = 0; i < array_length(e2.mesh.vertices); ++i) {
+			e2.mesh.vertices[i].position.x -= 0.01f;
+		}
+		graphics_mesh_update(e2.mesh);
+	}
 }
 
 void core_mouse_change_process(boolean reset, r64 x_pos, r64 y_pos)
