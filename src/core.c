@@ -5,6 +5,7 @@
 #include "core.h"
 #include "graphics.h"
 #include "menu.h"
+#include "gjk.h"
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
@@ -20,17 +21,36 @@ int core_init()
 	Vertex* vertices = array_new(Vertex);
 	u32* indices = array_new(indices);
 	Vertex v;
-	v.position = (vec2){-0.5f, -0.5f};
+	v.position = (vec2){4.0f, 11.0f};
 	array_push(vertices, v);
-	v.position = (vec2){0.5f, -0.5f};
+	v.position = (vec2){4.0f, 5.0f};
 	array_push(vertices, v);
-	v.position = (vec2){0.0f, 0.5f};
+	v.position = (vec2){9.0f, 9.0f};
 	array_push(vertices, v);
 	array_push(indices, 0);
 	array_push(indices, 1);
 	array_push(indices, 2);
-	Mesh m = graphics_mesh_create(vertices, indices);
-	graphics_entity_create_with_color(&e, m, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});
+	Mesh m1 = graphics_mesh_create(vertices, indices);
+	graphics_entity_create_with_color(&e, m1, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});
+
+	vertices = array_new(Vertex);
+	indices = array_new(indices);
+	v;
+	v.position = (vec2){5.0f, 7.0f};
+	array_push(vertices, v);
+	v.position = (vec2){7.0f, 3.0f};
+	array_push(vertices, v);
+	v.position = (vec2){10.0f, 2.0f};
+	array_push(vertices, v);
+	v.position = (vec2){12.0f, 7.0f};
+	array_push(vertices, v);
+	array_push(indices, 0);
+	array_push(indices, 1);
+	array_push(indices, 2);
+	Mesh m2 = graphics_mesh_create(vertices, indices);
+	graphics_entity_create_with_color(&e, m2, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});
+
+	printf("collision: %d\n", gjk(m1, m2));
 
 	menu_register_dummy_callback(menu_dummy_callback);
 
