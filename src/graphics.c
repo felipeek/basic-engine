@@ -390,6 +390,9 @@ void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 wor
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = true;
 	entity->type = type;
+	entity->bs.vertex_count = array_length(mesh.vertices);
+	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
+	graphics_bounding_shapes_update(entity);
 }
 
 void graphics_bounding_shapes_update(Entity* entity)
@@ -421,6 +424,8 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_pos
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = false;
 	entity->type = type;
+	entity->bs.vertex_count = array_length(mesh.vertices);
+	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
 	graphics_bounding_shapes_update(entity);
 }
 
@@ -442,6 +447,8 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_p
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = false;
 	entity->type = type;
+	entity->bs.vertex_count = array_length(mesh.vertices);
+	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
 	graphics_bounding_shapes_update(entity);
 }
 

@@ -68,15 +68,15 @@ int core_init()
 		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
 	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
     array_push(entities, e);
-	graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 5.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
-    array_push(entities, e);
-	graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 8.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
-    array_push(entities, e);
-	graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 11.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
-    array_push(entities, e);
+	//graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 5.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
+ //   array_push(entities, e);
+	//graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 8.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
+ //   array_push(entities, e);
+	//graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 11.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
+ //   array_push(entities, e);
 
 	menu_register_dummy_callback(menu_dummy_callback);
 
@@ -107,6 +107,7 @@ void core_render()
     for (u32 i = 0; i < array_length(entities); ++i) {
         graphics_entity_render_phong_shader(&camera, &entities[i], lights);
     }
+	#if 0
     //graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 	Collision_Info* cis = collision_get_sphere_sphere_points(&entities[0], &entities[2]);
     for (u32 i = 0; i < array_length(cis); ++i) {
@@ -127,6 +128,7 @@ void core_render()
     }
     graphics_renderer_primitives_flush(&camera);
     array_free(cis);
+	#endif
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)

@@ -239,7 +239,10 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				Entity* e2 = &entities[k];
 				if (e1->type == PLANE) {
 					if (e2->type == SPHERE) {
-						Collision_Info* cis = collision_get_plane_sphere_points(e2, e1);
+						//Collision_Info* cis = collision_get_plane_sphere_points(e2, e1);
+						graphics_bounding_shapes_update(e1);
+						graphics_bounding_shapes_update(e2);
+						Collision_Info* cis = collision_get_convex_convex_points(e2, e1);
 						for (u32 m = 0; m < array_length(cis); ++m) {
 							array_push(collision_infos, cis[m]);
 						}

@@ -97,6 +97,17 @@ Collision_Info* collision_get_plane_cube_points(Entity* cube, Entity* plane) {
 
 // GJK
 
+typedef struct {
+  vec3 v;   // minkowski difference
+  vec3 sup1; // original bshape vertex
+  vec3 sup2; // original bshape vertex
+} Support_Point;
+
+typedef struct {
+  Support_Point simplex[4];
+  int current_index;
+} GJK_Support_List;
+
 static void
 support_list_add(GJK_Support_List* list, Support_Point point)
 {
@@ -135,7 +146,8 @@ collision_gjk_support(Bounding_Shape* b1, Bounding_Shape* b2, vec3 direction)
 
   Support_Point sup_point = {
 	.v = gm_vec3_subtract(b1->vertices[b1_index], b2->vertices[b2_index]),
-	.sup = b1->vertices[b1_index]
+	.sup1 = b1->vertices[b1_index],
+	.sup2 = b2->vertices[b2_index]
   };
   return sup_point;
 }
@@ -483,9 +495,9 @@ barycentric(vec3 p, vec3 a, vec3 b, vec3 c, r32 *u, r32 *v, r32 *w)
 }
 
 typedef struct {
-	vec3 collision_point;
-	vec3 normal;
-	r32 penetration;
+	vec3 b1_collision_point;
+	vec3 b2_collision_point;
+	vec3 distance_vector;
 } EPA_Collision_Point;
 
 EPA_Collision_Point
@@ -514,9 +526,9 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
 
 	  // @TODO: fix this
 	  EPA_Collision_Point cp;
-	  cp.collision_point = (vec3){0.0f, 0.0f, 0.0f};
-	  cp.normal = (vec3){0.0f, 1.0f, 0.0};
-	  cp.penetration = 0.0f;
+	  cp.b1_collision_point = (vec3){0.0f, 0.0f, 0.0f};
+	  cp.b2_collision_point = (vec3){0.0f, 0.0f, 0.0f};
+	  cp.distance_vector = (vec3){0.0f, 1.0f, 0.0};
 	  return cp;
 	}
 	// Find the new support in the normal direction of the closest face
@@ -537,17 +549,23 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
 
 	  vec3 wcolpoint = 
 		gm_vec3_add(
-		  gm_vec3_add(gm_vec3_scalar_product(bary_u, faces[index].a.sup), gm_vec3_scalar_product(bary_v, faces[index].b.sup)),
-		  gm_vec3_scalar_product(bary_w, faces[index].c.sup)
+		  gm_vec3_add(gm_vec3_scalar_product(bary_u, faces[index].a.sup1), gm_vec3_scalar_product(bary_v, faces[index].b.sup1)),
+		  gm_vec3_scalar_product(bary_w, faces[index].c.sup1)
+		);
+
+	  vec3 wcolpoint2 = 
+		gm_vec3_add(
+		  gm_vec3_add(gm_vec3_scalar_product(bary_u, faces[index].a.sup2), gm_vec3_scalar_product(bary_v, faces[index].b.sup2)),
+		  gm_vec3_scalar_product(bary_w, faces[index].c.sup2)
 		);
 
 	  vec3 penetration = gm_vec3_scalar_product(faces[index].distance, gm_vec3_normalize(faces[index].normal));
 	  array_free(faces);
 
 	  EPA_Collision_Point cp;
-	  cp.collision_point = wcolpoint;
-	  cp.normal = gm_vec3_scalar_product(-1.0f, penetration);
-	  cp.penetration = gm_vec3_length(penetration);
+	  cp.b1_collision_point = wcolpoint;
+	  cp.b2_collision_point = wcolpoint2;
+	  cp.distance_vector = penetration;
 	  return cp;
 	}
 	// Expand polytope
@@ -615,7 +633,7 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
 
 Collision_Info* collision_get_convex_convex_points(Entity* e1, Entity* e2) {
 	Collision_Info* collision_infos = array_new(Collision_Info);
-	GJK_Support_List gjk_sl;
+	GJK_Support_List gjk_sl = {0};
 	if (!collision_gjk_collides(&gjk_sl, &e1->bs, &e2->bs)) {
 		return collision_infos;
 	}
@@ -627,6 +645,17 @@ Collision_Info* collision_get_convex_convex_points(Entity* e1, Entity* e2) {
 	ci.e2 = e2;
 	ci.lambda_n = 0.0f;
 	ci.lambda_t = 0.0f;
-	ci.normal = gm_vec3_normalize(epa_cp.normal);
-	ci.
+	ci.normal = gm_vec3_normalize(epa_cp.distance_vector);
+	ci.r1_wc = gm_vec3_subtract(epa_cp.b1_collision_point, e1->world_position);
+	ci.r2_wc = gm_vec3_subtract(epa_cp.b2_collision_point, e2->world_position);
+
+	Quaternion inv = quaternion_inverse(&e1->world_rotation);
+	mat3 inv_m = quaternion_get_matrix3(&inv);
+	ci.r1_lc = gm_mat3_multiply_vec3(&inv_m, ci.r1_wc);
+	inv = quaternion_inverse(&e2->world_rotation);
+	inv_m = quaternion_get_matrix3(&inv);
+	ci.r2_lc = gm_mat3_multiply_vec3(&inv_m, ci.r2_wc);
+
+	array_push(collision_infos, ci);
+	return collision_infos;
 }
