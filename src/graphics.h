@@ -21,6 +21,11 @@ typedef struct
 	u32 normal_map_texture;
 } Normal_Mapping_Info;
 
+typedef struct {
+  u32 vertex_count;
+  vec3* vertices;
+} Bounding_Shape;
+
 typedef struct
 {
 	boolean use_diffuse_map;
@@ -44,6 +49,7 @@ typedef struct
 	vec3 world_scale;
 	mat4 model_matrix;
 	Diffuse_Info diffuse_info;
+	Bounding_Shape bs;
 } Entity;
 
 typedef struct
