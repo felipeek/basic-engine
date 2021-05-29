@@ -392,6 +392,17 @@ void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 wor
 	entity->type = type;
 }
 
+void graphics_bounding_shapes_update(Entity* entity)
+{
+	for (u32 i = 0; i < array_length(entity->mesh.vertices); ++i) {
+		vec4 p = (vec4){entity->mesh.vertices[i].position.x, entity->mesh.vertices[i].position.y, entity->mesh.vertices[i].position.z, 1.0f};
+		p = gm_vec4_scalar_product(1.0f / p.w, p);
+		mat4 model_matrix = graphics_entity_get_model_matrix(entity);
+		vec4 r = gm_mat4_multiply_vec4(&model_matrix, p);
+		entity->bs.vertices[i] = gm_vec4_to_vec3(r);
+	}
+}
+
 void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass, Entity_Type type)
 {
 	entity->mesh = mesh;
@@ -410,6 +421,7 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_pos
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = false;
 	entity->type = type;
+	graphics_bounding_shapes_update(entity);
 }
 
 void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass, Entity_Type type)
@@ -430,6 +442,7 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_p
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = false;
 	entity->type = type;
+	graphics_bounding_shapes_update(entity);
 }
 
 void graphics_entity_destroy(Entity* entity)

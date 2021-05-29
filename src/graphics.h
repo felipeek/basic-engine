@@ -47,6 +47,11 @@ typedef enum {
 	CUBE
 } Entity_Type;
 
+typedef struct {
+  u32 vertex_count;
+  vec3* vertices;
+} Bounding_Shape;
+
 typedef struct
 {
 	Entity_Type type;
@@ -70,6 +75,7 @@ typedef struct
 	vec3 previous_angular_velocity;
 
 	boolean fixed;
+	Bounding_Shape bs;
 } Entity;
 
 typedef struct
@@ -104,6 +110,7 @@ Mesh graphics_quad_create();
 Mesh graphics_mesh_create(Vertex* vertices, u32* indices, Normal_Mapping_Info* normal_info);
 Mesh graphics_mesh_create_from_obj(const s8* obj_path, Normal_Mapping_Info* normal_info);
 void graphics_mesh_render(Shader shader, Mesh mesh);
+void graphics_bounding_shapes_update(Entity* entity);
 void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, Entity_Type type);
 void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass, Entity_Type type);
 void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass, Entity_Type type);
