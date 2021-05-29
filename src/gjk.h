@@ -4,11 +4,17 @@
 #include "graphics.h"
 
 typedef struct {
-	vec2 p[3];
+	vec2 p;
+	vec2 o_m1;
+	vec2 o_m2;
+} Minkowski_Point;
+
+typedef struct {
+	Minkowski_Point mp[3];
 	u32 num;
 } Simplex;
 
 boolean gjk(Mesh m1, Mesh m2, Simplex* _simplex);
-vec2 epa(Simplex simplex, Mesh m1, Mesh m2);
+vec2 epa(Simplex gjk_simplex, Mesh m1, Mesh m2, vec2* collision_point);
 
 #endif

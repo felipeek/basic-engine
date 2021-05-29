@@ -123,7 +123,7 @@ s32 main(s32 argc, s8** argv)
 	if (core_init())
 		return -1;
 
-	glEnable(GL_DEPTH_TEST);
+	//glEnable(GL_DEPTH_TEST);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	r64 last_frame = glfwGetTime();

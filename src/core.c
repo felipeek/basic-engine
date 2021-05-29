@@ -38,19 +38,38 @@ int core_init()
 {
 	Vertex* vertices;
 
+	//vertices = array_new(Vertex);
+	//add_vertex(&vertices, 0.1f, 0.1f);
+	//add_vertex(&vertices, 0.8f, 0.2f);
+	//add_vertex(&vertices, 0.85f, 0.6f);
+	//add_vertex(&vertices, 0.3f, 0.55f);
+	//Mesh m = graphics_mesh_create(vertices, generate_indices_for(vertices));
+	//graphics_entity_create_with_color(&e1, m, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});	
+
+	//vertices = array_new(Vertex);
+	//add_vertex(&vertices, 0.12f, 0.1f);
+	//add_vertex(&vertices, 0.2f, 0.2f);
+	//add_vertex(&vertices, 0.3f, 0.2f);
+	//add_vertex(&vertices, 0.4f, 0.15f);
+	//m = graphics_mesh_create(vertices, generate_indices_for(vertices));
+	//graphics_entity_create_with_color(&e2, m, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});	
+
 	vertices = array_new(Vertex);
-	add_vertex(&vertices, 0.1f, 0.1f);
-	add_vertex(&vertices, 0.8f, 0.2f);
-	add_vertex(&vertices, 0.85f, 0.6f);
-	add_vertex(&vertices, 0.3f, 0.55f);
+	add_vertex(&vertices, -0.1f, 0.2f);
+	add_vertex(&vertices, 0.1f, 0.2f);
+	add_vertex(&vertices, 0.1f, 0.0f);
+	add_vertex(&vertices, 0.1f, 0.0f);
+	add_vertex(&vertices, -0.1f, 0.0f);
 	Mesh m = graphics_mesh_create(vertices, generate_indices_for(vertices));
 	graphics_entity_create_with_color(&e1, m, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});	
 
 	vertices = array_new(Vertex);
-	add_vertex(&vertices, 0.12f, 0.1f);
-	add_vertex(&vertices, 0.2f, 0.2f);
-	add_vertex(&vertices, 0.3f, 0.2f);
-	add_vertex(&vertices, 0.4f, 0.15f);
+	add_vertex(&vertices, -0.2f, 0.1f);
+	add_vertex(&vertices, -0.2f, 0.08f);
+	add_vertex(&vertices, -0.2f, -0.1f);
+	add_vertex(&vertices, 0.2f, -0.1f);
+	add_vertex(&vertices, 0.2f, -0.08f);
+	add_vertex(&vertices, 0.2f, 0.1f);
 	m = graphics_mesh_create(vertices, generate_indices_for(vertices));
 	graphics_entity_create_with_color(&e2, m, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});	
 
@@ -76,8 +95,10 @@ void core_update(r32 delta_time)
 		e1.color = (vec3){1.0f, 0.0f, 0.0f};
 		e2.color = (vec3){1.0f, 0.0f, 0.0f};
 
-		vec2 result = epa(s, e1.mesh, e2.mesh);
-		penetration_line.mesh.vertices[1].position = result;
+		vec2 collision_point;
+		vec2 result = epa(s, e1.mesh, e2.mesh, &collision_point);
+		penetration_line.mesh.vertices[0].position = collision_point;
+		penetration_line.mesh.vertices[1].position = gm_vec2_add(collision_point, result);
 		graphics_mesh_update(penetration_line.mesh);
 	} else {
 		e1.color = (vec3){0.0f, 1.0f, 0.0f};

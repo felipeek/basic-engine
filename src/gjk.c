@@ -19,22 +19,27 @@ vec2 get_farthest_point_in_direction(vec2 direction, Mesh m) {
 	return point;
 }
 
-vec2 support(vec2 direction, Mesh m1, Mesh m2) {
+Minkowski_Point support(vec2 direction, Mesh m1, Mesh m2) {
 	vec2 p1 = get_farthest_point_in_direction(direction, m1);
 	vec2 p2 = get_farthest_point_in_direction((vec2){-direction.x, -direction.y}, m2);
-	return gm_vec2_subtract(p1, p2);
+
+	Minkowski_Point mp;
+	mp.p = gm_vec2_subtract(p1, p2);
+	mp.o_m1 = p1;
+	mp.o_m2 = p2;
+	return mp;
 }
 
-static void simplex_add(Simplex* simplex, vec2 p) {
+static void simplex_add(Simplex* simplex, Minkowski_Point mp) {
 	switch (simplex->num) {
 		case 0: {
-			simplex->p[0] = p;
+			simplex->mp[0] = mp;
 		} break;
 		case 1: {
-			simplex->p[1] = p;
+			simplex->mp[1] = mp;
 		} break;
 		case 2: {
-			simplex->p[2] = p;
+			simplex->mp[2] = mp;
 		} break;
 		default: assert(0);
 	}
@@ -45,11 +50,11 @@ static void simplex_add(Simplex* simplex, vec2 p) {
 static void simplex_remove(Simplex* simplex, u32 index) {
 	switch (index) {
 		case 0: {
-			simplex->p[0] = simplex->p[1];
-			simplex->p[1] = simplex->p[2];
+			simplex->mp[0] = simplex->mp[1];
+			simplex->mp[1] = simplex->mp[2];
 		} break;
 		case 1: {
-			simplex->p[1] = simplex->p[2];
+			simplex->mp[1] = simplex->mp[2];
 		} break;
 		case 2: {
 		} break;
@@ -67,8 +72,8 @@ static boolean contains_origin(Simplex* simplex, vec2* direction, vec2 last_simp
 	vec2 a = last_simplex_point;
 	vec2 ao = (vec2){-last_simplex_point.x, -last_simplex_point.y};
 	if (simplex->num == 3) {
-		vec2 b = simplex->p[0];
-		vec2 c = simplex->p[1];
+		vec2 b = simplex->mp[0].p;
+		vec2 c = simplex->mp[1].p;
 
 		vec2 ab = gm_vec2_subtract(b, a);
 		vec2 ac = gm_vec2_subtract(c, a);
@@ -88,7 +93,7 @@ static boolean contains_origin(Simplex* simplex, vec2* direction, vec2 last_simp
 			}
 		}
 	} else {
-		vec2 b = simplex->p[0];
+		vec2 b = simplex->mp[0].p;
 		vec2 ab = gm_vec2_subtract(b, a);
 		vec2 ab_perp = triple_product(ab, ao, ab);
 		*direction = ab_perp;
@@ -106,13 +111,13 @@ boolean gjk(Mesh m1, Mesh m2, Simplex* _simplex) {
 	direction = (vec2){-direction.x, -direction.y};
 
 	while (true) {
-		vec2 new_simplex_point = support(direction, m1, m2);
+		Minkowski_Point new_simplex_point = support(direction, m1, m2);
 		simplex_add(&simplex, new_simplex_point);
 
-		if (gm_vec2_dot(new_simplex_point, direction) <= 0.0f) {
+		if (gm_vec2_dot(new_simplex_point.p, direction) <= 0.0f) {
 			return false;
 		} else {
-			if (contains_origin(&simplex, &direction, new_simplex_point)) {
+			if (contains_origin(&simplex, &direction, new_simplex_point.p)) {
 				if (_simplex) *_simplex = simplex;
 				return true;
 			}
@@ -124,16 +129,17 @@ typedef struct {
 	r32 distance;
 	vec2 normal;
 	u32 index;
+	vec2 collision_point;
 } Edge;
 
-static Edge find_closest_edge(vec2* simplex) {
+static Edge find_closest_edge(Minkowski_Point* simplex) {
 	Edge closest;
 	closest.distance = FLT_MAX;
 
 	for (u32 i = 0; i <	array_length(simplex); ++i) {
 		int j = i + 1 == array_length(simplex) ? 0 : i + 1;
-		vec2 a = simplex[i];
-		vec2 b = simplex[j];
+		vec2 a = simplex[i].p;
+		vec2 b = simplex[j].p;
 		vec2 e = gm_vec2_subtract(b, a);
 		vec2 oa = a;
 		vec2 n = triple_product(e, oa, e);
@@ -143,30 +149,37 @@ static Edge find_closest_edge(vec2* simplex) {
 			closest.distance = d;
 			closest.normal = n;
 			closest.index = j;
+
+			vec2 ao = (vec2){-a.x, -a.y};
+			r32 s = gm_vec2_dot(ao, e) / gm_vec2_dot(e, e);
+			vec2 edge_in_world_space = gm_vec2_subtract(simplex[j].o_m1, simplex[i].o_m1);
+			closest.collision_point = gm_vec2_add(simplex[i].o_m1, gm_vec2_scalar_product(s, edge_in_world_space));
 		}
 	}
 
 	return closest;
 }
 
-vec2 epa(Simplex gjk_simplex, Mesh m1, Mesh m2) {
+vec2 epa(Simplex gjk_simplex, Mesh m1, Mesh m2, vec2* collision_point) {
 	assert(gjk_simplex.num == 3);
-	vec2* simplex = array_new_len(vec2, 3);
-	array_push(simplex, gjk_simplex.p[0]);
-	array_push(simplex, gjk_simplex.p[1]);
-	array_push(simplex, gjk_simplex.p[2]);
+	Minkowski_Point* simplex = array_new_len(Minkowski_Point, 3);
+	array_push(simplex, gjk_simplex.mp[0]);
+	array_push(simplex, gjk_simplex.mp[1]);
+	array_push(simplex, gjk_simplex.mp[2]);
 	
 	const u32 LIMIT = 100;
 	for (u32 i = 0; i < LIMIT; ++i) {
 		Edge e = find_closest_edge(simplex);
-		vec2 p = support(e.normal, m1, m2);
-		r32 d = gm_vec2_dot(p, e.normal);
+		Minkowski_Point mp = support(e.normal, m1, m2);
+		r32 d = gm_vec2_dot(mp.p, e.normal);
 
 		if (d - e.distance < 0.00001f) {
+			*collision_point = e.collision_point;
+			e = find_closest_edge(simplex);
 			array_free(simplex);
 			return gm_vec2_scalar_product(d, gm_vec2_normalize(e.normal));
 		} else {
-			array_insert(simplex, p, e.index);
+			array_insert(simplex, mp, e.index);
 		}
 	}
 
