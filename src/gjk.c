@@ -1,11 +1,7 @@
 #include "gjk.h"
 #include "float.h"
 #include <light_array.h>
-
-typedef struct {
-	vec2 p[3];
-	u32 num;
-} Simplex;
+#include <stdio.h>
 	
 vec2 get_farthest_point_in_direction(vec2 direction, Mesh m) {
 	vec2 point = m.vertices[0].position;
@@ -101,7 +97,7 @@ static boolean contains_origin(Simplex* simplex, vec2* direction, vec2 last_simp
 	return false;
 }
 
-boolean gjk(Mesh m1, Mesh m2) {
+boolean gjk(Mesh m1, Mesh m2, Simplex* _simplex) {
 	Simplex simplex = {0};
 	vec2 direction = (vec2){1.0f, -1.0f};
 	simplex_add(&simplex, support(direction, m1, m2));
@@ -117,8 +113,63 @@ boolean gjk(Mesh m1, Mesh m2) {
 			return false;
 		} else {
 			if (contains_origin(&simplex, &direction, new_simplex_point)) {
+				if (_simplex) *_simplex = simplex;
 				return true;
 			}
 		}
 	}
+}
+
+typedef struct {
+	r32 distance;
+	vec2 normal;
+	u32 index;
+} Edge;
+
+static Edge find_closest_edge(vec2* simplex) {
+	Edge closest;
+	closest.distance = FLT_MAX;
+
+	for (u32 i = 0; i <	array_length(simplex); ++i) {
+		int j = i + 1 == array_length(simplex) ? 0 : i + 1;
+		vec2 a = simplex[i];
+		vec2 b = simplex[j];
+		vec2 e = gm_vec2_subtract(b, a);
+		vec2 oa = a;
+		vec2 n = triple_product(e, oa, e);
+		n = gm_vec2_normalize(n);
+		r32 d = gm_vec2_dot(n, a);
+		if (d < closest.distance) {
+			closest.distance = d;
+			closest.normal = n;
+			closest.index = j;
+		}
+	}
+
+	return closest;
+}
+
+vec2 epa(Simplex gjk_simplex, Mesh m1, Mesh m2) {
+	assert(gjk_simplex.num == 3);
+	vec2* simplex = array_new_len(vec2, 3);
+	array_push(simplex, gjk_simplex.p[0]);
+	array_push(simplex, gjk_simplex.p[1]);
+	array_push(simplex, gjk_simplex.p[2]);
+	
+	const u32 LIMIT = 100;
+	for (u32 i = 0; i < LIMIT; ++i) {
+		Edge e = find_closest_edge(simplex);
+		vec2 p = support(e.normal, m1, m2);
+		r32 d = gm_vec2_dot(p, e.normal);
+
+		if (d - e.distance < 0.00001f) {
+			array_free(simplex);
+			return gm_vec2_scalar_product(d, gm_vec2_normalize(e.normal));
+		} else {
+			array_insert(simplex, p, e.index);
+		}
+	}
+
+	printf("EPA did not converge.\n");
+	return (vec2){0.0f, 0.0f};
 }

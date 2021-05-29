@@ -9,7 +9,7 @@
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
-static Entity e1, e2;
+static Entity e1, e2, penetration_line;
 
 static void menu_dummy_callback()
 {
@@ -47,12 +47,18 @@ int core_init()
 	graphics_entity_create_with_color(&e1, m, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});	
 
 	vertices = array_new(Vertex);
-	add_vertex(&vertices, 0.1f, 0.1f);
+	add_vertex(&vertices, 0.12f, 0.1f);
 	add_vertex(&vertices, 0.2f, 0.2f);
 	add_vertex(&vertices, 0.3f, 0.2f);
 	add_vertex(&vertices, 0.4f, 0.15f);
 	m = graphics_mesh_create(vertices, generate_indices_for(vertices));
 	graphics_entity_create_with_color(&e2, m, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});	
+
+	vertices = array_new(Vertex);
+	add_vertex(&vertices, 0.0f, 0.0f);
+	add_vertex(&vertices, 0.0f, 0.0f);
+	m = graphics_mesh_create(vertices, generate_indices_for(vertices));
+	graphics_entity_create_with_color(&penetration_line, m, (vec2){0.0f, 0.0f}, (vec3){1.0f, 1.0f, 1.0f});	
 
 	menu_register_dummy_callback(menu_dummy_callback);
 
@@ -65,20 +71,27 @@ void core_destroy()
 
 void core_update(r32 delta_time)
 {
-	if (gjk(e1.mesh, e2.mesh)) {
+	Simplex s;
+	if (gjk(e1.mesh, e2.mesh, &s)) {
 		e1.color = (vec3){1.0f, 0.0f, 0.0f};
 		e2.color = (vec3){1.0f, 0.0f, 0.0f};
+
+		vec2 result = epa(s, e1.mesh, e2.mesh);
+		penetration_line.mesh.vertices[1].position = result;
+		graphics_mesh_update(penetration_line.mesh);
 	} else {
 		e1.color = (vec3){0.0f, 1.0f, 0.0f};
 		e2.color = (vec3){0.0f, 1.0f, 0.0f};
+		penetration_line.mesh.vertices[1].position = (vec2){0.0f, 0.0f};
+		graphics_mesh_update(penetration_line.mesh);
 	}
-
 }
 
 void core_render()
 {
 	graphics_entity_render_basic_shader(&e1);
 	graphics_entity_render_basic_shader(&e2);
+	graphics_entity_render_basic_shader(&penetration_line);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
