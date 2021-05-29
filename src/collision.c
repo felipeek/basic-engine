@@ -42,7 +42,8 @@ collision_gjk_support(Bounding_Shape* b1, Bounding_Shape* b2, vec3 direction)
 
   Support_Point sup_point = {
 	.v = gm_vec3_subtract(b1->vertices[b1_index], b2->vertices[b2_index]),
-	.sup = b1->vertices[b1_index]
+	.sup = b1->vertices[b1_index],
+	.sup2 = b2->vertices[b2_index]
   };
   return sup_point;
 }
@@ -442,11 +443,18 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
 		  gm_vec3_scalar_product(bary_w, faces[index].c.sup)
 		);
 
+	  vec3 wcolpoint2 = 
+		gm_vec3_add(
+		  gm_vec3_add(gm_vec3_scalar_product(bary_u, faces[index].a.sup2), gm_vec3_scalar_product(bary_v, faces[index].b.sup2)),
+		  gm_vec3_scalar_product(bary_w, faces[index].c.sup2)
+		);
+
 	  vec3 penetration = gm_vec3_scalar_product(faces[index].distance, gm_vec3_normalize(faces[index].normal));
 	  array_free(faces);
 
 	  Collision_Point cp;
 	  cp.collision_point = wcolpoint;
+	  cp.other_collison_point = wcolpoint2;
 	  cp.normal = gm_vec3_scalar_product(-1.0f, penetration);
 	  cp.penetration = gm_vec3_length(penetration);
 	  return cp;

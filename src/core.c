@@ -100,6 +100,7 @@ void core_render()
 
 	if (has_collision) {
 		graphics_renderer_debug_points(&cp.collision_point, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+		graphics_renderer_debug_points(&cp.other_collison_point, 1, (vec4){0.0f, 0.0f, 1.0f, 1.0f});
 		graphics_renderer_debug_vector(cp.collision_point, gm_vec3_add(cp.collision_point, cp.normal), (vec4){1.0f, 1.0f, 1.0f, 1.0f});
 		graphics_renderer_primitives_flush(&camera);
 	}
