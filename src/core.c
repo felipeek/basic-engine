@@ -50,6 +50,8 @@ static void menu_dummy_callback()
 	printf("dummy callback called!\n");
 }
 
+Collision_Info* collision_infos;
+
 int core_init()
 {
 	// Create camera
@@ -57,15 +59,17 @@ int core_init()
 	// Create light
 	lights = create_lights();
 
+	collision_infos = array_new(Collision_Info);
+
     Entity e;
     entities = array_new(Entity);
-	Mesh m = graphics_mesh_create_from_obj("./res/sphere.obj", 0);
+	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	u32 tex = graphics_texture_create("./res/tex.png");
 	graphics_entity_create_with_color_fixed(&e, m, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){5.0f, 0.0f, 5.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, PLANE);
     array_push(entities, e);
 	graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
+		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, CUBE);
 	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
     array_push(entities, e);
 	//graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 5.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
@@ -107,27 +111,21 @@ void core_render()
     for (u32 i = 0; i < array_length(entities); ++i) {
         graphics_entity_render_phong_shader(&camera, &entities[i], lights);
     }
-	#if 0
-    //graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
-	Collision_Info* cis = collision_get_sphere_sphere_points(&entities[0], &entities[2]);
-    for (u32 i = 0; i < array_length(cis); ++i) {
-		//vec3 collision_point1 = gm_vec3_add(entities[0].world_position, cis[i].r1_wc);
-		//vec3 collision_point2 = gm_vec3_add(entities[2].world_position, cis[i].r2_wc);
-		mat3 q1_m = quaternion_get_matrix3(&entities[0].world_rotation);
-		mat3 q2_m = quaternion_get_matrix3(&entities[2].world_rotation);
-		vec3 collision_point1 = gm_vec3_add(entities[0].world_position, gm_mat3_multiply_vec3(&q1_m, cis[i].r1_lc));
-		vec3 collision_point2 = gm_vec3_add(entities[2].world_position, gm_mat3_multiply_vec3(&q2_m, cis[i].r2_lc));
+	#if 1
+    for (u32 i = 0; i < array_length(collision_infos); ++i) {
+		Collision_Info* ci = &collision_infos[i];
+		//vec3 collision_point1 = gm_vec3_add(entities[0].world_position, collision_infos[i].r1_wc);
+		//vec3 collision_point2 = gm_vec3_add(entities[2].world_position, collision_infos[i].r2_wc);
+		mat3 q1_m = quaternion_get_matrix3(&ci->e1->world_rotation);
+		mat3 q2_m = quaternion_get_matrix3(&ci->e2->world_rotation);
+		vec3 collision_point1 = gm_vec3_add(ci->e1->world_position, gm_mat3_multiply_vec3(&q1_m, ci->r1_lc));
+		vec3 collision_point2 = gm_vec3_add(ci->e2->world_position, gm_mat3_multiply_vec3(&q2_m, ci->r2_lc));
         graphics_renderer_debug_points(&collision_point1, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
         graphics_renderer_debug_points(&collision_point2, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
-        graphics_renderer_debug_vector(entities[0].world_position,
-            collision_point1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
-        graphics_renderer_debug_vector(entities[2].world_position,
-            collision_point2, (vec4){0.0f, 1.0f, 1.0f, 1.0f});
-        //graphics_renderer_debug_vector(collision_point1,
-        //    gm_vec3_add(collision_point1, cis[i].normal), (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+        graphics_renderer_debug_vector(collision_point1, gm_vec3_add(collision_point1, ci->normal), (vec4){0.0f, 0.0f, 0.0f, 1.0f});
+        //graphics_renderer_debug_vector(collision_point2, gm_vec3_add(collision_point2, ci->normal), (vec4){0.0f, 0.0f, 0.0f, 1.0f});
     }
     graphics_renderer_primitives_flush(&camera);
-    array_free(cis);
 	#endif
 }
 

@@ -139,7 +139,8 @@ static vec3 calculate_p(Entity* e, vec3 r_lc) {
 		case PLANE: {
 			return (vec3){0.0f, e->world_position.y, 0.0f}; // we consider an infinite plane, so we just project the cube vertex onto the plane
 		} break;
-		case SPHERE: {
+		case SPHERE:
+		case CUBE: {
 			mat3 current_rot_matrix = quaternion_get_matrix3(&e->world_rotation);
 			return gm_vec3_add(e->world_position, gm_mat3_multiply_vec3(&current_rot_matrix, r_lc));
 		} break;
@@ -190,6 +191,8 @@ static void create_constraints_for_collision(Collision_Info* ci, Constraint** co
 	}
 }
 
+extern Collision_Info* collision_infos;
+
 void pbd_simulate(r32 dt, Entity* entities) {
 	if (dt <= 0.0f) return;
 	r32 h = dt / NUM_SUBSTEPS;
@@ -229,16 +232,25 @@ void pbd_simulate(r32 dt, Entity* entities) {
 			e->world_rotation = quaternion_normalize(&e->world_rotation);
 		}
 
+		array_clear(collision_infos);
 		// As explained in sec 3.5, in each substep we need to check for collisions
 		// (I am not pre-collecting potential collision pairs.)
 		// Here we just check the plane-cube collision and collect the intersections.
-		Collision_Info* collision_infos = array_new(Collision_Info);
 		for (u32 j = 0; j < array_length(entities); ++j) {
 			for (u32 k = j + 1; k < array_length(entities); ++k) {
 				Entity* e1 = &entities[j];
 				Entity* e2 = &entities[k];
 				if (e1->type == PLANE) {
 					if (e2->type == SPHERE) {
+						Collision_Info* cis = collision_get_plane_sphere_points(e2, e1);
+						graphics_bounding_shapes_update(e1);
+						graphics_bounding_shapes_update(e2);
+						//Collision_Info* cis = collision_get_convex_convex_points(e2, e1);
+						for (u32 m = 0; m < array_length(cis); ++m) {
+							array_push(collision_infos, cis[m]);
+						}
+						array_free(cis);
+					} else if (e2->type == CUBE) {
 						//Collision_Info* cis = collision_get_plane_sphere_points(e2, e1);
 						graphics_bounding_shapes_update(e1);
 						graphics_bounding_shapes_update(e2);
@@ -375,6 +387,6 @@ void pbd_simulate(r32 dt, Entity* entities) {
 		}
 
 		array_free(constraints);
-		array_free(collision_infos);
+		//array_free(collision_infos);
 	}
 }
