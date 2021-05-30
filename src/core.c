@@ -34,6 +34,17 @@ static void add_vertex(Vertex** vertices, r32 x, r32 y) {
 	array_push(*vertices, v);
 }
 
+r32 delta = 0.0f;
+
+static void create_circle_vertices(Vertex* vertices, vec2 center) {
+	for (u32 i = 0; i < array_length(vertices); ++i) {
+		r32 theta = ((r32)i / array_length(vertices)) * (2.0f * PI_F);
+		theta += delta;
+		vertices[i].position = gm_vec2_scalar_product(0.5f, (vec2){cosf(theta), sinf(theta)});
+		vertices[i].position = gm_vec2_add(vertices[i].position, center);
+	}
+}
+
 int core_init()
 {
 	Vertex* vertices;
@@ -54,14 +65,22 @@ int core_init()
 	//m = graphics_mesh_create(vertices, generate_indices_for(vertices));
 	//graphics_entity_create_with_color(&e2, m, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});	
 
+	//vertices = array_new(Vertex);
+	//add_vertex(&vertices, -0.1f, 0.2f);
+	//add_vertex(&vertices, 0.1f, 0.2f);
+	//add_vertex(&vertices, 0.1f, 0.0f);
+	//add_vertex(&vertices, 0.1f, 0.0f);
+	//add_vertex(&vertices, -0.1f, 0.0f);
+	//Mesh m = graphics_mesh_create(vertices, generate_indices_for(vertices));
+	//graphics_entity_create_with_color(&e1, m, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});	
+
 	vertices = array_new(Vertex);
-	add_vertex(&vertices, -0.1f, 0.2f);
-	add_vertex(&vertices, 0.1f, 0.2f);
-	add_vertex(&vertices, 0.1f, 0.0f);
-	add_vertex(&vertices, 0.1f, 0.0f);
-	add_vertex(&vertices, -0.1f, 0.0f);
+	for (r32 i = 0; i < 2000; ++i) {
+		add_vertex(&vertices, 0.0f, 0.0f);
+	}
+	create_circle_vertices(vertices, (vec2){0.0f, 0.0f});
 	Mesh m = graphics_mesh_create(vertices, generate_indices_for(vertices));
-	graphics_entity_create_with_color(&e1, m, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});	
+	graphics_entity_create_with_color(&e2, m, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});	
 
 	vertices = array_new(Vertex);
 	add_vertex(&vertices, -0.2f, 0.1f);
@@ -71,7 +90,7 @@ int core_init()
 	add_vertex(&vertices, 0.2f, -0.08f);
 	add_vertex(&vertices, 0.2f, 0.1f);
 	m = graphics_mesh_create(vertices, generate_indices_for(vertices));
-	graphics_entity_create_with_color(&e2, m, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});	
+	graphics_entity_create_with_color(&e1, m, (vec2){0.0f, 0.0f}, (vec3){0.0f, 0.0f, 1.0f});	
 
 	vertices = array_new(Vertex);
 	add_vertex(&vertices, 0.0f, 0.0f);
@@ -139,6 +158,17 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		for (u32 i = 0; i < array_length(e2.mesh.vertices); ++i) {
 			e2.mesh.vertices[i].position.x -= 0.01f;
 		}
+		graphics_mesh_update(e2.mesh);
+	}
+	if (key_state[GLFW_KEY_Q]) {
+		delta += 0.01f;
+
+		vec2 center = (vec2){0.0f, 0.0f};
+		for (u32 i = 0; i < array_length(e2.mesh.vertices); ++i) {
+			center = gm_vec2_add(center, e2.mesh.vertices[i].position);
+		}
+		center = gm_vec2_scalar_product(1.0f / array_length(e2.mesh.vertices), center);
+		create_circle_vertices(e2.mesh.vertices, center);
 		graphics_mesh_update(e2.mesh);
 	}
 }
