@@ -46,16 +46,20 @@ static void menu_dummy_callback()
 
 int core_init()
 {
-	// Create camera
-	camera = create_camera();
-	// Create light
-	lights = create_lights();
+	Vertex* vertices;
+	u32* indexes;
+	obj_randomizer("/home/felipeek/Development/masters/data/curvedplane2.obj", &vertices, &indexes);
+	exit(0);
+	//// Create camera
+	//camera = create_camera();
+	//// Create light
+	//lights = create_lights();
 
-	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 0.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+	//Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	//graphics_entity_create_with_color(&e, m, (vec3){0.0f, 0.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 
-	menu_register_dummy_callback(menu_dummy_callback);
+	//menu_register_dummy_callback(menu_dummy_callback);
 
 	return 0;
 }

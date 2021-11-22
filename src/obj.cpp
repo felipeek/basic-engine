@@ -146,3 +146,139 @@ extern "C" int obj_parse(const char* obj_path, Vertex** vertices, u32** indexes)
 
 	return 0;
 }
+
+static void randomize(Vertex* vertices, u32* indexes) {
+	u32* positions_left = array_new(u32);
+	u32* randomized_positions = array_new(u32);
+	for (int i = 0; i < array_length(vertices); ++i) {
+		array_push(positions_left, i);
+	}
+
+	for (int i = 0; i < array_length(vertices); ++i) {
+		u32 pos = rand() % array_length(positions_left);
+		u32 selected = positions_left[pos];
+		array_push(randomized_positions, selected);
+		array_remove(positions_left, pos);
+	}
+
+	assert(array_length(positions_left) == 0);
+	array_free(positions_left);
+
+	Vertex* vertices_copy = array_new(Vertex);
+	for (int i = 0; i < array_length(vertices); ++i) {
+		array_push(vertices_copy, vertices[i]);
+	}
+	for (int i = 0; i < array_length(vertices); ++i) {
+		vertices[randomized_positions[i]] = vertices_copy[i];
+	}
+	array_free(vertices_copy);
+
+	u32* indexes_copy = array_new(u32);
+	for (int i = 0; i < array_length(indexes); ++i) {
+		array_push(indexes_copy, indexes[i]);
+	}
+	for (int i = 0; i < array_length(indexes); ++i) {
+		indexes[i] = indexes_copy[randomized_positions[i]];
+	}
+	array_free(indexes_copy);
+
+	array_free(randomized_positions);
+}
+
+void obj_save(Vertex* vertices, u32* indexes) {
+	FILE* f = fopen("/home/felipeek/Desktop/out.obj", "w");
+	for (u32 i = 0; i < array_length(vertices); ++i) {
+		fprintf(f, "v %f %f %f\n", vertices[i].position.x, vertices[i].position.y, vertices[i].position.z);
+	}
+
+	for (u32 i = 0; i < array_length(indexes); i += 3) {
+		fprintf(f, "f %u %u %u\n", indexes[i] + 1, indexes[i + 1] + 1, indexes[i + 2] + 1);
+	}
+
+	fclose(f);
+}
+
+extern "C" int obj_randomizer(const char* obj_path, Vertex** vertices, u32** indexes)
+{
+	tinyobj::attrib_t attrib;
+	std::vector<tinyobj::shape_t> shapes;
+	std::string warn;
+	std::string err;
+
+	bool ret = tinyobj::LoadObj(&attrib, &shapes, 0, &warn, &err, obj_path, 0, true);
+
+	if (!warn.empty()) {
+		std::cout << warn << std::endl;
+	}
+
+	if (!err.empty()) {
+		std::cerr << err << std::endl;
+	}
+
+	if (!ret) {
+		exit(1);
+	}
+
+	*vertices = array_new(Vertex);
+	*indexes = array_new(u32);
+
+	// For now, we are not re-using vertices, i.e., our indices are 0 1 2 3 4 5 6 7...
+	// This is because tinyobj loads the object in such a way that the position, tex coords and normals are completely independent
+	// vectors (just like in the obj file)
+	// for this reason, if we wanna re-use vertices, we need to be sure that all three pos,tex_coords,normals are the same...
+	// for example, we may have two indices poiting to the same vertex position, but using different uv_coords... so we would not
+	// be able to re-use this specific vertex in this case
+	// we can make such algorithm if needed, but for now, we are just duplicating everything
+	s32 index_counter = 0;
+	for (size_t s = 0; s < shapes.size(); s++) {
+		for (size_t f = 0; f < shapes[s].mesh.indices.size() / 3; f++) {
+			array_push(*indexes, index_counter);
+			++index_counter;
+			array_push(*indexes, index_counter);
+			++index_counter;
+			array_push(*indexes, index_counter);
+			++index_counter;
+
+			tinyobj::index_t idx0 = shapes[s].mesh.indices[3 * f + 0];
+			tinyobj::index_t idx1 = shapes[s].mesh.indices[3 * f + 1];
+			tinyobj::index_t idx2 = shapes[s].mesh.indices[3 * f + 2];
+			Vertex v[3];
+
+			if (attrib.texcoords.size() > 0) {
+				v[0].texture_coordinates.x = attrib.texcoords[2 * idx0.texcoord_index];
+				v[0].texture_coordinates.y = attrib.texcoords[2 * idx0.texcoord_index + 1];
+				v[1].texture_coordinates.x = attrib.texcoords[2 * idx1.texcoord_index];
+				v[1].texture_coordinates.y = attrib.texcoords[2 * idx1.texcoord_index + 1];
+				v[2].texture_coordinates.x = attrib.texcoords[2 * idx2.texcoord_index];
+				v[2].texture_coordinates.y = attrib.texcoords[2 * idx2.texcoord_index + 1];
+			}
+
+			int f0 = idx0.vertex_index;
+			int f1 = idx1.vertex_index;
+			int f2 = idx2.vertex_index;
+
+			v[0].position.x = attrib.vertices[3 * f0 + 0];
+			v[0].position.y = attrib.vertices[3 * f0 + 1];
+			v[0].position.z = attrib.vertices[3 * f0 + 2];
+			v[1].position.x = attrib.vertices[3 * f1 + 0];
+			v[1].position.y = attrib.vertices[3 * f1 + 1];
+			v[1].position.z = attrib.vertices[3 * f1 + 2];
+			v[2].position.x = attrib.vertices[3 * f2 + 0];
+			v[2].position.y = attrib.vertices[3 * f2 + 1];
+			v[2].position.z = attrib.vertices[3 * f2 + 2];
+
+			v[0].normal = (vec3){0.0f, 0.0f, 0.0f};
+			v[1].normal = (vec3){0.0f, 0.0f, 0.0f};
+			v[2].normal = (vec3){0.0f, 0.0f, 0.0f};
+
+			array_push(*vertices, v[0]);
+			array_push(*vertices, v[1]);
+			array_push(*vertices, v[2]);
+		}
+	}
+
+	randomize(*vertices, *indexes);
+	obj_save(*vertices, *indexes);
+
+	return 0;
+}
