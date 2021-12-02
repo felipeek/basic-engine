@@ -91,12 +91,96 @@ void core_update(r32 delta_time)
     }
 }
 
+typedef struct {
+	Entity* e1;
+	Entity* e2;
+	vec3 r1_lc;
+	vec3 r2_lc;
+	vec3 r1_wc;
+	vec3 r2_wc;
+	vec3 normal;
+	r32 lambda_n;
+	r32 lambda_t;
+} Collision_Info;
+extern Collision_Info* collision_infos;
+extern int has_unlucky_one;
+extern Collision_Info unlucky_one;
+extern int has_got_from_gjk;
+extern Collision_Info got_from_gjk;
+
 void core_render()
 {
     for (u32 i = 0; i < array_length(entities); ++i) {
         graphics_entity_render_phong_shader(&camera, &entities[i], lights);
     }
     //graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+
+#if 1
+	if (has_got_from_gjk) {
+		int is_has_got_from_gjk_in_the_points = 0;
+		for (u32 i = 0; i < array_length(collision_infos); ++i) {
+			Collision_Info* ci = &collision_infos[i];
+			vec3 collision_point = gm_vec3_add(ci->e1->world_position, ci->r1_wc);
+			vec3 has_got_from_gjk_collision_point = gm_vec3_add(got_from_gjk.e1->world_position, got_from_gjk.r1_wc);
+			if (collision_point.x == has_got_from_gjk_collision_point.x && collision_point.y == has_got_from_gjk_collision_point.y &&
+				collision_point.z == has_got_from_gjk_collision_point.z) {
+				is_has_got_from_gjk_in_the_points = 1;
+				break;
+			}
+		}
+
+		vec4 color = is_has_got_from_gjk_in_the_points ? (vec4) {0.0f, 1.0f, 0.0f, 1.0f} : (vec4) {0.0f, 0.0f, 1.0f, 1.0f};
+		vec3 collision_point = gm_vec3_add(got_from_gjk.e1->world_position, got_from_gjk.r1_wc);
+		graphics_renderer_debug_points(&collision_point, 1, color);
+		graphics_renderer_debug_vector(collision_point,
+			gm_vec3_add(collision_point, got_from_gjk.normal), color);
+		graphics_renderer_primitives_flush(&camera);
+	}
+
+	if (collision_infos != NULL) {
+		for (u32 i = 0; i < array_length(collision_infos); ++i) {
+			Collision_Info* ci = &collision_infos[i];
+			vec3 collision_point = gm_vec3_add(ci->e1->world_position, ci->r1_wc);
+			graphics_renderer_debug_points(&collision_point, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+			graphics_renderer_debug_vector(collision_point,
+				gm_vec3_add(collision_point, ci->normal), (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+		}
+		graphics_renderer_primitives_flush(&camera);
+	}
+
+#else
+	if (has_unlucky_one) {
+		int is_unlucky_one_in_the_points = 0;
+		for (u32 i = 0; i < array_length(collision_infos); ++i) {
+			Collision_Info* ci = &collision_infos[i];
+			vec3 collision_point = gm_vec3_add(ci->e1->world_position, ci->r1_wc);
+			vec3 unlucky_one_collision_point = gm_vec3_add(unlucky_one.e1->world_position, unlucky_one.r1_wc);
+			if (collision_point.x == unlucky_one_collision_point.x && collision_point.y == unlucky_one_collision_point.y &&
+				collision_point.z == unlucky_one_collision_point.z) {
+				is_unlucky_one_in_the_points = 1;
+				break;
+			}
+		}
+
+		vec4 color = is_unlucky_one_in_the_points ? (vec4) {1.0f, 1.0f, 0.0f, 1.0f} : (vec4) {1.0f, 1.0f, 1.0f, 1.0f};
+		vec3 collision_point = gm_vec3_add(unlucky_one.e1->world_position, unlucky_one.r1_wc);
+		graphics_renderer_debug_points(&collision_point, 1, color);
+		graphics_renderer_debug_vector(collision_point,
+			gm_vec3_add(collision_point, unlucky_one.normal), color);
+		graphics_renderer_primitives_flush(&camera);
+	}
+
+	if (has_got_from_gjk) {
+		vec4 color = (vec4){0.0f,0.0f,1.0f,1.0f};
+		vec3 collision_point = gm_vec3_add(got_from_gjk.e1->world_position, got_from_gjk.r1_wc);
+		graphics_renderer_debug_points(&collision_point, 1, color);
+		graphics_renderer_debug_vector(collision_point,
+			gm_vec3_add(collision_point, got_from_gjk.normal), color);
+		graphics_renderer_primitives_flush(&camera);
+	}
+#endif
+
+	/*
     Collision_Point* cps = collision_get_plane_cube_points(&entities[0], PLANE_Y);
     for (u32 i = 0; i < array_length(cps); ++i) {
         graphics_renderer_debug_points(&cps[i].collision_point, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
@@ -105,6 +189,7 @@ void core_render()
     }
     graphics_renderer_primitives_flush(&camera);
     array_free(cps);
+	*/
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
