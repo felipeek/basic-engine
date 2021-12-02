@@ -73,8 +73,8 @@ int core_init()
 	graphics_entity_create_with_color(&plane, m, (vec4){0.0f, PLANE_Y, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
 	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&cube, m, (vec4){0.0f, 5.0f, 0.0f, 1.0f}, quaternion_new((vec3){3.0f, 1.0f, 0.5f}, 45.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
+	graphics_entity_create_with_color(&cube, m, (vec4){0.0f, 5.0f, 0.0f, 1.0f}, quaternion_new((vec3){3.0f, 1.0f, 0.5f}, 0.0f),
+		(vec3){5.0f, 5.0f, 5.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
 
 	menu_register_dummy_callback(menu_dummy_callback);
 
@@ -146,7 +146,7 @@ void core_render()
 void core_input_process(boolean* key_state, r32 delta_time)
 {
 	r32 movement_speed = 3.0f;
-	r32 rotation_speed = 300.0f;
+	r32 rotation_speed = 30.0f;
 
 	if (key_state[GLFW_KEY_LEFT_SHIFT])
 		movement_speed = 0.5f;
