@@ -59,23 +59,14 @@ int core_init()
 
     Entity e;
     entities = array_new(Entity);
-	Mesh m = graphics_mesh_create_from_obj("./res/sphere.obj", 0);
-	u32 tex = graphics_texture_create("./res/tex.png");
+	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	//u32 tex = graphics_texture_create("./res/tex.png");
 	graphics_entity_create_with_color_fixed(&e, m, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){5.0f, 0.0f, 5.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, PLANE);
+			(vec3){5.0f, 1.0f, 5.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, PLANE);
     array_push(entities, e);
-	graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
+	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f, SPHERE);
 	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
-    array_push(entities, e);
-	graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 5.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
-    array_push(entities, e);
-	graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 8.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
-    array_push(entities, e);
-	graphics_entity_create_with_texture(&e, m, (vec3){0.0f, 11.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, tex, 1.0f, SPHERE);
     array_push(entities, e);
 
 	menu_register_dummy_callback(menu_dummy_callback);
@@ -102,31 +93,91 @@ void core_update(r32 delta_time)
     }
 }
 
+extern Collision_Info* collision_infos;
+extern int has_unlucky_one;
+extern Collision_Info unlucky_one;
+extern int has_got_from_gjk;
+extern Collision_Info got_from_gjk;
+
 void core_render()
 {
     for (u32 i = 0; i < array_length(entities); ++i) {
         graphics_entity_render_phong_shader(&camera, &entities[i], lights);
     }
-    //graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
-	Collision_Info* cis = collision_get_sphere_sphere_points(&entities[0], &entities[2]);
-    for (u32 i = 0; i < array_length(cis); ++i) {
-		//vec3 collision_point1 = gm_vec3_add(entities[0].world_position, cis[i].r1_wc);
-		//vec3 collision_point2 = gm_vec3_add(entities[2].world_position, cis[i].r2_wc);
-		mat3 q1_m = quaternion_get_matrix3(&entities[0].world_rotation);
-		mat3 q2_m = quaternion_get_matrix3(&entities[2].world_rotation);
-		vec3 collision_point1 = gm_vec3_add(entities[0].world_position, gm_mat3_multiply_vec3(&q1_m, cis[i].r1_lc));
-		vec3 collision_point2 = gm_vec3_add(entities[2].world_position, gm_mat3_multiply_vec3(&q2_m, cis[i].r2_lc));
-        graphics_renderer_debug_points(&collision_point1, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
-        graphics_renderer_debug_points(&collision_point2, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
-        graphics_renderer_debug_vector(entities[0].world_position,
-            collision_point1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
-        graphics_renderer_debug_vector(entities[2].world_position,
-            collision_point2, (vec4){0.0f, 1.0f, 1.0f, 1.0f});
-        //graphics_renderer_debug_vector(collision_point1,
-        //    gm_vec3_add(collision_point1, cis[i].normal), (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+
+#if 1
+	if (has_got_from_gjk) {
+		int is_has_got_from_gjk_in_the_points = 0;
+		for (u32 i = 0; i < array_length(collision_infos); ++i) {
+			Collision_Info* ci = &collision_infos[i];
+			vec3 collision_point = gm_vec3_add(ci->e2->world_position, ci->r2_wc);
+			vec3 has_got_from_gjk_collision_point = gm_vec3_add(got_from_gjk.e2->world_position, got_from_gjk.r2_wc);
+			if (collision_point.x == has_got_from_gjk_collision_point.x && collision_point.y == has_got_from_gjk_collision_point.y &&
+				collision_point.z == has_got_from_gjk_collision_point.z) {
+				is_has_got_from_gjk_in_the_points = 1;
+				break;
+			}
+		}
+
+		vec4 color = is_has_got_from_gjk_in_the_points ? (vec4) {0.0f, 1.0f, 0.0f, 1.0f} : (vec4) {0.0f, 0.0f, 1.0f, 1.0f};
+		vec3 collision_point = gm_vec3_add(got_from_gjk.e2->world_position, got_from_gjk.r2_wc);
+		graphics_renderer_debug_points(&collision_point, 1, color);
+		graphics_renderer_debug_vector(collision_point,
+			gm_vec3_add(collision_point, got_from_gjk.normal), color);
+		graphics_renderer_primitives_flush(&camera);
+	}
+
+	if (collision_infos != NULL) {
+		for (u32 i = 0; i < array_length(collision_infos); ++i) {
+			Collision_Info* ci = &collision_infos[i];
+			vec3 collision_point = gm_vec3_add(ci->e2->world_position, ci->r2_wc);
+			graphics_renderer_debug_points(&collision_point, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+			graphics_renderer_debug_vector(collision_point,
+				gm_vec3_add(collision_point, ci->normal), (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+		}
+		graphics_renderer_primitives_flush(&camera);
+	}
+
+#else
+	if (has_unlucky_one) {
+		int is_unlucky_one_in_the_points = 0;
+		for (u32 i = 0; i < array_length(collision_infos); ++i) {
+			Collision_Info* ci = &collision_infos[i];
+			vec3 collision_point = gm_vec3_add(ci->e2->world_position, ci->r2_wc);
+			vec3 unlucky_one_collision_point = gm_vec3_add(unlucky_one.e2->world_position, unlucky_one.r2_wc);
+			if (collision_point.x == unlucky_one_collision_point.x && collision_point.y == unlucky_one_collision_point.y &&
+				collision_point.z == unlucky_one_collision_point.z) {
+				is_unlucky_one_in_the_points = 1;
+				break;
+			}
+		}
+		vec4 color = is_unlucky_one_in_the_points ? (vec4) {1.0f, 1.0f, 0.0f, 1.0f} : (vec4) {1.0f, 1.0f, 1.0f, 1.0f};
+		vec3 collision_point = gm_vec3_add(unlucky_one.e2->world_position, unlucky_one.r2_wc);
+		graphics_renderer_debug_points(&collision_point, 1, color);
+		graphics_renderer_debug_vector(collision_point,
+			gm_vec3_add(collision_point, unlucky_one.normal), color);
+		graphics_renderer_primitives_flush(&camera);
+	}
+	//if (has_got_from_gjk) {
+	//	vec4 color = (vec4){0.0f,0.0f,1.0f,1.0f};
+	//	vec3 collision_point = gm_vec3_add(got_from_gjk.e2->world_position, got_from_gjk.r2_wc);
+	//	graphics_renderer_debug_points(&collision_point, 1, color);
+	//	graphics_renderer_debug_vector(collision_point,
+	//		gm_vec3_add(collision_point, got_from_gjk.normal), color);
+	//	graphics_renderer_primitives_flush(&camera);
+	//}
+#endif
+
+	/*
+    Collision_Point* cps = collision_get_plane_cube_points(&entities[0], PLANE_Y);
+    for (u32 i = 0; i < array_length(cps); ++i) {
+        graphics_renderer_debug_points(&cps[i].collision_point, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+        graphics_renderer_debug_vector(cps[i].collision_point,
+            gm_vec3_add(cps[i].collision_point, cps[i].normal), (vec4){1.0f, 1.0f, 1.0f, 1.0f});
     }
     graphics_renderer_primitives_flush(&camera);
-    array_free(cis);
+    array_free(cps);
+	*/
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
@@ -209,7 +260,7 @@ void core_input_process(boolean* key_state, r32 delta_time)
 	}
 	if (key_state[GLFW_KEY_1]) {
         is_mouse_bound_to_entity_movement = true;
-        bound_entity = &entities[0];
+        bound_entity = &entities[1];
     }
     else
         is_mouse_bound_to_entity_movement = false;

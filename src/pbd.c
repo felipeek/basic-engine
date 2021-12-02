@@ -1,7 +1,9 @@
 #include "pbd.h"
 #include <light_array.h>
 #include <assert.h>
+#include <float.h>
 #include "collision.h"
+#include "gjk.h"
 
 #define NUM_SUBSTEPS 1
 #define NUM_POS_ITERS 1
@@ -190,6 +192,121 @@ static void create_constraints_for_collision(Collision_Info* ci, Constraint** co
 	}
 }
 
+Collision_Info* collision_infos = NULL;
+int has_unlucky_one;
+Collision_Info unlucky_one;
+int has_got_from_gjk;
+Collision_Info got_from_gjk;
+
+static void update_collision_infos() {
+	for (int i = 0; i < array_length(collision_infos); ++i) {
+		Collision_Info* current = &collision_infos[i];
+		mat3 q1_mat = quaternion_get_matrix3(&current->e1->world_rotation);
+		current->r1_wc = gm_mat3_multiply_vec3(&q1_mat, current->r1_lc);
+
+		mat3 q2_mat = quaternion_get_matrix3(&current->e2->world_rotation);
+		current->r2_wc = gm_mat3_multiply_vec3(&q2_mat, current->r2_lc);
+
+		vec3 collision_point1 = gm_vec3_add(current->e1->world_position, current->r1_wc);
+		vec3 collision_point2 = gm_vec3_add(current->e2->world_position, current->r2_wc);
+		r32 distance = gm_vec3_dot(gm_vec3_subtract(collision_point1, collision_point2), current->normal);
+		//r32 distance = -gm_vec3_length(gm_vec3_subtract(collision_point1, collision_point2));
+		//printf("distance: %.3f\n", distance);
+
+		//if (distance > 0.1f) {
+		//	printf("removing\n");
+		//	array_remove(collision_infos, i);
+		//	--i;
+		//}
+	}
+}
+
+static void add_collision_info(Collision_Info ci) {
+	has_got_from_gjk = 1; got_from_gjk = ci;
+	array_push(collision_infos, ci);
+	if (array_length(collision_infos) <= 4) {
+		return;
+	}
+
+	// Need to remove one collision point!
+	vec3* collision_points1 = array_new(vec3);
+	vec3* collision_points2 = array_new(vec3);
+	r32 deepest_penetration = -FLT_MAX;
+	Collision_Info chosen;
+	int chosen_idx = -1;
+
+	for (int i = 0; i < array_length(collision_infos); ++i) {
+		Collision_Info* current = &(collision_infos)[i];
+
+		vec3 current_collision_point1 = gm_vec3_add(current->e1->world_position, current->r1_wc);
+		vec3 current_collision_point2 = gm_vec3_add(current->e2->world_position, current->r2_wc);
+		array_push(collision_points1, current_collision_point1);
+		array_push(collision_points2, current_collision_point2);
+
+		r32 current_penetration = -gm_vec3_dot(gm_vec3_subtract(current_collision_point1, current_collision_point2), current->normal);
+
+		if (current_penetration > deepest_penetration) {
+			deepest_penetration = current_penetration;
+			chosen_idx = i;
+			chosen = *current;
+		}
+	}
+
+	// We are left with 4 vertices. We keep the 3 that form the biggest triangle.
+
+	// remove the chosen one just to ease calculations
+	array_remove(collision_infos, chosen_idx); // tmp, 
+	array_remove(collision_points1, chosen_idx);
+	array_remove(collision_points2, chosen_idx);
+
+	r32 a1_1 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points1[1], collision_points1[0]),
+		gm_vec3_subtract(collision_points1[2], collision_points1[0]))); // 0, 1, 2
+	r32 a2_1 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points1[2], collision_points1[1]),
+		gm_vec3_subtract(collision_points1[3], collision_points1[1]))); // 1, 2, 3
+	r32 a3_1 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points1[2], collision_points1[0]),
+		gm_vec3_subtract(collision_points1[3], collision_points1[0]))); // 0, 2, 3
+	r32 a4_1 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points1[1], collision_points1[0]),
+		gm_vec3_subtract(collision_points1[3], collision_points1[0]))); // 0, 1, 3
+
+	r32 a1_2 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points2[1], collision_points2[0]),
+		gm_vec3_subtract(collision_points2[2], collision_points2[0]))); // 0, 1, 2
+	r32 a2_2 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points2[2], collision_points2[1]),
+		gm_vec3_subtract(collision_points2[3], collision_points2[1]))); // 1, 2, 3
+	r32 a3_2 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points2[2], collision_points2[0]),
+		gm_vec3_subtract(collision_points2[3], collision_points2[0]))); // 0, 2, 3
+	r32 a4_2 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points2[1], collision_points2[0]),
+		gm_vec3_subtract(collision_points2[3], collision_points2[0]))); // 0, 1, 3
+
+	r32 a1 = a1_1 + a1_2;
+	r32 a2 = a2_1 + a2_2;
+	r32 a3 = a3_1 + a3_2;
+	r32 a4 = a4_1 + a4_2;
+
+	array_free(collision_points1);
+	array_free(collision_points2);
+
+	if (a1 > a2 && a1 > a3 && a1 > a4) {
+		// a1 wins
+		unlucky_one = (collision_infos)[3]; has_unlucky_one = 1;
+		array_remove(collision_infos, 3);
+	} else if (a2 > a3 && a2 > a4) {
+		// a2 wins
+		unlucky_one = (collision_infos)[0]; has_unlucky_one = 1;
+		array_remove(collision_infos, 0);
+	} else if (a3 > a4) {
+		// a3 wins
+		unlucky_one = (collision_infos)[1]; has_unlucky_one = 1;
+		array_remove(collision_infos, 1);
+	} else {
+		// a4 wins
+		unlucky_one = (collision_infos)[2]; has_unlucky_one = 1;
+		array_remove(collision_infos, 2);
+	}
+
+	//unlucky_one = chosen;
+	array_push(collision_infos, chosen);
+}
+
 void pbd_simulate(r32 dt, Entity* entities) {
 	if (dt <= 0.0f) return;
 	r32 h = dt / NUM_SUBSTEPS;
@@ -229,39 +346,56 @@ void pbd_simulate(r32 dt, Entity* entities) {
 			e->world_rotation = quaternion_normalize(&e->world_rotation);
 		}
 
+		if (collision_infos == NULL) {
+			collision_infos = array_new(Collision_Info);
+		}
+
+		update_collision_infos();
+
 		// As explained in sec 3.5, in each substep we need to check for collisions
 		// (I am not pre-collecting potential collision pairs.)
 		// Here we just check the plane-cube collision and collect the intersections.
-		Collision_Info* collision_infos = array_new(Collision_Info);
 		for (u32 j = 0; j < array_length(entities); ++j) {
 			for (u32 k = j + 1; k < array_length(entities); ++k) {
 				Entity* e1 = &entities[j];
 				Entity* e2 = &entities[k];
-				if (e1->type == PLANE) {
-					if (e2->type == SPHERE) {
-						Collision_Info* cis = collision_get_plane_sphere_points(e2, e1);
-						for (u32 m = 0; m < array_length(cis); ++m) {
-							array_push(collision_infos, cis[m]);
-						}
-						array_free(cis);
-					} else {
-						assert(0);
-					}
-				} else if (e1->type == SPHERE) {
-					if (e2->type == PLANE) {
-						Collision_Info* cis = collision_get_plane_sphere_points(e1, e2);
-						for (u32 m = 0; m < array_length(cis); ++m) {
-							array_push(collision_infos, cis[m]);
-						}
-						array_free(cis);
-					} else if (e2->type == SPHERE) {
-						Collision_Info* cis = collision_get_sphere_sphere_points(e1, e2);
-						for (u32 m = 0; m < array_length(cis); ++m) {
-							array_push(collision_infos, cis[m]);
-						}
-						array_free(cis);
-					} else {
-						assert(0);
+
+				graphics_entity_update_bounding_shapes(e1);
+				graphics_entity_update_bounding_shapes(e2);
+
+				GJK_Support_List gjk_sl = {0};
+				if (collision_gjk_collides(&gjk_sl, &e1->bs, &e2->bs)) {
+					Collision_Point cp1 = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs);
+					gjk_sl = (GJK_Support_List){0};
+					if (collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs)) {
+						Collision_Point cp2 = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
+						Collision_Info ci = (Collision_Info){0};
+						ci.e1 = e1;
+						ci.e2 = e2;
+						ci.normal = gm_vec3_normalize(cp2.normal); // why cp1 though?
+						ci.r1_wc = gm_vec3_subtract(cp1.collision_point, e1->world_position);
+						ci.r2_wc = gm_vec3_subtract(cp2.collision_point, e2->world_position);
+
+						Quaternion q1_inv = quaternion_inverse(&e1->world_rotation);
+						mat3 q1_mat = quaternion_get_matrix3(&q1_inv);
+						ci.r1_lc = gm_mat3_multiply_vec3(&q1_mat, ci.r1_wc);
+
+						Quaternion q2_inv = quaternion_inverse(&e2->world_rotation);
+						mat3 q2_mat = quaternion_get_matrix3(&q2_inv);
+						ci.r2_lc = gm_mat3_multiply_vec3(&q2_mat, ci.r2_wc);
+						add_collision_info(ci);
+						unlucky_one = ci; has_unlucky_one = 1;
+
+						//q1_mat = quaternion_get_matrix3(&ci.e1->world_rotation);
+						//vec3 ci_r1_wc = gm_mat3_multiply_vec3(&q1_mat, ci.r1_lc);
+
+						//q2_mat = quaternion_get_matrix3(&ci.e2->world_rotation);
+						//vec3 ci_r2_wc = gm_mat3_multiply_vec3(&q2_mat, ci.r2_lc);
+
+						//vec3 collision_point1 = gm_vec3_add(ci.e1->world_position, ci_r1_wc);
+						//vec3 collision_point2 = gm_vec3_add(ci.e2->world_position, ci_r2_wc);
+						////r32 distance = gm_vec3_dot(gm_vec3_subtract(collision_point1, collision_point2), ci.normal);
+						//r32 distance = gm_vec3_length(gm_vec3_subtract(collision_point1, collision_point2));
 					}
 				}
 			}
@@ -372,6 +506,6 @@ void pbd_simulate(r32 dt, Entity* entities) {
 		}
 
 		array_free(constraints);
-		array_free(collision_infos);
+		//array_free(collision_infos);
 	}
 }

@@ -309,6 +309,15 @@ void graphics_entity_change_diffuse_map(Entity* entity, u32 diffuse_map, boolean
 	entity->diffuse_info.use_diffuse_map = true;
 }
 
+void graphics_entity_update_bounding_shapes(Entity* entity)
+{
+	for (u32 i = 0; i < array_length(entity->mesh.vertices); ++i) {
+		mat4 model_matrix = graphics_entity_get_model_matrix(entity);
+		entity->bs.vertices[i] = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&model_matrix,
+			(vec4){entity->mesh.vertices[i].position.x, entity->mesh.vertices[i].position.y, entity->mesh.vertices[i].position.z, 1.0f}));
+	}
+}
+
 void graphics_entity_change_color(Entity* entity, vec4 color, boolean delete_diffuse_map)
 {
 	if (delete_diffuse_map && entity->diffuse_info.use_diffuse_map)
@@ -390,6 +399,8 @@ void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 wor
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = true;
 	entity->type = type;
+	entity->bs.vertex_count = array_length(mesh.vertices);
+	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
 }
 
 void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass, Entity_Type type)
@@ -410,6 +421,8 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_pos
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = false;
 	entity->type = type;
+	entity->bs.vertex_count = array_length(mesh.vertices);
+	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
 }
 
 void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass, Entity_Type type)
@@ -430,6 +443,8 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_p
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = false;
 	entity->type = type;
+	entity->bs.vertex_count = array_length(mesh.vertices);
+	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
 }
 
 void graphics_entity_destroy(Entity* entity)
