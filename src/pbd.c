@@ -193,7 +193,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				if (collision_gjk_collides(&gjk_sl, &e1->bs, &e2->bs)) {
 					Collision_Point cp1 = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs);
 					gjk_sl = (GJK_Support_List){0};
-					if (collision_gjk_collides(&gjk_sl, &e1->bs, &e2->bs)) {
+					if (collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs)) {
 						Collision_Point cp2 = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
 						Collision_Info ci = (Collision_Info){0};
 						ci.e1 = e1;
