@@ -192,6 +192,14 @@ static void create_constraints_for_collision(Collision_Info* ci, Constraint** co
 	}
 }
 
+static vec3 find_ortho(vec3 v) {
+	vec3 aux = v;
+	aux.x += 100.0;
+	aux = gm_vec3_normalize(aux);
+	aux = gm_vec3_cross(v, aux);
+	return gm_vec3_normalize(aux);
+}
+
 Collision_Info* collision_infos = NULL;
 int has_unlucky_one;
 Collision_Info unlucky_one;
@@ -221,8 +229,27 @@ static void update_collision_infos() {
 	}
 }
 
+#if 0
 static void add_collision_info(Collision_Info ci) {
 	has_got_from_gjk = 1; got_from_gjk = ci;
+
+	vec3 received_collision_point1 = gm_vec3_add(ci.e1->world_position, ci.r1_wc);
+	vec3 received_collision_point2 = gm_vec3_add(ci.e2->world_position, ci.r2_wc);
+
+	for (int i = 0; i < array_length(collision_infos); ++i) {
+		Collision_Info* current = &collision_infos[i];
+		vec3 collision_point1 = gm_vec3_add(current->e1->world_position, current->r1_wc);
+		vec3 collision_point2 = gm_vec3_add(current->e2->world_position, current->r2_wc);
+
+		r32 diff1 = gm_vec3_length(gm_vec3_subtract(collision_point1, received_collision_point1));
+		r32 diff2 = gm_vec3_length(gm_vec3_subtract(collision_point2, received_collision_point2));
+		r32 diff = diff1 < diff2 ? diff1 : diff2;
+		if (diff < 0.3f) {
+			// already there
+			return;
+		}
+	}
+
 	array_push(collision_infos, ci);
 	if (array_length(collision_infos) <= 4) {
 		return;
@@ -243,7 +270,7 @@ static void add_collision_info(Collision_Info ci) {
 		array_push(collision_points1, current_collision_point1);
 		array_push(collision_points2, current_collision_point2);
 
-		r32 current_penetration = -gm_vec3_dot(gm_vec3_subtract(current_collision_point1, current_collision_point2), current->normal);
+		r32 current_penetration = gm_vec3_dot(gm_vec3_subtract(current_collision_point1, current_collision_point2), current->normal);
 
 		if (current_penetration > deepest_penetration) {
 			deepest_penetration = current_penetration;
@@ -303,8 +330,216 @@ static void add_collision_info(Collision_Info ci) {
 		array_remove(collision_infos, 2);
 	}
 
-	//unlucky_one = chosen;
+	unlucky_one = chosen;
 	array_push(collision_infos, chosen);
+}
+#else
+static void add_collision_info(Collision_Info ci) {
+	has_got_from_gjk = 1; got_from_gjk = ci;
+
+	vec3 received_collision_point1 = gm_vec3_add(ci.e1->world_position, ci.r1_wc);
+	vec3 received_collision_point2 = gm_vec3_add(ci.e2->world_position, ci.r2_wc);
+
+	for (int i = 0; i < array_length(collision_infos); ++i) {
+		Collision_Info* current = &collision_infos[i];
+		vec3 collision_point1 = gm_vec3_add(current->e1->world_position, current->r1_wc);
+		vec3 collision_point2 = gm_vec3_add(current->e2->world_position, current->r2_wc);
+
+		r32 diff1 = gm_vec3_length(gm_vec3_subtract(collision_point1, received_collision_point1));
+		r32 diff2 = gm_vec3_length(gm_vec3_subtract(collision_point2, received_collision_point2));
+		r32 diff = diff1 < diff2 ? diff1 : diff2;
+		//if (diff < 0.3f) {
+		//	// already there
+		//	return;
+		//}
+	}
+
+	array_push(collision_infos, ci);
+	if (array_length(collision_infos) <= 4) {
+		return;
+	}
+
+	vec3* collision_points1 = array_new(vec3);
+	vec3* collision_points2 = array_new(vec3);
+	for (int i = 0; i < array_length(collision_infos); ++i) {
+		Collision_Info* current = &(collision_infos)[i];
+		vec3 current_collision_point1 = gm_vec3_add(current->e1->world_position, current->r1_wc);
+		vec3 current_collision_point2 = gm_vec3_add(current->e2->world_position, current->r2_wc);
+		array_push(collision_points1, current_collision_point1);
+		array_push(collision_points2, current_collision_point2);
+	}
+
+	r32 a1_1 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points1[1], collision_points1[0]),
+		gm_vec3_subtract(collision_points1[2], collision_points1[0]))); // 0, 1, 2
+	r32 a2_1 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points1[2], collision_points1[1]),
+		gm_vec3_subtract(collision_points1[3], collision_points1[1]))); // 1, 2, 3
+	r32 a3_1 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points1[2], collision_points1[0]),
+		gm_vec3_subtract(collision_points1[3], collision_points1[0]))); // 0, 2, 3
+	r32 a4_1 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points1[1], collision_points1[0]),
+		gm_vec3_subtract(collision_points1[3], collision_points1[0]))); // 0, 1, 3
+	r32 a5_1 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points1[1], collision_points1[0]),
+		gm_vec3_subtract(collision_points1[4], collision_points1[0]))); // 0, 1, 4
+	r32 a6_1 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points1[2], collision_points1[1]),
+		gm_vec3_subtract(collision_points1[4], collision_points1[1]))); // 1, 2, 4
+	r32 a7_1 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points1[3], collision_points1[1]),
+		gm_vec3_subtract(collision_points1[4], collision_points1[1]))); // 1, 3, 4
+	r32 a8_1 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points1[3], collision_points1[2]),
+		gm_vec3_subtract(collision_points1[4], collision_points1[2]))); // 2, 3, 4
+	r32 a9_1 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points1[2], collision_points1[0]),
+		gm_vec3_subtract(collision_points1[4], collision_points1[0]))); // 0, 2, 4
+	r32 a10_1 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points1[3], collision_points1[0]),
+		gm_vec3_subtract(collision_points1[4], collision_points1[0]))); // 0, 3, 4
+
+	r32 a1_2 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points2[1], collision_points2[0]),
+		gm_vec3_subtract(collision_points2[2], collision_points2[0]))); // 0, 1, 2
+	r32 a2_2 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points2[2], collision_points2[1]),
+		gm_vec3_subtract(collision_points2[3], collision_points2[1]))); // 1, 2, 3
+	r32 a3_2 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points2[2], collision_points2[0]),
+		gm_vec3_subtract(collision_points2[3], collision_points2[0]))); // 0, 2, 3
+	r32 a4_2 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points2[1], collision_points2[0]),
+		gm_vec3_subtract(collision_points2[3], collision_points2[0]))); // 0, 1, 3
+	r32 a5_2 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points1[1], collision_points1[0]),
+		gm_vec3_subtract(collision_points2[4], collision_points2[0]))); // 0, 1, 4
+	r32 a6_2 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points2[2], collision_points2[1]),
+		gm_vec3_subtract(collision_points2[4], collision_points2[1]))); // 1, 2, 4
+	r32 a7_2 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points2[3], collision_points2[1]),
+		gm_vec3_subtract(collision_points2[4], collision_points2[1]))); // 1, 3, 4
+	r32 a8_2 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points2[3], collision_points2[2]),
+		gm_vec3_subtract(collision_points2[4], collision_points2[2]))); // 2, 3, 4
+	r32 a9_2 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points2[2], collision_points2[0]),
+		gm_vec3_subtract(collision_points2[4], collision_points2[0]))); // 0, 2, 4
+	r32 a10_2 = gm_vec3_length(gm_vec3_cross(gm_vec3_subtract(collision_points2[3], collision_points2[0]),
+		gm_vec3_subtract(collision_points2[4], collision_points2[0]))); // 0, 3, 4
+
+	r32 a1 = a1_1 + a1_2;
+	r32 a2 = a2_1 + a2_2;
+	r32 a3 = a3_1 + a3_2;
+	r32 a4 = a4_1 + a4_2;
+	r32 a5 = a5_1 + a5_2;
+	r32 a6 = a6_1 + a6_2;
+	r32 a7 = a7_1 + a7_2;
+	r32 a8 = a8_1 + a8_2;
+	r32 a9 = a9_1 + a9_2;
+	r32 a10 = a10_1 + a10_2;
+
+	array_free(collision_points1);
+	array_free(collision_points2);
+
+	if (a1 > a2 && a1 > a3 && a1 > a4 && a1 > a5 && a1 > a6 && a1 > a7 && a1 > a8 && a1 > a9 && a1 > a10) {
+		// a1 wins
+		unlucky_one = (collision_infos)[3]; has_unlucky_one = 1;
+		array_remove(collision_infos, 4);
+		array_remove(collision_infos, 3);
+	} else if (a2 > a3 && a2 > a4 && a2 > a5 && a2 > a6 && a2 > a7 && a2 > a8 && a2 > a9 && a2 > a10) {
+		// a2 wins
+		unlucky_one = (collision_infos)[0]; has_unlucky_one = 1;
+		array_remove(collision_infos, 4);
+		array_remove(collision_infos, 0);
+	} else if (a3 > a4 && a3 > a5 && a3 > a6 && a3 > a7 && a3 > a8 && a3 > a9 && a3 > a10) {
+		// a3 wins
+		unlucky_one = (collision_infos)[1]; has_unlucky_one = 1;
+		array_remove(collision_infos, 4);
+		array_remove(collision_infos, 1);
+	} else if (a4 > a5 && a4 > a6 && a4 > a7 && a4 > a8 && a4 > a9 && a4 > a10) {
+		// a4 wins
+		unlucky_one = (collision_infos)[2]; has_unlucky_one = 1;
+		array_remove(collision_infos, 4);
+		array_remove(collision_infos, 2);
+	} else if (a5 > a6 && a5 > a7 && a5 > a8 && a5 > a9 && a5 > a10) {
+		// a5 wins
+		unlucky_one = (collision_infos)[2]; has_unlucky_one = 1;
+		array_remove(collision_infos, 3);
+		array_remove(collision_infos, 2);
+	} else if (a6 > a7 && a6 > a8 && a6 > a9 && a6 > a10) {
+		// a6 wins
+		unlucky_one = (collision_infos)[0]; has_unlucky_one = 1;
+		array_remove(collision_infos, 3);
+		array_remove(collision_infos, 0);
+	} else if (a7 > a8 && a7 > a9 && a7 > a10) {
+		// a7 wins
+		unlucky_one = (collision_infos)[0]; has_unlucky_one = 1;
+		array_remove(collision_infos, 2);
+		array_remove(collision_infos, 0);
+	} else if (a8 > a9 && a8 > a10) {
+		// a8 wins
+		unlucky_one = (collision_infos)[0]; has_unlucky_one = 1;
+		array_remove(collision_infos, 1);
+		array_remove(collision_infos, 0);
+	} else if (a9 > a10) {
+		// a9 wins
+		unlucky_one = (collision_infos)[1]; has_unlucky_one = 1;
+		array_remove(collision_infos, 3);
+		array_remove(collision_infos, 1);
+	} else {
+		// a10 wins
+		unlucky_one = (collision_infos)[1]; has_unlucky_one = 1;
+		array_remove(collision_infos, 2);
+		array_remove(collision_infos, 1);
+	}
+}
+#endif
+
+static void collect_collision_infos_via_perturbation(Entity* e1, Entity* e2, Collision_Info* ci) {
+	Quaternion e1_rotation = e1->world_rotation;
+	Quaternion e2_rotation = e2->world_rotation;
+
+	vec3 normal = ci->normal;
+	vec3 ortho = find_ortho(normal);
+
+	const r32 PERTURBATION_ANGLE = 5.0f;
+	const int NUM_ITERATIONS = 16;
+	Quaternion Rp = quaternion_new(ortho, PERTURBATION_ANGLE);
+	r32 angle = 360.0f / NUM_ITERATIONS;
+
+	for (int i = 0; i < NUM_ITERATIONS; ++i) {
+		Quaternion Rn = quaternion_new(normal, angle * i);
+		Quaternion Rn_inv = quaternion_inverse(&Rn);
+		Quaternion new_rotation = quaternion_product(&Rn, &e2_rotation);
+		new_rotation = quaternion_product(&Rp, &new_rotation);
+		new_rotation = quaternion_product(&Rn_inv, &new_rotation);
+		graphics_entity_set_rotation(e2, new_rotation);
+
+		graphics_entity_update_bounding_shapes(e1);
+		graphics_entity_update_bounding_shapes(e2);
+		GJK_Support_List gjk_sl = {0};
+		if (collision_gjk_collides(&gjk_sl, &e1->bs, &e2->bs)) {
+			Collision_Point cp1 = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs);
+			gjk_sl = (GJK_Support_List){0};
+			if (collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs)) {
+				Collision_Point cp2 = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
+				Collision_Info ci = (Collision_Info){0};
+				ci.e1 = e1;
+				ci.e2 = e2;
+				ci.normal = gm_vec3_normalize(normal); // REVIEW, DO WE USE THIS NORMAL OR THE ORIGINAL ONE?
+
+				// we calculate only r1_lc and r2_lc because the cube is artifically rotated
+				vec3 r1_wc = gm_vec3_subtract(cp1.collision_point, e1->world_position);
+				vec3 r2_wc = gm_vec3_subtract(cp2.collision_point, e2->world_position);
+
+				Quaternion q1_inv = quaternion_inverse(&e1->world_rotation);
+				mat3 q1_mat = quaternion_get_matrix3(&q1_inv);
+				ci.r1_lc = gm_mat3_multiply_vec3(&q1_mat, r1_wc);
+
+				Quaternion q2_inv = quaternion_inverse(&e2->world_rotation);
+				mat3 q2_mat = quaternion_get_matrix3(&q2_inv);
+				ci.r2_lc = gm_mat3_multiply_vec3(&q2_mat, r2_wc);
+
+				// now we calculate r1_wc and r2_wc based on the real rotation
+				q1_mat = quaternion_get_matrix3(&e1_rotation);
+				ci.r1_wc = gm_mat3_multiply_vec3(&q1_mat, ci.r1_lc);
+
+				q2_mat = quaternion_get_matrix3(&e2_rotation);
+				ci.r2_wc = gm_mat3_multiply_vec3(&q2_mat, ci.r2_lc);
+
+				graphics_entity_set_rotation(e1, e1_rotation); // reset for safety
+				graphics_entity_set_rotation(e2, e2_rotation); // reset for safety
+				add_collision_info(ci);
+				//printf("perturbation find collision!\n");
+			}
+		}
+	}
+
+	graphics_entity_set_rotation(e2, e2_rotation);
 }
 
 void pbd_simulate(r32 dt, Entity* entities) {
@@ -386,6 +621,9 @@ void pbd_simulate(r32 dt, Entity* entities) {
 						add_collision_info(ci);
 						unlucky_one = ci; has_unlucky_one = 1;
 
+						collect_collision_infos_via_perturbation(e1, e2, &ci);
+						update_collision_infos();
+
 						//q1_mat = quaternion_get_matrix3(&ci.e1->world_rotation);
 						//vec3 ci_r1_wc = gm_mat3_multiply_vec3(&q1_mat, ci.r1_lc);
 
@@ -403,6 +641,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 
 		// Now we run the PBD solver with NUM_POS_ITERS iterations
 		Constraint* constraints = array_new(Constraint);
+		printf("We have %ld collisions\n", array_length(collision_infos));
 		for (u32 j = 0; j < NUM_POS_ITERS; ++j) {
 
 			// Before solving the constraints, we need to generate additional constraints if we detected collisions

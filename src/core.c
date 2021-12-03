@@ -79,8 +79,10 @@ void core_destroy()
 	array_free(lights);
 }
 
+int paused;
 void core_update(r32 delta_time)
 {
+	if (paused) return;
 	for (u32 i = 0; i < array_length(entities); ++i) {
 		Physics_Force pf;
 		pf.force = (vec3){0.0f, -GRAVITY * 1.0f / entities[i].inverse_mass, 0.0f};
@@ -106,27 +108,6 @@ void core_render()
     }
 
 #if 1
-	if (has_got_from_gjk) {
-		int is_has_got_from_gjk_in_the_points = 0;
-		for (u32 i = 0; i < array_length(collision_infos); ++i) {
-			Collision_Info* ci = &collision_infos[i];
-			vec3 collision_point = gm_vec3_add(ci->e2->world_position, ci->r2_wc);
-			vec3 has_got_from_gjk_collision_point = gm_vec3_add(got_from_gjk.e2->world_position, got_from_gjk.r2_wc);
-			if (collision_point.x == has_got_from_gjk_collision_point.x && collision_point.y == has_got_from_gjk_collision_point.y &&
-				collision_point.z == has_got_from_gjk_collision_point.z) {
-				is_has_got_from_gjk_in_the_points = 1;
-				break;
-			}
-		}
-
-		vec4 color = is_has_got_from_gjk_in_the_points ? (vec4) {0.0f, 1.0f, 0.0f, 1.0f} : (vec4) {0.0f, 0.0f, 1.0f, 1.0f};
-		vec3 collision_point = gm_vec3_add(got_from_gjk.e2->world_position, got_from_gjk.r2_wc);
-		graphics_renderer_debug_points(&collision_point, 1, color);
-		graphics_renderer_debug_vector(collision_point,
-			gm_vec3_add(collision_point, got_from_gjk.normal), color);
-		graphics_renderer_primitives_flush(&camera);
-	}
-
 	if (collision_infos != NULL) {
 		for (u32 i = 0; i < array_length(collision_infos); ++i) {
 			Collision_Info* ci = &collision_infos[i];
@@ -137,6 +118,46 @@ void core_render()
 		}
 		graphics_renderer_primitives_flush(&camera);
 	}
+
+	//if (has_unlucky_one) {
+	//	int is_unlucky_one_in_the_points = 0;
+	//	for (u32 i = 0; i < array_length(collision_infos); ++i) {
+	//		Collision_Info* ci = &collision_infos[i];
+	//		vec3 collision_point = gm_vec3_add(ci->e2->world_position, ci->r2_wc);
+	//		vec3 unlucky_one_collision_point = gm_vec3_add(unlucky_one.e2->world_position, unlucky_one.r2_wc);
+	//		if (collision_point.x == unlucky_one_collision_point.x && collision_point.y == unlucky_one_collision_point.y &&
+	//			collision_point.z == unlucky_one_collision_point.z) {
+	//			is_unlucky_one_in_the_points = 1;
+	//			break;
+	//		}
+	//	}
+	//	vec4 color = is_unlucky_one_in_the_points ? (vec4) {1.0f, 1.0f, 0.0f, 1.0f} : (vec4) {1.0f, 1.0f, 1.0f, 1.0f};
+	//	vec3 collision_point = gm_vec3_add(unlucky_one.e2->world_position, unlucky_one.r2_wc);
+	//	graphics_renderer_debug_points(&collision_point, 1, color);
+	//	graphics_renderer_debug_vector(collision_point,
+	//		gm_vec3_add(collision_point, unlucky_one.normal), color);
+	//	graphics_renderer_primitives_flush(&camera);
+	//}
+	//if (has_got_from_gjk) {
+	//	int is_has_got_from_gjk_in_the_points = 0;
+	//	for (u32 i = 0; i < array_length(collision_infos); ++i) {
+	//		Collision_Info* ci = &collision_infos[i];
+	//		vec3 collision_point = gm_vec3_add(ci->e2->world_position, ci->r2_wc);
+	//		vec3 has_got_from_gjk_collision_point = gm_vec3_add(got_from_gjk.e2->world_position, got_from_gjk.r2_wc);
+	//		if (collision_point.x == has_got_from_gjk_collision_point.x && collision_point.y == has_got_from_gjk_collision_point.y &&
+	//			collision_point.z == has_got_from_gjk_collision_point.z) {
+	//			is_has_got_from_gjk_in_the_points = 1;
+	//			break;
+	//		}
+	//	}
+
+	//	vec4 color = is_has_got_from_gjk_in_the_points ? (vec4) {0.0f, 1.0f, 0.0f, 1.0f} : (vec4) {0.0f, 0.0f, 1.0f, 1.0f};
+	//	vec3 collision_point = gm_vec3_add(got_from_gjk.e2->world_position, got_from_gjk.r2_wc);
+	//	graphics_renderer_debug_points(&collision_point, 1, color);
+	//	graphics_renderer_debug_vector(collision_point,
+	//		gm_vec3_add(collision_point, got_from_gjk.normal), color);
+	//	graphics_renderer_primitives_flush(&camera);
+	//}
 
 #else
 	if (has_unlucky_one) {
@@ -264,6 +285,11 @@ void core_input_process(boolean* key_state, r32 delta_time)
     }
     else
         is_mouse_bound_to_entity_movement = false;
+
+	if (key_state[GLFW_KEY_P]) {
+		paused = !paused;
+		key_state[GLFW_KEY_P] = false;
+	}
 }
 
 void core_mouse_change_process(boolean reset, r64 x_pos, r64 y_pos)
