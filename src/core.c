@@ -64,7 +64,7 @@ int core_init()
 	graphics_entity_create_with_color_fixed(&e, m, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 			(vec3){5.0f, 1.0f, 5.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, PLANE);
     array_push(entities, e);
-	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
+	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f, SPHERE);
 	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
     array_push(entities, e);
@@ -82,6 +82,7 @@ void core_destroy()
 int paused;
 void core_update(r32 delta_time)
 {
+#if 1
 	if (paused) return;
 	for (u32 i = 0; i < array_length(entities); ++i) {
 		Physics_Force pf;
@@ -93,6 +94,9 @@ void core_update(r32 delta_time)
     for (u32 i = 0; i < array_length(entities); ++i) {
         array_clear(entities[i].forces);
     }
+#else
+	collect_collisions(entities);
+#endif
 }
 
 extern Collision_Info* collision_infos;
@@ -131,7 +135,7 @@ void core_render()
 	//			break;
 	//		}
 	//	}
-	//	vec4 color = is_unlucky_one_in_the_points ? (vec4) {1.0f, 1.0f, 0.0f, 1.0f} : (vec4) {1.0f, 1.0f, 1.0f, 1.0f};
+	//	vec4 color = is_unlucky_one_in_the_points ? (vec4) {0.0f, 1.0f, 0.0f, 1.0f} : (vec4) {1.0f, 1.0f, 0.0f, 1.0f};
 	//	vec3 collision_point = gm_vec3_add(unlucky_one.e2->world_position, unlucky_one.r2_wc);
 	//	graphics_renderer_debug_points(&collision_point, 1, color);
 	//	graphics_renderer_debug_vector(collision_point,
@@ -204,7 +208,7 @@ void core_render()
 void core_input_process(boolean* key_state, r32 delta_time)
 {
 	r32 movement_speed = 3.0f;
-	r32 rotation_speed = 300.0f;
+	r32 rotation_speed = 30.0f;
 
 	if (key_state[GLFW_KEY_LEFT_SHIFT])
 		movement_speed = 0.5f;
@@ -224,12 +228,12 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
 		{
 			Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, rotation_speed * delta_time);
-			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
+			graphics_entity_set_rotation(&entities[1], quaternion_product(&rotation, &entities[1].world_rotation));
 		}
 		else
 		{
 			Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, -rotation_speed * delta_time);
-			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
+			graphics_entity_set_rotation(&entities[1], quaternion_product(&rotation, &entities[1].world_rotation));
 		}
 	}
 	if (key_state[GLFW_KEY_Y])
@@ -237,12 +241,12 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
 		{
 			Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, rotation_speed * delta_time);
-			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
+			graphics_entity_set_rotation(&entities[1], quaternion_product(&rotation, &entities[1].world_rotation));
 		}
 		else
 		{
 			Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, -rotation_speed * delta_time);
-			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
+			graphics_entity_set_rotation(&entities[1], quaternion_product(&rotation, &entities[1].world_rotation));
 		}
 	}
 	if (key_state[GLFW_KEY_Z])
@@ -250,12 +254,12 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
 		{
 			Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, rotation_speed * delta_time);
-			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
+			graphics_entity_set_rotation(&entities[1], quaternion_product(&rotation, &entities[1].world_rotation));
 		}
 		else
 		{
 			Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, -rotation_speed * delta_time);
-			graphics_entity_set_rotation(&entities[0], quaternion_product(&rotation, &entities[0].world_rotation));
+			graphics_entity_set_rotation(&entities[1], quaternion_product(&rotation, &entities[1].world_rotation));
 		}
 	}
 	if (key_state[GLFW_KEY_L])
