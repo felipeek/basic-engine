@@ -556,7 +556,7 @@ void collect_collisions(Entity* entities) {
 					add_collision_info(ci);
 					unlucky_one = ci; has_unlucky_one = 1;
 
-					collect_collision_infos_via_perturbation(e1, e2, &ci);
+					//collect_collision_infos_via_perturbation(e1, e2, &ci);
 					update_collision_infos();
 
 					//q1_mat = quaternion_get_matrix3(&ci.e1->world_rotation);
@@ -618,6 +618,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 			collision_infos = array_new(Collision_Info);
 		}
 
+#if 1
 		update_collision_infos();
 
 		// As explained in sec 3.5, in each substep we need to check for collisions
@@ -654,7 +655,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 						add_collision_info(ci);
 						unlucky_one = ci; has_unlucky_one = 1;
 
-						collect_collision_infos_via_perturbation(e1, e2, &ci);
+						//collect_collision_infos_via_perturbation(e1, e2, &ci);
 						update_collision_infos();
 
 						//q1_mat = quaternion_get_matrix3(&ci.e1->world_rotation);
@@ -671,6 +672,9 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				}
 			}
 		}
+	#endif
+
+		//collision_infos = collision_get_plane_cube_points(&entities[1], &entities[0]);
 
 		// Now we run the PBD solver with NUM_POS_ITERS iterations
 		Constraint* constraints = array_new(Constraint);
@@ -755,7 +759,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 			vec3 v_til = gm_vec3_subtract(gm_vec3_add(old_v1, gm_vec3_cross(old_w1, r1_wc)), gm_vec3_add(old_v2, gm_vec3_cross(old_w2, r2_wc)));
 			r32 vn_til = gm_vec3_dot(n, v_til);
 			//r32 e = (fabsf(vn) > 2.0f * GRAVITY * h) ? 0.8f : 0.0f;
-			r32 e = 0.1f;
+			r32 e = 0.0f;
 			// @NOTE: equation (34) was modified here
 			fact = -vn + MIN(-e * vn_til, 0.0f);
 			// update delta_v
