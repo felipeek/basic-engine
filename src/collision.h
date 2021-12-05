@@ -2,6 +2,7 @@
 #define BASIC_ENGINE_COLLISION_H
 #include "gm.h"
 #include "graphics.h"
+#include "pmc.h"
 
 typedef struct {
 	Entity* e1;
@@ -15,7 +16,7 @@ typedef struct {
 	r32 lambda_t;
 } Collision_Info;
 
-Collision_Info* collision_get_plane_cube_points(Entity* cube, Entity* plane);
+PMC_Contact* collision_get_plane_cube_points(Entity* cube, Entity* plane);
 Collision_Info* collision_get_plane_sphere_points(Entity* sphere, Entity* plane);
 Collision_Info* collision_get_sphere_sphere_points(Entity* sphere1, Entity* sphere2);
 

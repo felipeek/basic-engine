@@ -177,7 +177,7 @@ static void create_constraints_for_contacts(PMC* pmc, Constraint** constraints) 
 
 			// if 'd' is greater than 0.0, we should also add a constraint for static friction, but only if lambda_t < u_s * lambda_n
 			// the problem is that if NUM_POS_ITERS is 1, lambda_t and lambda_n will always be 0.0, so this will never be used.
-			const r32 static_friction_coefficient = 0.0f;
+			const r32 static_friction_coefficient = 0.5f;
 			if (contact->lambda_t < static_friction_coefficient * contact->lambda_n) {
 				vec3 p1_til = calculate_p_til(contact->e1, contact->r1_lc);
 				vec3 p2_til = calculate_p_til(contact->e2, contact->r2_lc);
@@ -273,17 +273,20 @@ void pbd_simulate(r32 dt, Entity* entities) {
 						pmc_add(contact);
 						//unlucky_one = contact; has_unlucky_one = 1;
 
-						//collect_collision_infos_via_perturbation(e1, e2, &contact);
-						//pmc_perturb(e1, e2, contact.normal);
-
-						pmc_update(); // check if necessary
+						pmc_perturb(e1, e2, contact.normal);
+						//pmc_update(); // check if necessary
 					}
 				}
 			}
 		}
+#else
+		for (u32 k = 1; k < array_length(entities); ++k) {
+			PMC_Contact* contacts = collision_get_plane_cube_points(&entities[k], &entities[0]);
+			for (u32 j = 0; j < array_length(contacts); ++j) {
+				pmc_add(contacts[j]);
+			}
+		}
 #endif
-
-		//collision_infos = collision_get_plane_cube_points(&entities[1], &entities[0]);
 
 		// Now we run the PBD solver with NUM_POS_ITERS iterations
 		Constraint* constraints = array_new(Constraint);
@@ -298,6 +301,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				create_constraints_for_contacts(pmc, &constraints);
 			}
 
+			printf("num constraints: [%ld]\n", array_length(constraints));
 			// Now, solve the constraints
 			for (u32 k = 0; k < array_length(constraints); ++k) {
 				Constraint* constraint = &constraints[k];
@@ -359,7 +363,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				vec3 delta_v = (vec3){0.0f, 0.0f, 0.0f};
 				
 				// we start by applying Coloumb's dynamic friction force
-				const r32 dynamic_friction_coefficient = 0.0f;
+				const r32 dynamic_friction_coefficient = 0.5f;
 				r32 fn = lambda_n / (h * h);
 				// @NOTE: equation (30) was modified here
 				r32 fact = MIN(-h * dynamic_friction_coefficient * fn, gm_vec3_length(vt));
@@ -374,7 +378,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				vec3 v_til = gm_vec3_subtract(gm_vec3_add(old_v1, gm_vec3_cross(old_w1, r1_wc)), gm_vec3_add(old_v2, gm_vec3_cross(old_w2, r2_wc)));
 				r32 vn_til = gm_vec3_dot(n, v_til);
 				//r32 e = (fabsf(vn) > 2.0f * GRAVITY * h) ? 0.8f : 0.0f;
-				r32 e = 0.8f;
+				r32 e = 0.2f;
 				// @NOTE: equation (34) was modified here
 				fact = -vn + MIN(-e * vn_til, 0.0f);
 				// update delta_v

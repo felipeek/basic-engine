@@ -56,15 +56,15 @@ Collision_Info* collision_get_plane_sphere_points(Entity* sphere, Entity* plane)
 	return collision_infos;
 }
 
-Collision_Info* collision_get_plane_cube_points(Entity* cube, Entity* plane) {
-	Collision_Info* collision_infos = array_new(Collision_Info);
+PMC_Contact* collision_get_plane_cube_points(Entity* cube, Entity* plane) {
+	PMC_Contact* collision_infos = array_new(PMC_Contact);
 	for (u32 i = 0; i < array_length(cube->mesh.vertices); ++i) {
 		Vertex* v = &cube->mesh.vertices[i];
 		mat4 model_matrix = graphics_entity_get_model_matrix(cube);
 		vec4 pos_wc = gm_mat4_multiply_vec4(&model_matrix, (vec4){v->position.x, v->position.y, v->position.z, 1.0f});
         pos_wc = gm_vec4_scalar_product(1.0f / pos_wc.w, pos_wc);
 		if (pos_wc.y <= plane->world_position.y) {
-			Collision_Info ci;
+			PMC_Contact ci;
 			ci.e1 = plane;
 			ci.e2 = cube;
 			ci.normal = (vec3){0.0f, 1.0f, 0.0f};

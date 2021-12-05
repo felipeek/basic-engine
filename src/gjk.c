@@ -409,6 +409,7 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
 	// Whenever the distance is 0, 
 	if (faces[index].distance == 0.0f)
 	{
+		/*
 	  array_free(faces);
 	  //assert(0);
 	  //return (vec3) {0.0f, 0.0f, 0.0f};
@@ -419,6 +420,9 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
 	  cp.normal = (vec3){0.0f, 1.0f, 0.0};
 	  cp.penetration = 0.0f;
 	  return cp;
+	  */
+
+	 printf("EPA corner-case\n");
 	}
 	// Find the new support in the normal direction of the closest face
 	Support_Point sup_p = collision_gjk_support(b1, b2, faces[index].normal);

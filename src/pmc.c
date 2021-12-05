@@ -48,47 +48,49 @@ static vec3 find_ortho(vec3 v) {
 	return gm_vec3_normalize(aux);
 }
 
+static boolean is_contact_still_valid(PMC_Contact contact) {
+	mat3 q1_mat = quaternion_get_matrix3(&contact.e1->world_rotation);
+	contact.r1_wc = gm_mat3_multiply_vec3(&q1_mat, contact.r1_lc);
+
+	mat3 q2_mat = quaternion_get_matrix3(&contact.e2->world_rotation);
+	contact.r2_wc = gm_mat3_multiply_vec3(&q2_mat, contact.r2_lc);
+
+	vec3 collision_point1 = gm_vec3_add(contact.e1->world_position, contact.r1_wc);
+	vec3 collision_point2 = gm_vec3_add(contact.e2->world_position, contact.r2_wc);
+	r32 distance = -gm_vec3_dot(gm_vec3_subtract(collision_point1, collision_point2), contact.normal);
+
+	// check distance
+	if (distance > 0.0f) {
+		printf("not adding because not touching anymore\n");
+		return false;
+	}
+
+	// check d2d
+	r32 d = gm_vec3_dot(gm_vec3_subtract(collision_point1, collision_point2), contact.normal);
+	vec3 projected_point = gm_vec3_subtract(collision_point1, gm_vec3_scalar_product(d, contact.normal));
+	vec3 projected_diff = gm_vec3_subtract(collision_point2, projected_point);
+	r32 d2d = gm_vec3_dot(projected_diff, projected_diff);
+	if (d2d > 0.1f) {
+		printf("not adding because d2d too big\n");
+		return false;
+	}
+
+	return true;
+}
+
 void pmc_update() {
 	PMC_Map_Key key;
 	PMC* pmc;
 	Hash_Map_Iterator iterator = hash_map_get_iterator(&pmc_map);
 	while ((iterator = hash_map_iterator_next(&pmc_map, iterator, &key, &pmc)) != HASH_MAP_ITERATOR_END) {
-
 		for (int i = 0; i < array_length(pmc->contacts); ++i) {
 			PMC_Contact* current = &pmc->contacts[i];
-			mat3 q1_mat = quaternion_get_matrix3(&current->e1->world_rotation);
-			current->r1_wc = gm_mat3_multiply_vec3(&q1_mat, current->r1_lc);
-
-			mat3 q2_mat = quaternion_get_matrix3(&current->e2->world_rotation);
-			current->r2_wc = gm_mat3_multiply_vec3(&q2_mat, current->r2_lc);
-
-			vec3 collision_point1 = gm_vec3_add(current->e1->world_position, current->r1_wc);
-			vec3 collision_point2 = gm_vec3_add(current->e2->world_position, current->r2_wc);
-			r32 distance = -gm_vec3_dot(gm_vec3_subtract(collision_point1, collision_point2), current->normal);
-			//r32 distance = -gm_vec3_length(gm_vec3_subtract(collision_point1, collision_point2));
-			//printf("distance: %.3f\n", distance);
-
-			// the bigger this threshold, the more we 'keep' the collision points
-			// keeping the collision points for longer times should be good to avoid bugs
-			// but if we keep for too much time, we mess up PBD, specially the restitution algorithm (e.g. when 'e' is big - the object should bounce)
-			const r32 THRESHOLD = 0.02f;
-			if (distance > THRESHOLD) {
-				printf("removing because not touching anymore\n");
+			if (!is_contact_still_valid(*current)) {
+				printf("removing because contact not valid anymore\n");
 				array_remove(pmc->contacts, i);
 				--i;
-			} else {
-				r32 d = gm_vec3_dot(gm_vec3_subtract(collision_point1, collision_point2), current->normal);
-				vec3 projected_point = gm_vec3_subtract(collision_point1, gm_vec3_scalar_product(d, current->normal));
-				vec3 projected_diff = gm_vec3_subtract(collision_point2, projected_point);
-				r32 d2d = gm_vec3_dot(projected_diff, projected_diff);
-				if (d2d > 0.1f) {
-					printf("removing because d2d too big\n");
-					array_remove(pmc->contacts, i);
-					--i;
-				}
 			}
 		}
-
 	}
 }
 
@@ -204,6 +206,10 @@ static PMC* get_pmc_for_entity_pair(Entity* e1, Entity* e2) {
 }
 
 void pmc_add(PMC_Contact contact) {
+	if (!is_contact_still_valid(contact)) {
+		return;
+	}
+
 	PMC* pmc = get_pmc_for_entity_pair(contact.e1, contact.e2);
 
 	vec3 received_collision_point2 = gm_vec3_add(contact.e2->world_position, contact.r2_wc);
@@ -230,7 +236,7 @@ void pmc_perturb(Entity* e1, Entity* e2, vec3 normal) {
 	vec3 ortho = find_ortho(normal);
 
 	const r32 PERTURBATION_ANGLE = 5.0f;
-	const int NUM_ITERATIONS = 4;
+	const int NUM_ITERATIONS = 16;
 	Quaternion Rp = quaternion_new(ortho, PERTURBATION_ANGLE);
 	r32 angle = 360.0f / NUM_ITERATIONS;
 

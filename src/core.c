@@ -66,19 +66,18 @@ int core_init()
 	//u32 tex = graphics_texture_create("./res/tex.png");
 	graphics_entity_create_with_color_fixed(&e, m, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 			(vec3){50.0f, 0.0f, 50.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, PLANE);
-    array_push(entities, e);
-	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 33.0f),
+	array_push(entities, e);
+	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f, SPHERE);
-	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
-    array_push(entities, e);
-	//graphics_entity_create_with_color(&e, m, (vec3){0.0f, 5.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
+	array_push(entities, e);
+	//graphics_entity_create_with_color(&e, m, (vec3){-2.5f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f, SPHERE);
 	////e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
- //   array_push(entities, e);
-	//graphics_entity_create_with_color(&e, m, (vec3){0.0f, 7.5f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
+	//array_push(entities, e);
+	//graphics_entity_create_with_color(&e, m, (vec3){2.5f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f, SPHERE);
 	////e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
- //   array_push(entities, e);
+	//array_push(entities, e);
 
 	menu_register_dummy_callback(menu_dummy_callback);
 
@@ -113,6 +112,7 @@ void core_render()
     for (u32 i = 0; i < array_length(entities); ++i) {
         graphics_entity_render_phong_shader(&camera, &entities[i], lights);
     }
+	pmc_render(&camera);
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
@@ -223,7 +223,9 @@ void core_input_process(boolean* key_state, r32 delta_time)
 			mesh_name = "./res/cube.obj";
 		}
 		Mesh m = graphics_mesh_create_from_obj(mesh_name, 0);
-		graphics_entity_create_with_color(&e, m, cube_position, quaternion_new((vec3){0.35f, 0.44f, 0.12f}, 33.0f),
+		//graphics_entity_create_with_color(&e, m, cube_position, quaternion_new((vec3){0.35f, 0.44f, 0.12f}, 33.0f),
+		//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, 1.0f}, 10.0f, SPHERE);
+		graphics_entity_create_with_color(&e, m, cube_position, quaternion_new((vec3){0.35f, 0.44f, 0.12f}, 0.0f),
 			(vec3){1.0f, 1.0f, 1.0f}, (vec4){rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, 1.0f}, 10.0f, SPHERE);
 
 		Physics_Force force;
