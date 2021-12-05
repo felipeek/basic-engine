@@ -3,6 +3,8 @@
 #include <light_array.h>
 #include "graphics.h"
 
+//#define USE_RESERVE
+
 int key_compare(const void* _key1, const void* _key2) {
 	const PMC_Map_Key key1 = *(PMC_Map_Key*)_key1;
 	const PMC_Map_Key key2 = *(PMC_Map_Key*)_key2;
@@ -70,7 +72,7 @@ static boolean is_contact_still_valid(PMC_Contact contact) {
 	vec3 projected_point = gm_vec3_subtract(collision_point1, gm_vec3_scalar_product(d, contact.normal));
 	vec3 projected_diff = gm_vec3_subtract(collision_point2, projected_point);
 	r32 d2d = gm_vec3_dot(projected_diff, projected_diff);
-	if (d2d > 0.1f) {
+	if (d2d > 0.001f) {
 		printf("not adding because d2d too big\n");
 		return false;
 	}
@@ -83,12 +85,27 @@ void pmc_update() {
 	PMC* pmc;
 	Hash_Map_Iterator iterator = hash_map_get_iterator(&pmc_map);
 	while ((iterator = hash_map_iterator_next(&pmc_map, iterator, &key, &pmc)) != HASH_MAP_ITERATOR_END) {
+#ifdef USE_RESERVE
+		for (int i = 0; i < array_length(pmc->reserve); ++i) {
+			PMC_Contact* current = &pmc->reserve[i];
+			if (is_contact_still_valid(*current)) {
+				printf("adding back because contact is now valid!\n");
+				array_remove(pmc->reserve, i);
+				--i;
+				pmc_add(*current);
+			}
+		}
+#endif
+
 		for (int i = 0; i < array_length(pmc->contacts); ++i) {
 			PMC_Contact* current = &pmc->contacts[i];
 			if (!is_contact_still_valid(*current)) {
 				printf("removing because contact not valid anymore\n");
 				array_remove(pmc->contacts, i);
 				--i;
+#ifdef USE_RESERVE
+				array_push(pmc->reserve, *current);
+#endif
 			}
 		}
 	}
@@ -199,6 +216,7 @@ static PMC* get_pmc_for_entity_pair(Entity* e1, Entity* e2) {
 	if (hash_map_get(&pmc_map, &key, &pmc)) {
 		pmc = malloc(sizeof(PMC));
 		pmc->contacts = array_new(PMC_Contact);
+		pmc->reserve = array_new(PMC_Contact);
 		assert(hash_map_put(&pmc_map, &key, &pmc) == 0);
 	}
 
@@ -206,11 +224,15 @@ static PMC* get_pmc_for_entity_pair(Entity* e1, Entity* e2) {
 }
 
 void pmc_add(PMC_Contact contact) {
+	PMC* pmc = get_pmc_for_entity_pair(contact.e1, contact.e2);
+	//printf("size: %ld\n", array_length(pmc->reserve));
+
 	if (!is_contact_still_valid(contact)) {
+#ifdef USE_RESERVE
+		array_push(pmc->reserve, contact);
+#endif
 		return;
 	}
-
-	PMC* pmc = get_pmc_for_entity_pair(contact.e1, contact.e2);
 
 	vec3 received_collision_point2 = gm_vec3_add(contact.e2->world_position, contact.r2_wc);
 	int existing_entry = get_cache_entry(pmc, received_collision_point2);

@@ -27,6 +27,7 @@ typedef struct {
 
 typedef struct {
 	PMC_Contact* contacts;
+	PMC_Contact* reserve;
 } PMC;
 
 
