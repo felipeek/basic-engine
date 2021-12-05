@@ -23,6 +23,6 @@ typedef struct {
 } Collision_Point;
 
 boolean collision_gjk_collides(GJK_Support_List* sup_list, Bounding_Shape* b1, Bounding_Shape* b2);
-Collision_Point collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2);
+boolean collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, Collision_Point* cp);
 
 #endif

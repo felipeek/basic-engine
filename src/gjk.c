@@ -389,8 +389,8 @@ barycentric(vec3 p, vec3 a, vec3 b, vec3 c, r32 *u, r32 *v, r32 *w)
   *u = 1.0f - *v - *w;
 }
 
-Collision_Point
-collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
+boolean
+collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, Collision_Point* cp)
 {
   int index = -1;
   Face *faces = array_new_len(Face, 4);
@@ -409,20 +409,8 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
 	// Whenever the distance is 0, 
 	if (faces[index].distance == 0.0f)
 	{
-		/*
 	  array_free(faces);
-	  //assert(0);
-	  //return (vec3) {0.0f, 0.0f, 0.0f};
-
-	  // @TODO: fix this
-	  Collision_Point cp;
-	  cp.collision_point = (vec3){0.0f, 0.0f, 0.0f};
-	  cp.normal = (vec3){0.0f, 1.0f, 0.0};
-	  cp.penetration = 0.0f;
-	  return cp;
-	  */
-
-	 printf("EPA corner-case\n");
+	  return false;
 	}
 	// Find the new support in the normal direction of the closest face
 	Support_Point sup_p = collision_gjk_support(b1, b2, faces[index].normal);
@@ -449,11 +437,10 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
 	  vec3 penetration = gm_vec3_scalar_product(faces[index].distance, gm_vec3_normalize(faces[index].normal));
 	  array_free(faces);
 
-	  Collision_Point cp;
-	  cp.collision_point = wcolpoint;
-	  cp.normal = gm_vec3_scalar_product(-1.0f, penetration);
-	  cp.penetration = gm_vec3_length(penetration);
-	  return cp;
+	  cp->collision_point = wcolpoint;
+	  cp->normal = gm_vec3_scalar_product(-1.0f, penetration);
+	  cp->penetration = gm_vec3_length(penetration);
+	  return true;
 	}
 	// Expand polytope
 	Edge *edges = array_new_len(Edge, 16);
@@ -515,5 +502,5 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
   array_free(faces);
   printf("The EPA routine took %d iterations and didn't complete", kk);
   assert(0); // this should be unreachable
-  return (Collision_Point){0};
+  return false;
 }

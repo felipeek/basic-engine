@@ -67,17 +67,31 @@ int core_init()
 	graphics_entity_create_with_color_fixed(&e, m, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 			(vec3){50.0f, 0.0f, 50.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, PLANE);
 	array_push(entities, e);
-	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 30.0f),
+	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f, SPHERE);
 	array_push(entities, e);
-	//graphics_entity_create_with_color(&e, m, (vec3){-2.5f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
-	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f, SPHERE);
-	////e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
-	//array_push(entities, e);
-	//graphics_entity_create_with_color(&e, m, (vec3){2.5f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
-	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f, SPHERE);
-	////e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
-	//array_push(entities, e);
+
+#if 0
+#if 0
+	graphics_entity_create_with_color(&e, m, (vec3){-2.5f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f, SPHERE);
+	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
+	array_push(entities, e);
+	graphics_entity_create_with_color(&e, m, (vec3){2.5f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f, SPHERE);
+	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
+	array_push(entities, e);
+#else
+	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 4.5f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f, SPHERE);
+	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
+	array_push(entities, e);
+	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 7.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f, SPHERE);
+	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
+	array_push(entities, e);
+#endif
+#endif
 
 	menu_register_dummy_callback(menu_dummy_callback);
 

@@ -250,31 +250,34 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				graphics_entity_update_bounding_shapes(e1);
 				graphics_entity_update_bounding_shapes(e2);
 
+				Collision_Point cp1, cp2;
 				GJK_Support_List gjk_sl = {0};
 				if (collision_gjk_collides(&gjk_sl, &e1->bs, &e2->bs)) {
-					Collision_Point cp1 = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs);
+					boolean found_cp = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs, &cp1);
 					gjk_sl = (GJK_Support_List){0};
-					if (collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs)) {
-						Collision_Point cp2 = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
-						PMC_Contact contact = (PMC_Contact){0};
-						contact.e1 = e1;
-						contact.e2 = e2;
-						contact.normal = gm_vec3_normalize(cp2.normal); // why cp1 though?
-						contact.r1_wc = gm_vec3_subtract(cp1.collision_point, e1->world_position);
-						contact.r2_wc = gm_vec3_subtract(cp2.collision_point, e2->world_position);
+					if (found_cp && collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs)) {
+						found_cp = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs, &cp2);
+						if (found_cp) {
+							PMC_Contact contact = (PMC_Contact){0};
+							contact.e1 = e1;
+							contact.e2 = e2;
+							contact.normal = gm_vec3_normalize(cp2.normal); // why cp1 though?
+							contact.r1_wc = gm_vec3_subtract(cp1.collision_point, e1->world_position);
+							contact.r2_wc = gm_vec3_subtract(cp2.collision_point, e2->world_position);
 
-						Quaternion q1_inv = quaternion_inverse(&e1->world_rotation);
-						mat3 q1_mat = quaternion_get_matrix3(&q1_inv);
-						contact.r1_lc = gm_mat3_multiply_vec3(&q1_mat, contact.r1_wc);
+							Quaternion q1_inv = quaternion_inverse(&e1->world_rotation);
+							mat3 q1_mat = quaternion_get_matrix3(&q1_inv);
+							contact.r1_lc = gm_mat3_multiply_vec3(&q1_mat, contact.r1_wc);
 
-						Quaternion q2_inv = quaternion_inverse(&e2->world_rotation);
-						mat3 q2_mat = quaternion_get_matrix3(&q2_inv);
-						contact.r2_lc = gm_mat3_multiply_vec3(&q2_mat, contact.r2_wc);
-						pmc_add(contact);
-						//unlucky_one = contact; has_unlucky_one = 1;
+							Quaternion q2_inv = quaternion_inverse(&e2->world_rotation);
+							mat3 q2_mat = quaternion_get_matrix3(&q2_inv);
+							contact.r2_lc = gm_mat3_multiply_vec3(&q2_mat, contact.r2_wc);
+							pmc_add(contact);
 
-						pmc_perturb(e1, e2, contact.normal);
-						//pmc_update(); // check if necessary
+							pmc_perturb(e1, e2, contact.normal);
+
+							//pmc_update(); // check if necessary
+						}
 					}
 				}
 			}
@@ -301,7 +304,6 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				create_constraints_for_contacts(pmc, &constraints);
 			}
 
-			printf("num constraints: [%ld]\n", array_length(constraints));
 			// Now, solve the constraints
 			for (u32 k = 0; k < array_length(constraints); ++k) {
 				Constraint* constraint = &constraints[k];
@@ -363,7 +365,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				vec3 delta_v = (vec3){0.0f, 0.0f, 0.0f};
 				
 				// we start by applying Coloumb's dynamic friction force
-				const r32 dynamic_friction_coefficient = 0.5f;
+				const r32 dynamic_friction_coefficient = 0.1f;
 				r32 fn = lambda_n / (h * h);
 				// @NOTE: equation (30) was modified here
 				r32 fact = MIN(-h * dynamic_friction_coefficient * fn, gm_vec3_length(vt));

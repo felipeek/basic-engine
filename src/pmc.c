@@ -60,7 +60,7 @@ static boolean is_contact_still_valid(PMC_Contact contact) {
 	r32 distance = -gm_vec3_dot(gm_vec3_subtract(collision_point1, collision_point2), contact.normal);
 
 	// check distance
-	if (distance > 0.0f) {
+	if (distance > 0.00f) {
 		printf("not adding because not touching anymore\n");
 		return false;
 	}
@@ -235,8 +235,8 @@ void pmc_perturb(Entity* e1, Entity* e2, vec3 normal) {
 
 	vec3 ortho = find_ortho(normal);
 
-	const r32 PERTURBATION_ANGLE = 5.0f;
-	const int NUM_ITERATIONS = 16;
+	const r32 PERTURBATION_ANGLE = 0.1f;
+	const int NUM_ITERATIONS = 4;
 	Quaternion Rp = quaternion_new(ortho, PERTURBATION_ANGLE);
 	r32 angle = 360.0f / NUM_ITERATIONS;
 
@@ -251,40 +251,42 @@ void pmc_perturb(Entity* e1, Entity* e2, vec3 normal) {
 		graphics_entity_update_bounding_shapes(e1);
 		graphics_entity_update_bounding_shapes(e2);
 		GJK_Support_List gjk_sl = {0};
+		Collision_Point cp1, cp2;
 		if (collision_gjk_collides(&gjk_sl, &e1->bs, &e2->bs)) {
-			Collision_Point cp1 = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs);
+			boolean found_cp = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs, &cp1);
 			gjk_sl = (GJK_Support_List){0};
-			if (collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs)) {
-				Collision_Point cp2 = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs);
+			if (found_cp && collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs)) {
+				found_cp = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs, &cp2);
+				if (found_cp) {
+					PMC_Contact contact = (PMC_Contact){0};
+					contact.e1 = e1;
+					contact.e2 = e2;
+					contact.normal = gm_vec3_normalize(normal); // REVIEW, DO WE USE THIS NORMAL OR THE ORIGINAL ONE?
 
-				PMC_Contact contact = (PMC_Contact){0};
-				contact.e1 = e1;
-				contact.e2 = e2;
-				contact.normal = gm_vec3_normalize(normal); // REVIEW, DO WE USE THIS NORMAL OR THE ORIGINAL ONE?
+					// we calculate only r1_lc and r2_lc because the cube is artifically rotated
+					vec3 r1_wc = gm_vec3_subtract(cp1.collision_point, e1->world_position);
+					vec3 r2_wc = gm_vec3_subtract(cp2.collision_point, e2->world_position);
 
-				// we calculate only r1_lc and r2_lc because the cube is artifically rotated
-				vec3 r1_wc = gm_vec3_subtract(cp1.collision_point, e1->world_position);
-				vec3 r2_wc = gm_vec3_subtract(cp2.collision_point, e2->world_position);
+					Quaternion q1_inv = quaternion_inverse(&e1->world_rotation);
+					mat3 q1_mat = quaternion_get_matrix3(&q1_inv);
+					contact.r1_lc = gm_mat3_multiply_vec3(&q1_mat, r1_wc);
 
-				Quaternion q1_inv = quaternion_inverse(&e1->world_rotation);
-				mat3 q1_mat = quaternion_get_matrix3(&q1_inv);
-				contact.r1_lc = gm_mat3_multiply_vec3(&q1_mat, r1_wc);
+					Quaternion q2_inv = quaternion_inverse(&e2->world_rotation);
+					mat3 q2_mat = quaternion_get_matrix3(&q2_inv);
+					contact.r2_lc = gm_mat3_multiply_vec3(&q2_mat, r2_wc);
 
-				Quaternion q2_inv = quaternion_inverse(&e2->world_rotation);
-				mat3 q2_mat = quaternion_get_matrix3(&q2_inv);
-				contact.r2_lc = gm_mat3_multiply_vec3(&q2_mat, r2_wc);
+					// now we calculate r1_wc and r2_wc based on the real rotation
+					q1_mat = quaternion_get_matrix3(&e1_rotation);
+					contact.r1_wc = gm_mat3_multiply_vec3(&q1_mat, contact.r1_lc);
 
-				// now we calculate r1_wc and r2_wc based on the real rotation
-				q1_mat = quaternion_get_matrix3(&e1_rotation);
-				contact.r1_wc = gm_mat3_multiply_vec3(&q1_mat, contact.r1_lc);
+					q2_mat = quaternion_get_matrix3(&e2_rotation);
+					contact.r2_wc = gm_mat3_multiply_vec3(&q2_mat, contact.r2_lc);
 
-				q2_mat = quaternion_get_matrix3(&e2_rotation);
-				contact.r2_wc = gm_mat3_multiply_vec3(&q2_mat, contact.r2_lc);
-
-				graphics_entity_set_rotation(e1, e1_rotation); // reset for safety
-				graphics_entity_set_rotation(e2, e2_rotation); // reset for safety
-				pmc_add(contact);
-				//printf("perturbation find collision!\n");
+					graphics_entity_set_rotation(e1, e1_rotation); // reset for safety
+					graphics_entity_set_rotation(e2, e2_rotation); // reset for safety
+					pmc_add(contact);
+					//printf("perturbation find collision!\n");
+				}
 			}
 		}
 	}
