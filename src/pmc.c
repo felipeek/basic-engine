@@ -63,7 +63,7 @@ static boolean is_contact_still_valid(PMC_Contact contact) {
 
 	// check distance
 	if (distance > 0.00f) {
-		printf("not adding because not touching anymore\n");
+		printf("Contact not valid: Distance\n");
 		return false;
 	}
 
@@ -73,7 +73,7 @@ static boolean is_contact_still_valid(PMC_Contact contact) {
 	vec3 projected_diff = gm_vec3_subtract(collision_point2, projected_point);
 	r32 d2d = gm_vec3_dot(projected_diff, projected_diff);
 	if (d2d > 0.001f) {
-		printf("not adding because d2d too big\n");
+		printf("Contact not valid: D2D\n");
 		return false;
 	}
 
@@ -100,7 +100,7 @@ void pmc_update() {
 		for (int i = 0; i < array_length(pmc->contacts); ++i) {
 			PMC_Contact* current = &pmc->contacts[i];
 			if (!is_contact_still_valid(*current)) {
-				printf("removing because contact not valid anymore\n");
+				//printf("removing because contact not valid anymore\n");
 				array_remove(pmc->contacts, i);
 				--i;
 #ifdef USE_RESERVE

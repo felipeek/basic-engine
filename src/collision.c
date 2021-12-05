@@ -63,13 +63,13 @@ PMC_Contact* collision_get_plane_cube_points(Entity* cube, Entity* plane) {
 		mat4 model_matrix = graphics_entity_get_model_matrix(cube);
 		vec4 pos_wc = gm_mat4_multiply_vec4(&model_matrix, (vec4){v->position.x, v->position.y, v->position.z, 1.0f});
         pos_wc = gm_vec4_scalar_product(1.0f / pos_wc.w, pos_wc);
-		if (pos_wc.y <= plane->world_position.y) {
+		if (pos_wc.y <= PLANE_Y + 1.0f) {
 			PMC_Contact ci;
 			ci.e1 = plane;
 			ci.e2 = cube;
 			ci.normal = (vec3){0.0f, 1.0f, 0.0f};
-			ci.r1_wc = (vec3){0.0f, 0.0f, 0.0f};
-			ci.r1_lc = (vec3){0.0f, 0.0f, 0.0f};
+			ci.r1_wc = gm_vec3_subtract((vec3){pos_wc.x, PLANE_Y + 1.0f, pos_wc.z}, plane->world_position);
+			ci.r1_lc = ci.r1_wc; // assuming no SCALE and no ROTATION (only translation)
 			ci.r2_wc = gm_vec3_subtract((vec3){pos_wc.x, pos_wc.y, pos_wc.z}, cube->world_position);
 			ci.r2_lc = (vec3){v->position.x, v->position.y, v->position.z};
 			ci.lambda_n = 0.0f;

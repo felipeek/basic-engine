@@ -381,8 +381,9 @@ static mat3 get_symmetric_inertia_tensor_for_object(Vertex* vertices, r32 mass) 
     return result;
 }
 
-void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, Entity_Type type)
+void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color)
 {
+	assert(world_scale.x == 1.0f && world_scale.y == 1.0f && world_scale.z == 1.0f); // just do it pls
 	entity->mesh = mesh;
 	entity->world_position = world_position;
 	entity->world_rotation = world_rotation;
@@ -398,13 +399,13 @@ void graphics_entity_create_with_color_fixed(Entity* entity, Mesh mesh, vec3 wor
 	entity->inverse_inertia_tensor = (mat3){0};
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = true;
-	entity->type = type;
 	entity->bs.vertex_count = array_length(mesh.vertices);
 	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
 }
 
-void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass, Entity_Type type)
+void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass)
 {
+	assert(world_scale.x == 1.0f && world_scale.y == 1.0f && world_scale.z == 1.0f); // just do it pls
 	entity->mesh = mesh;
 	entity->world_position = world_position;
 	entity->world_rotation = world_rotation;
@@ -420,13 +421,13 @@ void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec3 world_pos
 	assert(gm_mat3_inverse(&entity->inertia_tensor, &entity->inverse_inertia_tensor));
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = false;
-	entity->type = type;
 	entity->bs.vertex_count = array_length(mesh.vertices);
 	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
 }
 
-void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass, Entity_Type type)
+void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass)
 {
+	assert(world_scale.x == 1.0f && world_scale.y == 1.0f && world_scale.z == 1.0f); // just do it pls
 	entity->mesh = mesh;
 	entity->world_position = world_position;
 	entity->world_rotation = world_rotation;
@@ -442,7 +443,6 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_p
 	assert(gm_mat3_inverse(&entity->inertia_tensor, &entity->inverse_inertia_tensor));
 	entity->forces = array_new(Physics_Force);
 	entity->fixed = false;
-	entity->type = type;
 	entity->bs.vertex_count = array_length(mesh.vertices);
 	entity->bs.vertices = malloc(sizeof(vec3) * entity->bs.vertex_count);
 }

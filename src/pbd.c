@@ -8,7 +8,7 @@
 #include <hash_map.h>
 
 #define NUM_SUBSTEPS 10
-#define NUM_POS_ITERS 1
+#define NUM_POS_ITERS 10
 
 // Calculate the sum of all external forces acting on an entity
 static vec3 calculate_external_force(Entity* e) {
@@ -127,28 +127,12 @@ static void solve_constraint(Constraint* constraint, r32 h) {
 }
 
 static vec3 calculate_p_til(Entity* e, vec3 r_lc) {
-	switch (e->type) {
-		case PLANE: {
-			return (vec3){0.0f, e->world_position.y, 0.0f}; // we consider an infinite plane, so we just project the cube vertex onto the plane
-		} break;
-		case SPHERE: {
-			mat3 previous_rot_matrix = quaternion_get_matrix3(&e->previous_world_rotation);
-			return gm_vec3_add(e->previous_world_position, gm_mat3_multiply_vec3(&previous_rot_matrix, r_lc));
-		} break;
-		default: assert(0);
-	}
+	mat3 previous_rot_matrix = quaternion_get_matrix3(&e->previous_world_rotation);
+	return gm_vec3_add(e->previous_world_position, gm_mat3_multiply_vec3(&previous_rot_matrix, r_lc));
 }
 static vec3 calculate_p(Entity* e, vec3 r_lc) {
-	switch (e->type) {
-		case PLANE: {
-			return (vec3){0.0f, e->world_position.y, 0.0f}; // we consider an infinite plane, so we just project the cube vertex onto the plane
-		} break;
-		case SPHERE: {
-			mat3 current_rot_matrix = quaternion_get_matrix3(&e->world_rotation);
-			return gm_vec3_add(e->world_position, gm_mat3_multiply_vec3(&current_rot_matrix, r_lc));
-		} break;
-		default: assert(0);
-	}
+	mat3 current_rot_matrix = quaternion_get_matrix3(&e->world_rotation);
+	return gm_vec3_add(e->world_position, gm_mat3_multiply_vec3(&current_rot_matrix, r_lc));
 }
 
 // Create 'artificial' position constraints for a given collision that was detected in the simulation
@@ -305,6 +289,45 @@ void pbd_simulate(r32 dt, Entity* entities) {
 			}
 
 			// Now, solve the constraints
+
+#if 0
+			typedef struct {
+				Constraint c;
+				r32 height;
+			} Constraint_And_Height;
+
+			Constraint_And_Height* chs = array_new(Constraint_And_Height);
+
+			for (u32 k = 0; k < array_length(constraints); ++k) {
+				Constraint* constraint = &constraints[k];
+				vec3 w1 = constraint->positional_constraint.e1->world_position;
+				vec3 w2 = constraint->positional_constraint.e2->world_position;
+				r32 height = gm_vec3_add(w1, w2).y;
+
+				Constraint_And_Height ch;
+				ch.c = *constraint;
+				ch.height = height;
+				array_push(chs, ch);
+			}
+
+			for (s32 k = 0; k < (s32)array_length(chs) - 1; ++k) {
+				for (s32 l = 0; l < (s32)array_length(chs) - k - 1; ++l) {
+					if (chs[l].height < chs[l + 1].height) {
+						Constraint_And_Height aux = chs[l];
+						chs[l] = chs[l + 1];
+						chs[l + 1] = aux;
+					}
+				}
+			}
+
+			array_clear(constraints);
+
+			for (u32 k = 0; k < array_length(chs); ++k) {
+				Constraint_And_Height* ch = &chs[k];
+				array_push(constraints, ch->c);
+			}	
+#endif
+
 			for (u32 k = 0; k < array_length(constraints); ++k) {
 				Constraint* constraint = &constraints[k];
 				solve_constraint(constraint, h);
@@ -365,7 +388,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				vec3 delta_v = (vec3){0.0f, 0.0f, 0.0f};
 				
 				// we start by applying Coloumb's dynamic friction force
-				const r32 dynamic_friction_coefficient = 0.1f;
+				const r32 dynamic_friction_coefficient = 1.0f;
 				r32 fn = lambda_n / (h * h);
 				// @NOTE: equation (30) was modified here
 				r32 fact = MIN(-h * dynamic_friction_coefficient * fn, gm_vec3_length(vt));
