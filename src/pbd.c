@@ -3,7 +3,7 @@
 #include <assert.h>
 #include "collision.h"
 
-#define NUM_SUBSTEPS 1
+#define NUM_SUBSTEPS 100
 #define NUM_POS_ITERS 1
 
 // Calculate the sum of all external forces acting on an entity
@@ -131,6 +131,10 @@ static vec3 calculate_p_til(Entity* e, vec3 r_lc) {
 			mat3 previous_rot_matrix = quaternion_get_matrix3(&e->previous_world_rotation);
 			return gm_vec3_add(e->previous_world_position, gm_mat3_multiply_vec3(&previous_rot_matrix, r_lc));
 		} break;
+		case CUBE: {
+			mat3 previous_rot_matrix = quaternion_get_matrix3(&e->previous_world_rotation);
+			return gm_vec3_add(e->previous_world_position, gm_mat3_multiply_vec3(&previous_rot_matrix, r_lc));
+		} break;
 		default: assert(0);
 	}
 }
@@ -142,6 +146,10 @@ static vec3 calculate_p(Entity* e, vec3 r_lc) {
 		case SPHERE: {
 			mat3 current_rot_matrix = quaternion_get_matrix3(&e->world_rotation);
 			return gm_vec3_add(e->world_position, gm_mat3_multiply_vec3(&current_rot_matrix, r_lc));
+		} break;
+		case CUBE: {
+			mat3 previous_rot_matrix = quaternion_get_matrix3(&e->previous_world_rotation);
+			return gm_vec3_add(e->previous_world_position, gm_mat3_multiply_vec3(&previous_rot_matrix, r_lc));
 		} break;
 		default: assert(0);
 	}
@@ -240,6 +248,12 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				if (e1->type == PLANE) {
 					if (e2->type == SPHERE) {
 						Collision_Info* cis = collision_get_plane_sphere_points(e2, e1);
+						for (u32 m = 0; m < array_length(cis); ++m) {
+							array_push(collision_infos, cis[m]);
+						}
+						array_free(cis);
+					} else if (e2->type == CUBE) {
+						Collision_Info* cis = collision_get_plane_cube_points(e2, e1);
 						for (u32 m = 0; m < array_length(cis); ++m) {
 							array_push(collision_infos, cis[m]);
 						}
