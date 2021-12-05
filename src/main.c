@@ -2,6 +2,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define GRAPHICS_MATH_IMPLEMENT
+#define C_FEK_HASH_MAP_IMPLEMENT
+#include <hash_map.h>
 #include <light_array.h>
 #include <stb_image.h>
 #include <stb_image_write.h>

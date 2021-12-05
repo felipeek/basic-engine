@@ -8,6 +8,7 @@
 #include "menu.h"
 #include "pbd.h"
 #include "collision.h"
+#include "pmc.h"
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
@@ -59,17 +60,27 @@ int core_init()
 
     Entity e;
     entities = array_new(Entity);
-	Mesh m = graphics_mesh_create_from_obj("./res/monkeyconvex.obj", 0);
+	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	//u32 tex = graphics_texture_create("./res/tex.png");
 	graphics_entity_create_with_color_fixed(&e, m, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-			(vec3){5.0f, 0.0f, 5.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, PLANE);
+			(vec3){50.0f, 0.0f, 50.0f}, (vec4){1.0f, 1.0f, 0.0f, 1.0f}, PLANE);
     array_push(entities, e);
-	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 45.0f),
+	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f, SPHERE);
+	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
+    array_push(entities, e);
+	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 5.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f, SPHERE);
+	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
+    array_push(entities, e);
+	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 7.5f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f, SPHERE);
 	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
     array_push(entities, e);
 
 	menu_register_dummy_callback(menu_dummy_callback);
+
+	pmc_init();
 
 	return 0;
 }
@@ -99,11 +110,11 @@ void core_update(r32 delta_time)
 #endif
 }
 
-extern Collision_Info* collision_infos;
-extern int has_unlucky_one;
-extern Collision_Info unlucky_one;
-extern int has_got_from_gjk;
-extern Collision_Info got_from_gjk;
+//extern Collision_Info* collision_infos;
+//int has_unlucky_one;
+//Collision_Info unlucky_one;
+//int has_got_from_gjk;
+//Collision_Info got_from_gjk;
 
 void core_render()
 {
@@ -112,17 +123,7 @@ void core_render()
     }
 
 #if 1
-	if (collision_infos != NULL) {
-		for (u32 i = 0; i < array_length(collision_infos); ++i) {
-			Collision_Info* ci = &collision_infos[i];
-			vec3 collision_point = gm_vec3_add(ci->e2->world_position, ci->r2_wc);
-			graphics_renderer_debug_points(&collision_point, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
-			graphics_renderer_debug_vector(collision_point,
-				gm_vec3_add(collision_point, ci->normal), (vec4){1.0f, 1.0f, 1.0f, 1.0f});
-		}
-		graphics_renderer_primitives_flush(&camera);
-	}
-
+	//pmc_render(&camera);
 	//if (has_unlucky_one) {
 	//	int is_unlucky_one_in_the_points = 0;
 	//	for (u32 i = 0; i < array_length(collision_infos); ++i) {
