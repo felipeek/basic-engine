@@ -16,12 +16,6 @@ unsigned int key_hash(const void* _key) {
 	return (unsigned int)key.e1 + (unsigned int)key.e2;
 }
 
-// @temporary
-//extern int has_unlucky_one;
-//extern Collision_Info unlucky_one;
-//extern int has_got_from_gjk;
-//extern Collision_Info got_from_gjk;
-
 void pmc_init() {
 	assert(hash_map_create(&pmc_map, 32, sizeof(PMC_Map_Key), sizeof(PMC*), key_compare, key_hash) == 0);
 }
@@ -236,7 +230,7 @@ void pmc_perturb(Entity* e1, Entity* e2, vec3 normal) {
 	vec3 ortho = find_ortho(normal);
 
 	const r32 PERTURBATION_ANGLE = 5.0f;
-	const int NUM_ITERATIONS = 16;
+	const int NUM_ITERATIONS = 4;
 	Quaternion Rp = quaternion_new(ortho, PERTURBATION_ANGLE);
 	r32 angle = 360.0f / NUM_ITERATIONS;
 
