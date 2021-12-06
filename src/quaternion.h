@@ -22,4 +22,5 @@ vec3 quaternion_get_up_inverted(const Quaternion* quat);
 vec3 quaternion_get_right_inverted(const Quaternion* quat);
 Quaternion quaternion_normalize(const Quaternion* q);
 Quaternion quaternion_from_matrix(const mat4* m);
+mat3 quaternion_get_matrix3(const Quaternion* quat);
 #endif

@@ -73,7 +73,7 @@ int core_init()
 	graphics_entity_create_with_color(&plane, m, (vec4){0.0f, PLANE_Y, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
 	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&cube, m, (vec4){0.0f, 1.0f, 0.0f, 1.0f}, quaternion_new((vec3){3.0f, 1.0f, 0.5f}, 0.0f),
+	graphics_entity_create_with_color(&cube, m, (vec4){0.5f, 0.5f, 0.5f, 1.0f}, quaternion_new((vec3){3.0f, 1.0f, 0.5f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
 
 	menu_register_dummy_callback(menu_dummy_callback);
@@ -101,9 +101,8 @@ void core_destroy()
 	array_free(lights);
 }
 
-static vec3 col_point;
 static boolean collision;
-static vec3 penetration;
+static Persistent_Manifold pm;
 
 void core_update(r32 delta_time)
 {
@@ -118,7 +117,7 @@ void core_update(r32 delta_time)
 	if (collision_gjk_collides(&simplex, &cube_bs, &plane_bs)) {
 		cube.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
 		plane.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
-		col_point = collision_epa(simplex.simplex, &cube_bs, &plane_bs, &penetration);
+		pm = collision_epa(simplex.simplex, &cube_bs, &plane_bs);
 		collision = true;
 	} else {
 		cube.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
@@ -136,10 +135,21 @@ void core_render()
 	graphics_entity_render_phong_shader(&camera, &cube, lights);
 
 	if (collision) {
-		graphics_renderer_debug_points(&r_ctx, &col_point, 1, (vec4){1.0f, 1.0f, 1.0f});
-		graphics_renderer_debug_vector(&r_ctx, col_point, gm_vec3_add(col_point, gm_vec3_scalar_product(-1.0f, penetration)),
-			(vec4){1.0f, 1.0f, 1.0f, 1.0f});
-		graphics_renderer_primitives_flush(&r_ctx, &camera);
+		for (int i = 0; i < array_length(pm.collision_points1); ++i) {
+			vec3 cp = pm.collision_points1[i];
+			graphics_renderer_debug_points(&r_ctx, &cp, 1, (vec4){1.0f, 0.5f, 0.5f, 1.0f});
+			graphics_renderer_debug_vector(&r_ctx, cp, gm_vec3_add(cp, gm_vec3_scalar_product(-1.0f, pm.normal)),
+				(vec4){1.0f, 0.5f, 0.5f, 1.0f});
+			graphics_renderer_primitives_flush(&r_ctx, &camera);
+		}
+
+		for (int i = 0; i < array_length(pm.collision_points2); ++i) {
+			vec3 cp = pm.collision_points2[i];
+			graphics_renderer_debug_points(&r_ctx, &cp, 1, (vec4){0.5f, 1.0f, 0.5f, 1.0f});
+			graphics_renderer_debug_vector(&r_ctx, cp, gm_vec3_add(cp, gm_vec3_scalar_product(-1.0f, pm.normal)),
+				(vec4){0.5f, 1.0f, 0.5f, 1.0f});
+			graphics_renderer_primitives_flush(&r_ctx, &camera);
+		}
 	}
 }
 

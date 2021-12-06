@@ -421,8 +421,181 @@ barycentric(vec3 p, vec3 a, vec3 b, vec3 c, r32 *u, r32 *v, r32 *w)
   *u = 1.0f - *v - *w;
 }
 
-vec3
-collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, vec3* penetration)
+static vec3 find_ortho(vec3 v) {
+	vec3 aux = v;
+	aux.x += 100.0;
+	aux = gm_vec3_normalize(aux);
+	aux = gm_vec3_cross(v, aux);
+	return gm_vec3_normalize(aux);
+}
+
+Support_Point
+collision_gjk_individual_support(Bounding_Shape* b, vec3 direction)
+{
+  float max = -FLT_MAX;
+  int index = 0;
+  for (int i = 0; i < b->vertex_count; ++i)
+  {
+	float dot = gm_vec3_dot(b->vertices[i], direction);
+	if (dot > max)
+	{
+	  max = dot;
+	  index = i;
+	}
+  }
+
+  Support_Point sup_point = {
+	.v = b->vertices[index],
+	.sup = b->vertices[index]
+  };
+  return sup_point;
+}
+
+vec3* get_support_points_with_perturbation(Bounding_Shape* b, vec3 direction) {
+	vec3* result = array_new(vec3);
+
+	Support_Point support = collision_gjk_individual_support(b, direction);
+	array_push(result, support.v);
+
+	const r32 PERTURBATION_STRENGTH = 0.01f;
+	const int NUM_ITERATIONS = 16;
+	r32 angle = 360.0f / NUM_ITERATIONS;
+	vec3 ortho = gm_vec3_scalar_product(PERTURBATION_STRENGTH, find_ortho(direction));
+	for (int i = 0; i < NUM_ITERATIONS; ++i) {
+		Quaternion rotation_around_support_direction = quaternion_new(direction, angle * i);
+		mat3 m = quaternion_get_matrix3(&rotation_around_support_direction);
+		vec3 rotated_ortho = gm_mat3_multiply_vec3(&m, ortho);
+		vec3 perturbed_support_direction1 = gm_vec3_add(direction, rotated_ortho);
+
+		Support_Point support = collision_gjk_individual_support(b, perturbed_support_direction1);
+
+		boolean duplicated = false;
+		for (int j = 0; j < array_length(result); ++j) {
+			vec3 current = result[j];
+			if (support.v.x == current.x && support.v.y == current.y && support.v.z == current.z) {
+				duplicated = true;
+				break;
+			}
+		}
+
+		if (!duplicated) {
+			array_push(result, support.v);
+		}
+	}
+
+	return result;
+}
+
+typedef struct {
+	vec3 p;					// projected coords
+	vec3 world_coords;		// world coords
+	vec2 pv2;
+} Projected_Support_Point;
+
+// @TODO This can be merged with the get_support_points_with_perturbation function. Keeping it separated to ease debugging
+Projected_Support_Point* project_support_points_onto_normal_plane(vec3* support_points, vec3 normal) {
+	Projected_Support_Point* projected_support_points = array_new(Projected_Support_Point);
+
+	for (u32 i = 0; i < array_length(support_points); ++i) {
+		Projected_Support_Point psp;
+		psp.p = gm_vec3_subtract(support_points[i],
+			gm_vec3_scalar_product(gm_vec3_dot(normal, support_points[i]), normal));
+		psp.world_coords = support_points[i];
+		vec3 e1 = find_ortho(normal);
+		vec3 e2 = gm_vec3_cross(e1, normal);
+		psp.pv2.x = gm_vec3_dot(e1, support_points[i]);
+		psp.pv2.y = gm_vec3_dot(e2, support_points[i]);
+
+		array_push(projected_support_points, psp);
+	}
+
+	return projected_support_points;
+}
+
+static boolean is_point_inside_polygon(Projected_Support_Point point_to_test, Projected_Support_Point* polygon, vec3 polygon_center, vec3 polygon_normal) {
+	boolean inside_polygon = true;
+
+	for (u32 j = 0; j < array_length(polygon); ++j) {
+		Projected_Support_Point* current = &polygon[j];
+		Projected_Support_Point* next = &polygon[(j == array_length(polygon) - 1) ? 0 : j + 1];
+		vec3 e_i = gm_vec3_subtract(next->p, current->p);
+		vec3 u_i = gm_vec3_cross(polygon_normal, e_i);
+		vec3 v_i = gm_vec3_subtract(current->p, point_to_test.p);
+		vec3 w_i = gm_vec3_subtract(current->p, polygon_center);
+		r32 x_i = gm_vec3_dot(v_i, u_i) * gm_vec3_dot(w_i, u_i);
+		if (x_i < 0) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void clip_support_points(Projected_Support_Point* proj_support_points1, Projected_Support_Point* proj_support_points2,
+	vec3 normal, Projected_Support_Point** _clipped_points1, Projected_Support_Point** _clipped_points2) {
+
+	Projected_Support_Point* clipped_points1 = array_new(Projected_Support_Point);
+	Projected_Support_Point* clipped_points2 = array_new(Projected_Support_Point);
+
+	vec3 center1 = (vec3){0.0f, 0.0f, 0.0f};
+	vec3 center2 = (vec3){0.0f, 0.0f, 0.0f};
+	for (u32 i = 0; i < array_length(proj_support_points1); ++i) {
+		center1 = gm_vec3_add(center1, proj_support_points1[i].p);
+	}
+	for (u32 i = 0; i < array_length(proj_support_points2); ++i) {
+		center2 = gm_vec3_add(center2, proj_support_points2[i].p);
+	}
+	center1 = gm_vec3_scalar_product(1.0f / array_length(proj_support_points1), center1);
+	center2 = gm_vec3_scalar_product(1.0f / array_length(proj_support_points2), center2);
+
+	// check if points in proj_support_points1 are inside proj_support_points2
+	for (u32 i = 0; i < array_length(proj_support_points1); ++i) {
+		Projected_Support_Point point_to_test = proj_support_points1[i];
+		if (is_point_inside_polygon(point_to_test, proj_support_points2, center2, normal)) {
+			array_push(clipped_points1, point_to_test);
+		}
+	}
+
+	// check if points in proj_support_points2 are inside proj_support_points1
+	for (u32 i = 0; i < array_length(proj_support_points2); ++i) {
+		Projected_Support_Point point_to_test = proj_support_points2[i];
+		if (is_point_inside_polygon(point_to_test, proj_support_points1, center1, normal)) {
+			array_push(clipped_points2, point_to_test);
+		}
+	}
+
+	*_clipped_points1 = clipped_points1;
+	*_clipped_points2 = clipped_points2;
+}
+
+Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shape* b2, vec3 normal) {
+	Persistent_Manifold pm;
+	pm.normal = normal;
+	pm.collision_points1 = array_new(vec3);
+	pm.collision_points2 = array_new(vec3);
+
+	vec3* support_points1 = get_support_points_with_perturbation(b1, normal);
+	vec3* support_points2 = get_support_points_with_perturbation(b2, gm_vec3_scalar_product(-1.0f, normal));
+
+	Projected_Support_Point* proj_support_points1 = project_support_points_onto_normal_plane(support_points1, normal);
+	Projected_Support_Point* proj_support_points2 = project_support_points_onto_normal_plane(support_points2, normal);
+
+	Projected_Support_Point* clipped_support_points1;
+	Projected_Support_Point* clipped_support_points2;
+	clip_support_points(proj_support_points1, proj_support_points2, normal, &clipped_support_points1, &clipped_support_points2);
+
+	for (u32 i = 0; i < array_length(clipped_support_points1); ++i) {
+		array_push(pm.collision_points1, clipped_support_points1[i].world_coords);
+	}
+
+	for (u32 i = 0; i < array_length(clipped_support_points2); ++i) {
+		array_push(pm.collision_points2, clipped_support_points2[i].world_coords);
+	}
+
+	return pm;
+}
+
+Persistent_Manifold collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
 {
   int index = -1;
   Face *faces = array_new_len(Face, 4);
@@ -442,7 +615,11 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, ve
 	if (faces[index].distance == 0.0f)
 	{
 	  array_free(faces);
-	  return (vec3) {0.0f, 0.0f, 0.0f};
+	  Persistent_Manifold pm;
+	  pm.normal = (vec3) {0.0f, 0.0f, 0.0f};
+	  pm.collision_points1 = array_new(Persistent_Manifold);
+	  pm.collision_points2 = array_new(Persistent_Manifold);
+	  return pm;
 	}
 	// Find the new support in the normal direction of the closest face
 	Support_Point sup_p = collision_gjk_support(b1, b2, faces[index].normal);
@@ -454,22 +631,9 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, ve
 	  {
 		assert(0);
 	  }
-	  float bary_u,bary_v,bary_w;
-	  barycentric(gm_vec3_scalar_product(faces[index].distance, faces[index].normal),
-		faces[index].a.v, faces[index].b.v, faces[index].c.v, &bary_u, &bary_v, &bary_w);
 
-	  // collision point on object a in world space
-
-	  vec3 wcolpoint = 
-		gm_vec3_add(
-		  gm_vec3_add(gm_vec3_scalar_product(bary_u, faces[index].a.sup), gm_vec3_scalar_product(bary_v, faces[index].b.sup)),
-		  gm_vec3_scalar_product(bary_w, faces[index].c.sup)
-		);
-
-	  *penetration = gm_vec3_scalar_product(faces[index].distance, gm_vec3_normalize(faces[index].normal));
 	  array_free(faces);
-	  //return penetration;
-	  return wcolpoint;
+	  return create_persistent_manifold(b1, b2, gm_vec3_normalize(faces[index].normal));
 	}
 	// Expand polytope
 	Edge *edges = array_new_len(Edge, 16);
@@ -531,5 +695,5 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, ve
   array_free(faces);
   printf("The EPA routine took %d iterations and didn't complete", kk);
   assert(0); // this should be unreachable
-  return (vec3) {0};
+  return (Persistent_Manifold){0};
 }

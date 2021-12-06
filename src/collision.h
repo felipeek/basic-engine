@@ -27,9 +27,15 @@ typedef struct {
   vec3* vertices;
 } Bounding_Shape;
 
+typedef struct {
+	vec3 normal;
+	vec3* collision_points1;
+	vec3* collision_points2;
+} Persistent_Manifold;
+
 Collision_Point* collision_get_plane_cube_points(Entity* cube, r32 plane_y);
 
 boolean collision_gjk_collides(GJK_Support_List* sup_list, Bounding_Shape* b1, Bounding_Shape* b2);
-vec3 collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, vec3* penetration);
+Persistent_Manifold collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2);
 
 #endif
