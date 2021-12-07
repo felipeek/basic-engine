@@ -7,6 +7,7 @@
 #include "graphics.h"
 #include "menu.h"
 #include <float.h>
+#include "convex_bary_coords.h"
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
@@ -230,7 +231,7 @@ int core_init()
 	create_circle_vertices(circle_vertices, (vec2){0.0f, 0.0f});
 	circle_mesh = graphics_mesh_create(circle_vertices, generate_indices_for(circle_vertices));
 
-#if 0
+#if 1
 	vec2 p1 = (vec2){-2.0f, 1.0f};
 	vec2 p2 = (vec2){1.0f, 1.0f};
 	vec2 p3 = (vec2){4.0f, 2.0f};
@@ -291,13 +292,6 @@ void core_render()
 	}
 }
 
-static r32 calculate_weight_of_vertex(vec2 point, vec2 vertex, vec2 normal1, vec2 normal2) {
-	r32 numerator = fabsf(gm_vec2_cross(normal1, normal2));
-	r32 denominator1 = gm_vec2_dot(normal1, gm_vec2_subtract(vertex, point));
-	r32 denominator2 = gm_vec2_dot(normal2, gm_vec2_subtract(vertex, point));
-	r32 denominator = denominator1 * denominator2;
-	return numerator / denominator;
-}
 
 void core_input_process(boolean* key_state, r32 delta_time)
 {
@@ -360,17 +354,9 @@ void core_input_process(boolean* key_state, r32 delta_time)
 			printf("<%.3f, %.3f>\n", normals[i].x, normals[i].y);
 		}
 
-		r32 total_weight = 0.0f;
-		vec2 point = (vec2) {0.0f, 0.0f};
-		r32* weights = array_new(vec2);
-		for (u32 i = 0; i < array_length(hull); ++i) {
-			r32 weight = calculate_weight_of_vertex(point, hull[i], normals[(i == 0) ? (array_length(hull) - 1) : i - 1], normals[i]);
-			array_push(weights, weight);
-			total_weight += weight;
-		}
-
+		vec2 point = (vec2){4.0f, 4.0f};
+		r32* weights = convex_bary_coords_get(point, hull, normals);
 		for (u32 i = 0; i < array_length(weights); ++i) {
-			weights[i] /= total_weight;
 			printf("weight %d: %.3f\n", i, weights[i]);
 		}
 
