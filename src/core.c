@@ -1,4 +1,5 @@
 #include <GLFW/glfw3.h>
+#include <time.h>
 #include <light_array.h>
 #include <stdio.h>
 #include <math.h>
@@ -225,6 +226,7 @@ int core_init()
 	create_circle_vertices(circle_vertices, (vec2){0.0f, 0.0f});
 	circle_mesh = graphics_mesh_create(circle_vertices, generate_indices_for(circle_vertices));
 
+#if 0
 	vec2 p1 = (vec2){-2.0f, 1.0f};
 	vec2 p2 = (vec2){1.0f, 1.0f};
 	vec2 p3 = (vec2){4.0f, 2.0f};
@@ -241,6 +243,13 @@ int core_init()
 	array_push(points, p6);
 	array_push(points, p7);
 	array_push(points, p8);
+#else
+	srand(time(0));
+	for (u32 i = 0; i < 100; ++i) {
+		vec2 p = (vec2){20.0f * ((r32)rand() / RAND_MAX) - 10.0f, 20.0f * ((r32)rand() / RAND_MAX) - 10.0f};
+		array_push(points, p);
+	}
+#endif
 
 	menu_register_dummy_callback(menu_dummy_callback);
 	return 0;
