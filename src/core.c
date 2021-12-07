@@ -12,8 +12,10 @@
 
 static Entity* entities;
 static Entity* edges;
+static Entity* normals_entities;
 vec2* points;
 vec2* hull;
+vec2* normals;
 Mesh circle_mesh;
 
 typedef struct {
@@ -216,9 +218,11 @@ int core_init()
 
 	entities = array_new(Entity);
 	edges = array_new(Entity);
+	normals_entities = array_new(Entity);
 	Vertex* circle_vertices = array_new(Vertex);
 	points = array_new(vec2);
 	hull = array_new(vec2);
+	normals = array_new(vec2);
 
 	for (r32 i = 0; i < 2000; ++i) {
 		add_vertex(&circle_vertices, 0.0f, 0.0f);
@@ -245,7 +249,7 @@ int core_init()
 	array_push(points, p8);
 #else
 	srand(time(0));
-	for (u32 i = 0; i < 100; ++i) {
+	for (u32 i = 0; i < 10; ++i) {
 		vec2 p = (vec2){20.0f * ((r32)rand() / RAND_MAX) - 10.0f, 20.0f * ((r32)rand() / RAND_MAX) - 10.0f};
 		array_push(points, p);
 	}
@@ -281,6 +285,18 @@ void core_render()
 	for (u32 i = 0; i < array_length(edges); ++i) {
 		graphics_entity_render_basic_shader(&edges[i]);
 	}
+
+	for (u32 i = 0; i < array_length(normals_entities); ++i) {
+		graphics_entity_render_basic_shader(&normals_entities[i]);
+	}
+}
+
+static r32 calculate_weight_of_vertex(vec2 point, vec2 vertex, vec2 normal1, vec2 normal2) {
+	r32 numerator = fabsf(gm_vec2_cross(normal1, normal2));
+	r32 denominator1 = gm_vec2_dot(normal1, gm_vec2_subtract(vertex, point));
+	r32 denominator2 = gm_vec2_dot(normal2, gm_vec2_subtract(vertex, point));
+	r32 denominator = denominator1 * denominator2;
+	return numerator / denominator;
 }
 
 void core_input_process(boolean* key_state, r32 delta_time)
@@ -309,6 +325,53 @@ void core_input_process(boolean* key_state, r32 delta_time)
 			array_push(edges, e);
 
 			printf("<%.3f, %.3f>\n", current.x, current.y);
+		}
+
+		printf("\n\nnormals\n");
+
+		// calculate normals
+		array_clear(normals);
+		for (u32 i = 0; i < array_length(hull); ++i) {
+			vec2 current = hull[i];
+			vec2 next = hull[(i == array_length(hull) - 1) ? 0 : i + 1];
+
+			current = gm_vec2_scalar_product(0.1f, current);
+			next = gm_vec2_scalar_product(0.1f, next);
+
+			vec2 edge = gm_vec2_subtract(next, current);
+			normals[i] = gm_vec2_normalize((vec2){edge.y, -edge.x});
+
+			Vertex* vertices = array_new(Vertex);
+			Vertex v;
+			v.position = gm_vec2_scalar_product(0.5f, gm_vec2_add(current, next));
+			array_push(vertices, v);
+			v.position = gm_vec2_add(gm_vec2_scalar_product(0.5f, gm_vec2_add(current, next)),
+				gm_vec2_scalar_product(0.1f, normals[i]));
+			array_push(vertices, v);
+			u32* indices = array_new(u32);
+			array_push(indices, 0);
+			array_push(indices, 1);
+
+			Mesh m = graphics_mesh_create(vertices, indices);
+			Entity e;
+			graphics_entity_create_with_color(&e, m, (vec2){0.0f, 0.0f}, (vec3){1.0f, 1.0f, 1.0f});
+			array_push(normals_entities, e);
+
+			printf("<%.3f, %.3f>\n", normals[i].x, normals[i].y);
+		}
+
+		r32 total_weight = 0.0f;
+		vec2 point = (vec2) {0.0f, 0.0f};
+		r32* weights = array_new(vec2);
+		for (u32 i = 0; i < array_length(hull); ++i) {
+			r32 weight = calculate_weight_of_vertex(point, hull[i], normals[(i == 0) ? (array_length(hull) - 1) : i - 1], normals[i]);
+			array_push(weights, weight);
+			total_weight += weight;
+		}
+
+		for (u32 i = 0; i < array_length(weights); ++i) {
+			weights[i] /= total_weight;
+			printf("weight %d: %.3f\n", i, weights[i]);
 		}
 
 		key_state[GLFW_KEY_SPACE] = false;
