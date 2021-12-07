@@ -515,8 +515,17 @@ Projected_Support_Point* project_support_points_onto_normal_plane(vec3* support_
 	return projected_support_points;
 }
 
-static boolean is_point_inside_polygon(Projected_Support_Point point_to_test, Projected_Support_Point* polygon, vec3 polygon_center, vec3 polygon_normal) {
+typedef struct {
+	vec2 pv2;
+	vec3 wc1;
+	vec3 wc2;
+} Persistent_Manifold_Point;
+
+static boolean collect_inside(Projected_Support_Point point_to_test, Projected_Support_Point* polygon,
+	vec3 polygon_center, vec3 polygon_normal, boolean isPolygon1, Persistent_Manifold_Point* out) {
+
 	boolean inside_polygon = true;
+	vec3 point_in_polygon_wc = (vec3){0.0f, 0.0f, 0.0f};
 
 	for (u32 j = 0; j < array_length(polygon); ++j) {
 		Projected_Support_Point* current = &polygon[j];
@@ -531,44 +540,100 @@ static boolean is_point_inside_polygon(Projected_Support_Point point_to_test, Pr
 		}
 	}
 
+	out->pv2 = point_to_test.pv2;
+	if (isPolygon1) {
+	} else {
+		out->wc1 = point_to_test.world_coords;
+		
+	}
+
 	return true;
 }
 
-void clip_support_points(Projected_Support_Point* proj_support_points1, Projected_Support_Point* proj_support_points2,
-	vec3 normal, Projected_Support_Point** _clipped_points1, Projected_Support_Point** _clipped_points2) {
+// Returns 1 if the lines intersect, otherwise 0. In addition, if the lines 
+// intersect the intersection point may be stored in the floats i_x and i_y.
+// https://stackoverflow.com/a/1968345/3513453
+static boolean get_line_intersection(vec2 p0, vec2 p1, vec2 p2, vec2 p3, vec2* intersection, r32* t1, r32* t2) {
+	vec2 s1, s2;
+    s1.x = p1.x - p0.x;
+	s1.y = p1.y - p0.y;
+    s2.x = p3.x - p2.x;
+	s2.y = p3.y - p2.y;
 
-	Projected_Support_Point* clipped_points1 = array_new(Projected_Support_Point);
-	Projected_Support_Point* clipped_points2 = array_new(Projected_Support_Point);
+    r32 s, t;
+	r32 denom = (-s2.x * s1.y + s1.x * s2.y);
+    s = (-s1.y * (p0.x - p2.x) + s1.x * (p0.y - p2.y)) / (-s2.x * s1.y + s1.x * s2.y);
+    t = ( s2.x * (p0.y - p2.y) - s2.y * (p0.x - p2.x)) / (-s2.x * s1.y + s1.x * s2.y);
+
+    if (s >= 0.0f && s <= 1.0f && t >= 0.0f && t <= 1.0f)
+    {
+        // Collision detected
+        if (intersection != NULL) {
+            intersection->x = p0.x + (t * s1.x);
+            intersection->y = p0.y + (t * s1.y);
+		}
+		if (t1 != NULL && t2 != NULL) {
+			*t1 = t;
+			*t2 = s;
+		}
+        return true;
+    }
+
+    return false; // No collision
+}
+
+boolean collect_intersection(Projected_Support_Point a1, Projected_Support_Point a2,
+	Projected_Support_Point b1, Projected_Support_Point b2, Persistent_Manifold_Point* out) {
+
+	vec2 i;
+	r32 t1, t2;
+	
+	if (get_line_intersection(a1.pv2, a2.pv2, b1.pv2, b2.pv2, &i, &t1, &t2)) {
+		out->pv2 = gm_vec2_add(a1.pv2, gm_vec2_scalar_product(t1, gm_vec2_subtract(a2.pv2, a1.pv2)));
+		out->wc1 = gm_vec3_add(a1.world_coords, gm_vec3_scalar_product(t1, gm_vec3_subtract(a2.world_coords, a1.world_coords)));
+		out->wc2 = gm_vec3_add(b1.world_coords, gm_vec3_scalar_product(t2, gm_vec3_subtract(b2.world_coords, b1.world_coords)));
+		return true;
+	}
+
+	return false;
+}
+
+Persistent_Manifold_Point* clip_support_points(Projected_Support_Point* polygon1, Projected_Support_Point* polygon2,
+	vec3 normal) {
+	Persistent_Manifold_Point* persistent_manifold_points = array_new(Persistent_Manifold_Point);
 
 	vec3 center1 = (vec3){0.0f, 0.0f, 0.0f};
 	vec3 center2 = (vec3){0.0f, 0.0f, 0.0f};
-	for (u32 i = 0; i < array_length(proj_support_points1); ++i) {
-		center1 = gm_vec3_add(center1, proj_support_points1[i].p);
+	for (u32 i = 0; i < array_length(polygon1); ++i) {
+		center1 = gm_vec3_add(center1, polygon1[i].p);
 	}
-	for (u32 i = 0; i < array_length(proj_support_points2); ++i) {
-		center2 = gm_vec3_add(center2, proj_support_points2[i].p);
+	for (u32 i = 0; i < array_length(polygon2); ++i) {
+		center2 = gm_vec3_add(center2, polygon2[i].p);
 	}
-	center1 = gm_vec3_scalar_product(1.0f / array_length(proj_support_points1), center1);
-	center2 = gm_vec3_scalar_product(1.0f / array_length(proj_support_points2), center2);
+	center1 = gm_vec3_scalar_product(1.0f / array_length(polygon1), center1);
+	center2 = gm_vec3_scalar_product(1.0f / array_length(polygon2), center2);
 
-	// check if points in proj_support_points1 are inside proj_support_points2
-	for (u32 i = 0; i < array_length(proj_support_points1); ++i) {
-		Projected_Support_Point point_to_test = proj_support_points1[i];
-		if (is_point_inside_polygon(point_to_test, proj_support_points2, center2, normal)) {
+	// check if points in polygon1 are inside polygon2
+	for (u32 i = 0; i < array_length(polygon1); ++i) {
+		Projected_Support_Point point_to_test = polygon1[i];
+		if (is_point_inside_polygon(point_to_test, polygon2, center2, normal)) {
 			array_push(clipped_points1, point_to_test);
+		} else {
+			// collect intersections
 		}
 	}
 
-	// check if points in proj_support_points2 are inside proj_support_points1
-	for (u32 i = 0; i < array_length(proj_support_points2); ++i) {
-		Projected_Support_Point point_to_test = proj_support_points2[i];
-		if (is_point_inside_polygon(point_to_test, proj_support_points1, center1, normal)) {
+	// check if points in polygon2 are inside polygon1
+	for (u32 i = 0; i < array_length(polygon2); ++i) {
+		Projected_Support_Point point_to_test = polygon2[i];
+		if (is_point_inside_polygon(point_to_test, polygon1, center1, normal)) {
 			array_push(clipped_points2, point_to_test);
+		} else {
+			// collect intersections
 		}
 	}
 
-	*_clipped_points1 = clipped_points1;
-	*_clipped_points2 = clipped_points2;
+	return persistent_manifold_points;
 }
 
 Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shape* b2, vec3 normal) {
@@ -586,16 +651,14 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 	Projected_Support_Point* polygon1 = jarvis_march(proj_support_points1);
 	Projected_Support_Point* polygon2 = jarvis_march(proj_support_points2);
 
-	Projected_Support_Point* clipped_support_points1;
-	Projected_Support_Point* clipped_support_points2;
-	clip_support_points(polygon1, polygon2, normal, &clipped_support_points1, &clipped_support_points2);
+	Persistent_Manifold_Point* persistent_manifold_points = clip_support_points(polygon1, polygon2, normal);
 
-	for (u32 i = 0; i < array_length(clipped_support_points1); ++i) {
-		array_push(pm.collision_points1, clipped_support_points1[i].world_coords);
+	for (u32 i = 0; i < array_length(persistent_manifold_points); ++i) {
+		array_push(pm.collision_points1, persistent_manifold_points[i].wc1);
 	}
 
-	for (u32 i = 0; i < array_length(clipped_support_points2); ++i) {
-		array_push(pm.collision_points2, clipped_support_points2[i].world_coords);
+	for (u32 i = 0; i < array_length(persistent_manifold_points); ++i) {
+		array_push(pm.collision_points2, persistent_manifold_points[i].wc2);
 	}
 
 	return pm;
