@@ -163,6 +163,7 @@ vec2  gm_vec2_normalize(vec2 v);
 r32   gm_vec2_length(vec2 v);
 vec2  gm_vec2_subtract(vec2 v1, vec2 v2);
 r32   gm_vec2_dot(vec2 v1, vec2 v2);
+r32   gm_vec2_cross(vec2 v1, vec2 v2);
 r32   gm_vec2_angle(vec2 v);
 char* gm_vec2_to_string(char* buffer, vec2 v);
 
@@ -714,6 +715,11 @@ r32 gm_vec3_dot(vec3 v1, vec3 v2)
 r32 gm_vec2_dot(vec2 v1, vec2 v2)
 {
 	return v1.x * v2.x + v1.y * v2.y;
+}
+
+r32 gm_vec2_cross(vec2 v1, vec2 v2)
+{
+	return v1.x * v2.y - v1.y * v2.x;
 }
 
 r32 gm_vec2_angle(vec2 v)

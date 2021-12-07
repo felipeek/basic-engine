@@ -1,6 +1,7 @@
 #include "collision.h"
 #include <light_array.h>
 #include <float.h>
+#include "jarvis_march.h"
 
 Collision_Point* collision_get_plane_cube_points(Entity* cube, r32 plane_y) {
 	Collision_Point* collision_points = array_new(Collision_Point);
@@ -422,11 +423,19 @@ barycentric(vec3 p, vec3 a, vec3 b, vec3 c, r32 *u, r32 *v, r32 *w)
 }
 
 static vec3 find_ortho(vec3 v) {
-	vec3 aux = v;
-	aux.x += 100.0;
-	aux = gm_vec3_normalize(aux);
-	aux = gm_vec3_cross(v, aux);
-	return gm_vec3_normalize(aux);
+	// tricky problem: https://math.stackexchange.com/questions/137362/how-to-find-perpendicular-vector-to-another-vector
+
+	r32 v1 = v.z * v.z + v.y * v.y;
+	r32 v2 = v.z * v.z + v.x * v.x;
+	r32 v3 = v.y * v.y + v.x * v.x;
+
+	if (v1 > v2 && v1 > v3) {
+		return gm_vec3_normalize((vec3){0.0f, v.z, -v.y});
+	} else if (v2 > v3) {
+		return gm_vec3_normalize((vec3){-v.z, 0.0f, v.x});
+	} else {
+		return gm_vec3_normalize((vec3){-v.y, v.x, 0.0f});
+	}
 }
 
 Support_Point
@@ -457,7 +466,7 @@ vec3* get_support_points_with_perturbation(Bounding_Shape* b, vec3 direction) {
 	Support_Point support = collision_gjk_individual_support(b, direction);
 	array_push(result, support.v);
 
-	const r32 PERTURBATION_STRENGTH = 0.01f;
+	const r32 PERTURBATION_STRENGTH = 0.05f;
 	const int NUM_ITERATIONS = 16;
 	r32 angle = 360.0f / NUM_ITERATIONS;
 	vec3 ortho = gm_vec3_scalar_product(PERTURBATION_STRENGTH, find_ortho(direction));
@@ -485,12 +494,6 @@ vec3* get_support_points_with_perturbation(Bounding_Shape* b, vec3 direction) {
 
 	return result;
 }
-
-typedef struct {
-	vec3 p;					// projected coords
-	vec3 world_coords;		// world coords
-	vec2 pv2;
-} Projected_Support_Point;
 
 // @TODO This can be merged with the get_support_points_with_perturbation function. Keeping it separated to ease debugging
 Projected_Support_Point* project_support_points_onto_normal_plane(vec3* support_points, vec3 normal) {
@@ -580,9 +583,12 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 	Projected_Support_Point* proj_support_points1 = project_support_points_onto_normal_plane(support_points1, normal);
 	Projected_Support_Point* proj_support_points2 = project_support_points_onto_normal_plane(support_points2, normal);
 
+	Projected_Support_Point* polygon1 = jarvis_march(proj_support_points1);
+	Projected_Support_Point* polygon2 = jarvis_march(proj_support_points2);
+
 	Projected_Support_Point* clipped_support_points1;
 	Projected_Support_Point* clipped_support_points2;
-	clip_support_points(proj_support_points1, proj_support_points2, normal, &clipped_support_points1, &clipped_support_points2);
+	clip_support_points(polygon1, polygon2, normal, &clipped_support_points1, &clipped_support_points2);
 
 	for (u32 i = 0; i < array_length(clipped_support_points1); ++i) {
 		array_push(pm.collision_points1, clipped_support_points1[i].world_coords);

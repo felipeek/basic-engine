@@ -33,6 +33,12 @@ typedef struct {
 	vec3* collision_points2;
 } Persistent_Manifold;
 
+typedef struct {
+	vec3 p;					// projected coords
+	vec3 world_coords;		// world coords
+	vec2 pv2;
+} Projected_Support_Point;
+
 Collision_Point* collision_get_plane_cube_points(Entity* cube, r32 plane_y);
 
 boolean collision_gjk_collides(GJK_Support_List* sup_list, Bounding_Shape* b1, Bounding_Shape* b2);

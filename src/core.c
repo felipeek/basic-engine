@@ -71,7 +71,7 @@ int core_init()
 
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&plane, m, (vec4){0.0f, PLANE_Y, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
+		(vec3){0.4f, 0.4f, 0.4f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
 	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&cube, m, (vec4){0.5f, 0.5f, 0.5f, 1.0f}, quaternion_new((vec3){3.0f, 1.0f, 0.5f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
@@ -137,7 +137,7 @@ void core_render()
 	if (collision) {
 		for (int i = 0; i < array_length(pm.collision_points1); ++i) {
 			vec3 cp = pm.collision_points1[i];
-			graphics_renderer_debug_points(&r_ctx, &cp, 1, (vec4){1.0f, 0.5f, 0.5f, 1.0f});
+			graphics_renderer_debug_points(&r_ctx, &cp, 1, (vec4){1.0f, 0.0f, 0.5f, 1.0f});
 			graphics_renderer_debug_vector(&r_ctx, cp, gm_vec3_add(cp, gm_vec3_scalar_product(-1.0f, pm.normal)),
 				(vec4){1.0f, 0.5f, 0.5f, 1.0f});
 			graphics_renderer_primitives_flush(&r_ctx, &camera);
@@ -145,7 +145,7 @@ void core_render()
 
 		for (int i = 0; i < array_length(pm.collision_points2); ++i) {
 			vec3 cp = pm.collision_points2[i];
-			graphics_renderer_debug_points(&r_ctx, &cp, 1, (vec4){0.5f, 1.0f, 0.5f, 1.0f});
+			graphics_renderer_debug_points(&r_ctx, &cp, 1, (vec4){0.5f, 0.0f, 0.5f, 1.0f});
 			graphics_renderer_debug_vector(&r_ctx, cp, gm_vec3_add(cp, gm_vec3_scalar_product(-1.0f, pm.normal)),
 				(vec4){0.5f, 1.0f, 0.5f, 1.0f});
 			graphics_renderer_primitives_flush(&r_ctx, &camera);
