@@ -467,7 +467,7 @@ vec3* get_support_points_with_perturbation(Bounding_Shape* b, vec3 direction) {
 	Support_Point support = collision_gjk_individual_support(b, direction);
 	array_push(result, support.v);
 
-	const r32 PERTURBATION_STRENGTH = 0.09f;
+	const r32 PERTURBATION_STRENGTH = 0.05f;
 	const int NUM_ITERATIONS = 16;
 	r32 angle = 360.0f / NUM_ITERATIONS;
 	vec3 ortho = gm_vec3_scalar_product(PERTURBATION_STRENGTH, find_ortho(direction));
@@ -682,6 +682,17 @@ Persistent_Manifold_Point* clip_support_points(Projected_Support_Point* polygon1
 	return persistent_manifold_points;
 }
 
+static vec2 get_center_of_polygon(Projected_Support_Point* polygon) {
+	vec2 center = (vec2) {0.0f, 0.0f, 0.0f};
+	for (u32 i = 0; i < array_length(polygon); ++i) {
+		center = gm_vec3_add(center, polygon[i].p);
+	}
+	center = gm_vec3_scalar_product(1.0f / array_length(polygon), center);
+	return center;
+}
+
+int tmp = 0;
+
 Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shape* b2, vec3 normal) {
 	Persistent_Manifold pm;
 	pm.normal = normal;
@@ -691,13 +702,32 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 	vec3* support_points1 = get_support_points_with_perturbation(b1, normal);
 	vec3* support_points2 = get_support_points_with_perturbation(b2, gm_vec3_scalar_product(-1.0f, normal));
 
+	Persistent_Manifold_Point* persistent_manifold_points;
+if (tmp) {
+	persistent_manifold_points = array_new(Persistent_Manifold_Point);
+	for (u32 i = 0; i < array_length(support_points1); ++i) {
+		Persistent_Manifold_Point pmp;
+		pmp.pv2 = (vec2){0.0f, 0.0f};
+		pmp.wc1 = support_points1[i];
+		pmp.wc2 = (vec3){-9999.0f, -9999.0f, -9999.0f};
+		array_push(persistent_manifold_points, pmp);
+	}
+
+	for (u32 i = 0; i < array_length(support_points2); ++i) {
+		Persistent_Manifold_Point pmp;
+		pmp.pv2 = (vec2){0.0f, 0.0f};
+		pmp.wc1 = (vec3){-9999.0f, -9999.0f, -9999.0f};
+		pmp.wc2 = support_points2[i];
+		array_push(persistent_manifold_points, pmp);
+	}
+} else {
 	Projected_Support_Point* proj_support_points1 = project_support_points_onto_normal_plane(support_points1, normal);
 	Projected_Support_Point* proj_support_points2 = project_support_points_onto_normal_plane(support_points2, normal);
 
 	Projected_Support_Point* polygon1 = jarvis_march(proj_support_points1);
 	Projected_Support_Point* polygon2 = jarvis_march(proj_support_points2);
 
-	Persistent_Manifold_Point* persistent_manifold_points = clip_support_points(polygon1, polygon2, normal);
+	persistent_manifold_points = clip_support_points(polygon1, polygon2, normal);
 
 	// Clear duplicated points
 	const r32 EPSILON = 0.000001f;
@@ -712,6 +742,17 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 				--j;
 			}
 		}
+	}
+}
+
+	if (array_length(persistent_manifold_points) == 0) {
+		// We didn't find any intersection :(
+		// in this case, we fall back to simply getting the center of the convex hull
+		Persistent_Manifold_Point pmp;
+		pmp.wc1 = support1.v;
+		pmp.wc2 = support2.v;
+		pmp.pv2 = (vec2){0.0f, 0.0f};
+		array_push(persistent_manifold_points, pmp);
 	}
 
 	for (u32 i = 0; i < array_length(persistent_manifold_points); ++i) {

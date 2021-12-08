@@ -172,6 +172,7 @@ void core_render()
 	}
 }
 
+extern int tmp;
 void core_input_process(boolean* key_state, r32 delta_time)
 {
 	r32 movement_speed = 3.0f;
@@ -261,6 +262,11 @@ void core_input_process(boolean* key_state, r32 delta_time)
 			Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, -rotation_speed * delta_time);
 			graphics_entity_set_rotation(bound_entity, quaternion_product(&rotation, &bound_entity->world_rotation));
 		}
+	}
+
+	if (key_state[GLFW_KEY_SPACE]) {
+		tmp = !tmp;
+		key_state[GLFW_KEY_SPACE] = false;
 	}
 }
 
