@@ -467,7 +467,7 @@ vec3* get_support_points_with_perturbation(Bounding_Shape* b, vec3 direction) {
 	Support_Point support = collision_gjk_individual_support(b, direction);
 	array_push(result, support.v);
 
-	const r32 PERTURBATION_STRENGTH = 0.05f;
+	const r32 PERTURBATION_STRENGTH = 0.09f;
 	const int NUM_ITERATIONS = 16;
 	r32 angle = 360.0f / NUM_ITERATIONS;
 	vec3 ortho = gm_vec3_scalar_product(PERTURBATION_STRENGTH, find_ortho(direction));
@@ -698,6 +698,21 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 	Projected_Support_Point* polygon2 = jarvis_march(proj_support_points2);
 
 	Persistent_Manifold_Point* persistent_manifold_points = clip_support_points(polygon1, polygon2, normal);
+
+	// Clear duplicated points
+	const r32 EPSILON = 0.000001f;
+	for (u32 i = 0; i < array_length(persistent_manifold_points); ++i) {
+		Persistent_Manifold_Point* pmp1 = &persistent_manifold_points[i];
+		for (u32 j = i + 1; j < array_length(persistent_manifold_points); ++j) {
+			Persistent_Manifold_Point* pmp2 = &persistent_manifold_points[j];
+
+			if (((pmp1->pv2.x - pmp2->pv2.x) > -EPSILON && (pmp1->pv2.x - pmp2->pv2.x) < EPSILON) &&
+				((pmp1->pv2.y - pmp2->pv2.y) > -EPSILON && (pmp1->pv2.y - pmp2->pv2.y) < EPSILON)) {
+				array_remove(persistent_manifold_points, j);
+				--j;
+			}
+		}
+	}
 
 	for (u32 i = 0; i < array_length(persistent_manifold_points); ++i) {
 		array_push(pm.collision_points1, persistent_manifold_points[i].wc1);

@@ -72,8 +72,8 @@ int core_init()
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&plane, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
-	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&cube, m, (vec4){0.157, 1.294, 0.199, 1.0f}, (Quaternion){-0.360, -0.299, 0.257, 0.845},
+	m = graphics_mesh_create_from_obj("./res/sphere.obj", 0);
+	graphics_entity_create_with_color(&cube, m, (vec4){-1.349f, -1.007, 0.168f}, quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
 
 	// bug 1
@@ -126,7 +126,7 @@ void core_update(r32 delta_time)
 		cube_bs.vertices[i] = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&cube.model_matrix, cube.mesh.vertices[i].position));
 	}
 	for (u32 i = 0; i < array_length(plane.mesh.vertices); ++i) {
-		plane_bs.vertices[i] = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&plane.model_matrix, cube.mesh.vertices[i].position));
+		plane_bs.vertices[i] = gm_vec4_to_vec3(gm_mat4_multiply_vec4(&plane.model_matrix, plane.mesh.vertices[i].position));
 	}
 
 	GJK_Support_List simplex = { 0 };
