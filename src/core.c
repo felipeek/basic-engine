@@ -72,8 +72,8 @@ int core_init()
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&plane, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
-	m = graphics_mesh_create_from_obj("./res/sphere.obj", 0);
-	graphics_entity_create_with_color(&cube, m, (vec4){-1.349f, -1.007, 0.168f}, quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f),
+	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	graphics_entity_create_with_color(&cube, m, (vec4){-1.272, -0.059, -0.221}, (Quaternion){-0.381, -0.008, -0.434, 0.816},
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
 
 	// bug 1

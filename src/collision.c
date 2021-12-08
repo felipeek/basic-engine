@@ -3,6 +3,7 @@
 #include <float.h>
 #include "jarvis_march.h"
 #include "convex_bary_coords.h"
+#include <sys/time.h>
 
 Collision_Point* collision_get_plane_cube_points(Entity* cube, r32 plane_y) {
 	Collision_Point* collision_points = array_new(Collision_Point);
@@ -461,21 +462,22 @@ collision_gjk_individual_support(Bounding_Shape* b, vec3 direction)
   return sup_point;
 }
 
-vec3* get_support_points_with_perturbation(Bounding_Shape* b, vec3 direction) {
+vec3* get_support_points_with_perturbation(Bounding_Shape* b, vec3 direction, r32 strength) {
 	vec3* result = array_new(vec3);
 
 	Support_Point support = collision_gjk_individual_support(b, direction);
 	array_push(result, support.v);
 
-	const r32 PERTURBATION_STRENGTH = 0.05f;
 	const int NUM_ITERATIONS = 16;
 	r32 angle = 360.0f / NUM_ITERATIONS;
-	vec3 ortho = gm_vec3_scalar_product(PERTURBATION_STRENGTH, find_ortho(direction));
+	vec3 ortho = gm_vec3_scalar_product(strength, find_ortho(direction));
+	printf("=============\n");
 	for (int i = 0; i < NUM_ITERATIONS; ++i) {
 		Quaternion rotation_around_support_direction = quaternion_new(direction, angle * i);
 		mat3 m = quaternion_get_matrix3(&rotation_around_support_direction);
 		vec3 rotated_ortho = gm_mat3_multiply_vec3(&m, ortho);
 		vec3 perturbed_support_direction1 = gm_vec3_add(direction, rotated_ortho);
+		printf("<%.3f, %.3f, %.3f>\n", perturbed_support_direction1.x, perturbed_support_direction1.y, perturbed_support_direction1.z);
 
 		Support_Point support = collision_gjk_individual_support(b, perturbed_support_direction1);
 
@@ -493,6 +495,7 @@ vec3* get_support_points_with_perturbation(Bounding_Shape* b, vec3 direction) {
 		}
 	}
 
+	printf("=============\n");
 	return result;
 }
 
@@ -522,13 +525,13 @@ typedef struct {
 	vec3 wc2;
 } Persistent_Manifold_Point;
 
-static boolean find_world_coords_for_vertex_within_polygon(Projected_Support_Point point_to_test, Projected_Support_Point* polygon, vec3* wc) {
+static boolean find_world_coords_for_vertex_within_polygon(vec2 point_to_test, Projected_Support_Point* polygon, vec3* wc) {
 	vec2* hull = array_new(vec2);
 	for (u32 i = 0; i < array_length(polygon); ++i) {
 		array_push(hull, polygon[i].pv2);
 	}
 	r32* weights;
-	boolean inside = convex_bary_coords_get(point_to_test.pv2, hull, &weights);
+	boolean inside = convex_bary_coords_get(point_to_test, hull, &weights);
 	if (!inside) {
 		array_free(hull);
 		return false;
@@ -567,7 +570,7 @@ static boolean collect_inside(Projected_Support_Point point_to_test, Projected_S
 */
 
 	vec3 wc;
-	if (!find_world_coords_for_vertex_within_polygon(point_to_test, polygon, &wc)) {
+	if (!find_world_coords_for_vertex_within_polygon(point_to_test.pv2, polygon, &wc)) {
 		// outside poly
 		return false;
 	}
@@ -683,11 +686,45 @@ Persistent_Manifold_Point* clip_support_points(Projected_Support_Point* polygon1
 }
 
 static vec2 get_center_of_polygon(Projected_Support_Point* polygon) {
-	vec2 center = (vec2) {0.0f, 0.0f, 0.0f};
+	const r32 EPSILON = 0.000001f;
+	vec2 center = (vec2){0.0f, 0.0f};
+	r32 area = 0.0f;
+
+	vec2 min = (vec2){FLT_MAX, FLT_MAX};
+	vec2 max = (vec2){-FLT_MAX, -FLT_MAX};
+
 	for (u32 i = 0; i < array_length(polygon); ++i) {
-		center = gm_vec3_add(center, polygon[i].p);
+		vec2 current = polygon[i].pv2;
+		vec2 next = polygon[(i == array_length(polygon) - 1) ? 0 : i + 1].pv2;
+
+		r32 tmp = current.x * next.y - next.x * current.y;
+		area += 0.5f * tmp;
+
+		r32 cx = (current.x + next.x) * tmp;
+		r32 cy = (current.y + next.y) * tmp;
+
+		center = gm_vec2_add(center, (vec2){cx, cy});
+
+		if (current.x < min.x) {
+			min.x = current.x;
+		}
+		if (current.x > max.x) {
+			max.x = current.x;
+		}
+		if (current.y < min.y) {
+			min.y = current.y;
+		}
+		if (current.y > max.y) {
+			max.y = current.y;
+		}
 	}
-	center = gm_vec3_scalar_product(1.0f / array_length(polygon), center);
+
+	if (area > -EPSILON && area < EPSILON) {
+		// degenerate case, polygon is a line
+		return (vec2){(min.x + max.x) / 2.0f, (min.y + max.y) / 2.0f};
+	}
+
+	center = gm_vec2_scalar_product(1.0f / (6.0f * area), center);
 	return center;
 }
 
@@ -698,59 +735,83 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 	pm.normal = normal;
 	pm.collision_points1 = array_new(vec3);
 	pm.collision_points2 = array_new(vec3);
+	r32 strength = 0.09f;
 
-	vec3* support_points1 = get_support_points_with_perturbation(b1, normal);
-	vec3* support_points2 = get_support_points_with_perturbation(b2, gm_vec3_scalar_product(-1.0f, normal));
+	  struct timeval tv;
+		gettimeofday(&tv,NULL);
+		unsigned long start = 1000000 * tv.tv_sec + tv.tv_usec;
+	vec3* support_points1 = get_support_points_with_perturbation(b1, normal, strength);
+	vec3* support_points2 = get_support_points_with_perturbation(b2, gm_vec3_scalar_product(-1.0f, normal), strength);
 
-	Persistent_Manifold_Point* persistent_manifold_points;
-if (tmp) {
-	persistent_manifold_points = array_new(Persistent_Manifold_Point);
-	for (u32 i = 0; i < array_length(support_points1); ++i) {
-		Persistent_Manifold_Point pmp;
-		pmp.pv2 = (vec2){0.0f, 0.0f};
-		pmp.wc1 = support_points1[i];
-		pmp.wc2 = (vec3){-9999.0f, -9999.0f, -9999.0f};
-		array_push(persistent_manifold_points, pmp);
-	}
-
-	for (u32 i = 0; i < array_length(support_points2); ++i) {
-		Persistent_Manifold_Point pmp;
-		pmp.pv2 = (vec2){0.0f, 0.0f};
-		pmp.wc1 = (vec3){-9999.0f, -9999.0f, -9999.0f};
-		pmp.wc2 = support_points2[i];
-		array_push(persistent_manifold_points, pmp);
-	}
-} else {
 	Projected_Support_Point* proj_support_points1 = project_support_points_onto_normal_plane(support_points1, normal);
 	Projected_Support_Point* proj_support_points2 = project_support_points_onto_normal_plane(support_points2, normal);
 
 	Projected_Support_Point* polygon1 = jarvis_march(proj_support_points1);
 	Projected_Support_Point* polygon2 = jarvis_march(proj_support_points2);
 
-	persistent_manifold_points = clip_support_points(polygon1, polygon2, normal);
+	Persistent_Manifold_Point* persistent_manifold_points = clip_support_points(polygon1, polygon2, normal);
 
-	// Clear duplicated points
-	const r32 EPSILON = 0.000001f;
-	for (u32 i = 0; i < array_length(persistent_manifold_points); ++i) {
-		Persistent_Manifold_Point* pmp1 = &persistent_manifold_points[i];
-		for (u32 j = i + 1; j < array_length(persistent_manifold_points); ++j) {
-			Persistent_Manifold_Point* pmp2 = &persistent_manifold_points[j];
+	for (u32 i = 0; i < 0; ++i) {
+		if (array_length(persistent_manifold_points) != 0) {
+			break;
+		}
 
-			if (((pmp1->pv2.x - pmp2->pv2.x) > -EPSILON && (pmp1->pv2.x - pmp2->pv2.x) < EPSILON) &&
-				((pmp1->pv2.y - pmp2->pv2.y) > -EPSILON && (pmp1->pv2.y - pmp2->pv2.y) < EPSILON)) {
-				array_remove(persistent_manifold_points, j);
-				--j;
+		strength += 0.01f;
+		support_points1 = get_support_points_with_perturbation(b1, normal, strength);
+		support_points2 = get_support_points_with_perturbation(b2, gm_vec3_scalar_product(-1.0f, normal), strength);
+
+		proj_support_points1 = project_support_points_onto_normal_plane(support_points1, normal);
+		proj_support_points2 = project_support_points_onto_normal_plane(support_points2, normal);
+
+		polygon1 = jarvis_march(proj_support_points1);
+		polygon2 = jarvis_march(proj_support_points2);
+
+		persistent_manifold_points = clip_support_points(polygon1, polygon2, normal);
+	}
+
+	if (tmp) {
+		persistent_manifold_points = array_new(Persistent_Manifold_Point);
+		for (u32 i = 0; i < array_length(support_points1); ++i) {
+			Persistent_Manifold_Point pmp;
+			pmp.pv2 = (vec2){0.0f, 0.0f};
+			pmp.wc1 = support_points1[i];
+			pmp.wc2 = (vec3){-9999.0f, -9999.0f, -9999.0f};
+			array_push(persistent_manifold_points, pmp);
+		}
+
+		for (u32 i = 0; i < array_length(support_points2); ++i) {
+			Persistent_Manifold_Point pmp;
+			pmp.pv2 = (vec2){0.0f, 0.0f};
+			pmp.wc1 = (vec3){-9999.0f, -9999.0f, -9999.0f};
+			pmp.wc2 = support_points2[i];
+			array_push(persistent_manifold_points, pmp);
+		}
+	} else {
+		// Clear duplicated points
+		const r32 EPSILON = 0.000001f;
+		for (u32 i = 0; i < array_length(persistent_manifold_points); ++i) {
+			Persistent_Manifold_Point* pmp1 = &persistent_manifold_points[i];
+			for (u32 j = i + 1; j < array_length(persistent_manifold_points); ++j) {
+				Persistent_Manifold_Point* pmp2 = &persistent_manifold_points[j];
+
+				if (((pmp1->pv2.x - pmp2->pv2.x) > -EPSILON && (pmp1->pv2.x - pmp2->pv2.x) < EPSILON) &&
+					((pmp1->pv2.y - pmp2->pv2.y) > -EPSILON && (pmp1->pv2.y - pmp2->pv2.y) < EPSILON)) {
+					array_remove(persistent_manifold_points, j);
+					--j;
+				}
 			}
 		}
 	}
-}
 
 	if (array_length(persistent_manifold_points) == 0) {
 		// We didn't find any intersection :(
 		// in this case, we fall back to simply getting the center of the convex hull
+		printf("Warning: no intersection was found - falling back to center of convex hull (inaccurate)\n");
+		vec2 center1 = get_center_of_polygon(polygon1);
+		vec2 center2 = get_center_of_polygon(polygon2);
 		Persistent_Manifold_Point pmp;
-		pmp.wc1 = support1.v;
-		pmp.wc2 = support2.v;
+		assert(find_world_coords_for_vertex_within_polygon(center1, polygon1, &pmp.wc1) == true);
+		assert(find_world_coords_for_vertex_within_polygon(center2, polygon2, &pmp.wc2) == true);
 		pmp.pv2 = (vec2){0.0f, 0.0f};
 		array_push(persistent_manifold_points, pmp);
 	}
@@ -763,6 +824,9 @@ if (tmp) {
 		array_push(pm.collision_points2, persistent_manifold_points[i].wc2);
 	}
 
+		gettimeofday(&tv,NULL);
+		unsigned long now = 1000000 * tv.tv_sec + tv.tv_usec;
+	  printf("Took %.3f.\n", (now - start) / (1000.0f));
 	return pm;
 }
 
@@ -804,7 +868,9 @@ Persistent_Manifold collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bo
 	  }
 
 	  array_free(faces);
-	  return create_persistent_manifold(b1, b2, gm_vec3_normalize(faces[index].normal));
+
+	  Persistent_Manifold pm = create_persistent_manifold(b1, b2, gm_vec3_normalize(faces[index].normal));
+	  return pm;
 	}
 	// Expand polytope
 	Edge *edges = array_new_len(Edge, 16);
