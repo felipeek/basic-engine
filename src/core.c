@@ -15,6 +15,7 @@ static Entity* edges;
 vec2* points;
 vec2* hull;
 Mesh circle_mesh;
+vec2 center;
 
 typedef struct {
 	vec2 point;
@@ -226,7 +227,7 @@ int core_init()
 	create_circle_vertices(circle_vertices, (vec2){0.0f, 0.0f});
 	circle_mesh = graphics_mesh_create(circle_vertices, generate_indices_for(circle_vertices));
 
-#if 0
+#if 1
 	vec2 p1 = (vec2){-2.0f, 1.0f};
 	vec2 p2 = (vec2){1.0f, 1.0f};
 	vec2 p3 = (vec2){4.0f, 2.0f};
@@ -270,6 +271,10 @@ void core_update(r32 delta_time)
 		graphics_entity_create_with_color(&e, circle_mesh, norm_point, (vec3){1.0f, 1.0f, 1.0f});	
 		array_push(entities, e);
 	}
+
+	vec2 norm_point = (vec2){center.x / 10.0f, center.y / 10.0f};
+	graphics_entity_create_with_color(&e, circle_mesh, norm_point, (vec3){0.0f, 1.0f, 0.0f});
+	array_push(entities, e);
 }
 
 void core_render()
@@ -310,6 +315,23 @@ void core_input_process(boolean* key_state, r32 delta_time)
 
 			printf("<%.3f, %.3f>\n", current.x, current.y);
 		}
+
+		center = (vec2){0.0f, 0.0f};
+		r32 area = 0.0f;
+		for (u32 i = 0; i < array_length(hull); ++i) {
+			vec2 current = hull[i];
+			vec2 next = hull[(i == array_length(hull) - 1) ? 0 : i + 1];
+
+			r32 tmp = current.x * next.y - next.x * current.y;
+			area += 0.5f * tmp;
+
+			r32 cx = (current.x + next.x) * tmp;
+			r32 cy = (current.y + next.y) * tmp;
+
+			center = gm_vec2_add(center, (vec2){cx, cy});
+		}
+		
+		center = gm_vec2_scalar_product(1.0f / (6.0f * area), center);
 
 		key_state[GLFW_KEY_SPACE] = false;
 	}
