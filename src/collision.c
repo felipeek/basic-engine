@@ -2,6 +2,7 @@
 #include <light_array.h>
 #include <float.h>
 #include "jarvis_march.h"
+#include "convex_bary_coords.h"
 
 Collision_Point* collision_get_plane_cube_points(Entity* cube, r32 plane_y) {
 	Collision_Point* collision_points = array_new(Collision_Point);
@@ -521,9 +522,33 @@ typedef struct {
 	vec3 wc2;
 } Persistent_Manifold_Point;
 
+static boolean find_world_coords_for_vertex_within_polygon(Projected_Support_Point point_to_test, Projected_Support_Point* polygon, vec3* wc) {
+	vec2* hull = array_new(vec2);
+	for (u32 i = 0; i < array_length(polygon); ++i) {
+		array_push(hull, polygon[i].pv2);
+	}
+	r32* weights;
+	boolean inside = convex_bary_coords_get(point_to_test.pv2, hull, &weights);
+	if (!inside) {
+		array_free(hull);
+		return false;
+	}
+
+	*wc = (vec3){0.0f, 0.0f, 0.0f};
+	for (u32 i = 0; i < array_length(polygon); ++i) {
+		vec3 current = polygon[i].world_coords;
+		*wc = gm_vec3_add(gm_vec3_scalar_product(weights[i], current), *wc);
+	}
+
+	array_free(hull);
+	array_free(weights);
+	return true;
+}
+
 static boolean collect_inside(Projected_Support_Point point_to_test, Projected_Support_Point* polygon,
 	vec3 polygon_center, vec3 polygon_normal, boolean isPolygon1, Persistent_Manifold_Point* out) {
 
+/*
 	boolean inside_polygon = true;
 	vec3 point_in_polygon_wc = (vec3){0.0f, 0.0f, 0.0f};
 
@@ -539,12 +564,21 @@ static boolean collect_inside(Projected_Support_Point point_to_test, Projected_S
 			return false;
 		}
 	}
+*/
+
+	vec3 wc;
+	if (!find_world_coords_for_vertex_within_polygon(point_to_test, polygon, &wc)) {
+		// outside poly
+		return false;
+	}
 
 	out->pv2 = point_to_test.pv2;
 	if (isPolygon1) {
+		out->wc1 = wc;
+		out->wc2 = point_to_test.world_coords;
 	} else {
 		out->wc1 = point_to_test.world_coords;
-		
+		out->wc2 = wc;
 	}
 
 	return true;
@@ -616,20 +650,32 @@ Persistent_Manifold_Point* clip_support_points(Projected_Support_Point* polygon1
 	// check if points in polygon1 are inside polygon2
 	for (u32 i = 0; i < array_length(polygon1); ++i) {
 		Projected_Support_Point point_to_test = polygon1[i];
-		if (is_point_inside_polygon(point_to_test, polygon2, center2, normal)) {
-			array_push(clipped_points1, point_to_test);
-		} else {
-			// collect intersections
+		Persistent_Manifold_Point out;
+		if (collect_inside(point_to_test, polygon2, center2, normal, false, &out)) {
+			array_push(persistent_manifold_points, out);
 		}
 	}
 
 	// check if points in polygon2 are inside polygon1
 	for (u32 i = 0; i < array_length(polygon2); ++i) {
 		Projected_Support_Point point_to_test = polygon2[i];
-		if (is_point_inside_polygon(point_to_test, polygon1, center1, normal)) {
-			array_push(clipped_points2, point_to_test);
-		} else {
-			// collect intersections
+		Persistent_Manifold_Point out;
+		if (collect_inside(point_to_test, polygon1, center1, normal, true, &out)) {
+			array_push(persistent_manifold_points, out);
+		}
+	}
+
+	// check if polygon1 edges intersect with polygon2 edges
+	for (u32 i = 0; i < array_length(polygon1); ++i) {
+		Projected_Support_Point a1 = polygon1[i];
+		Projected_Support_Point a2 = polygon1[(i == array_length(polygon1) - 1) ? 0 : i + 1];
+		for (u32 j = 0; j < array_length(polygon2); ++j) {
+			Projected_Support_Point b1 = polygon2[j];
+			Projected_Support_Point b2 = polygon2[(j == array_length(polygon2) - 1) ? 0 : j + 1];
+			Persistent_Manifold_Point out;
+			if (collect_intersection(a1, a2, b1, b2, &out)) {
+				array_push(persistent_manifold_points, out);
+			}
 		}
 	}
 
