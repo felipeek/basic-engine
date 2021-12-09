@@ -12,8 +12,12 @@
 
 static Entity* entities;
 static Entity* edges;
+static Entity* clip_polygon_edges;
+static Entity* clipped_polygon_edges;
 vec2* points;
 vec2* hull;
+vec2* clip_polygon;
+vec2* clipped_polygon;
 Mesh circle_mesh;
 
 typedef struct {
@@ -111,7 +115,7 @@ vec2* jarvis_march(vec2* points) {
 			// Here we compare if the current point should be the new candidate point by comparing the vectors going from
 			// the last selected point to the current point with the vector going from the last selected point to the candidate point
 			r32 cross = gm_vec2_cross(candidate_point.last_selected_point_to_me, current_point.last_selected_point_to_me);
-			if (cross < 0.0f) {
+			if (cross < 0.0f) { // This test determines whether the output will be CW or CCW
 				// In this case, the current point is the new candidate point
 				candidate_point = current_point;
 				// Clear the colinear points since they were related to the last candidate point - they don't apply anymore.
@@ -176,6 +180,50 @@ vec2* jarvis_march(vec2* points) {
 	return convex_hull;
 }
 
+static vec2 intersection_line_line(vec2 p1, vec2 p2, vec2 p3, vec2 p4) {
+	vec2 result;
+
+	r32 D = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
+
+	result.x = ((((p1.x * p2.y) - (p1.y * p2.x)) * (p3.x - p4.x)) - ((p1.x - p2.x) * ((p3.x * p4.y) - (p3.y * p4.x)))) / D;
+	result.y = ((((p1.x * p2.y) - (p1.y * p2.x)) * (p3.y - p4.y)) - ((p1.y - p2.y) * ((p3.x * p4.y) - (p3.y * p4.x)))) / D;
+
+	return result;
+}
+
+vec2* sutherland_hodgman(vec2* subject, vec2* clip) {
+	vec2* output_list = array_copy(subject);
+
+	for (u32 i = 0; i < array_length(clip); ++i) {
+		vec2 e1 = clip[i];
+		vec2 e2 = clip[(i == array_length(clip) - 1) ? 0 : i + 1];
+		vec2 edge = gm_vec2_subtract(e2, e1);
+
+		vec2* input_list = array_copy(output_list);
+		array_clear(output_list);
+
+		for (u32 j = 0; j < array_length(input_list); ++j) {
+			vec2 current_point = input_list[j];
+			vec2 prev_point = input_list[(j == 0) ? (array_length(input_list) - 1): j - 1];
+
+			vec2 e1_to_current_point = gm_vec2_subtract(current_point, e1);
+			vec2 e1_to_prev_point = gm_vec2_subtract(prev_point, e1);
+			if (gm_vec2_cross(edge, e1_to_current_point) >= 0.0f) {
+				if (gm_vec2_cross(edge, e1_to_prev_point) < 0.0f) {
+					vec2 intersecting_point = intersection_line_line(prev_point, current_point, e1, e2);
+					array_push(output_list, intersecting_point);
+				}
+				array_push(output_list, current_point);
+			} else if (gm_vec2_cross(edge, e1_to_prev_point) >= 0.0f) {
+				vec2 intersecting_point = intersection_line_line(prev_point, current_point, e1, e2);
+				array_push(output_list, intersecting_point);
+			}
+		}
+	}
+
+	return output_list;
+}
+
 static void menu_dummy_callback()
 {
 	printf("dummy callback called!\n");
@@ -219,6 +267,10 @@ int core_init()
 	Vertex* circle_vertices = array_new(Vertex);
 	points = array_new(vec2);
 	hull = array_new(vec2);
+	clip_polygon = array_new(vec2);
+	clipped_polygon = array_new(vec2);
+	clip_polygon_edges = array_new(Entity);
+	clipped_polygon_edges = array_new(Entity);
 
 	for (r32 i = 0; i < 2000; ++i) {
 		add_vertex(&circle_vertices, 0.0f, 0.0f);
@@ -251,6 +303,36 @@ int core_init()
 	}
 #endif
 
+	r32 size = 9.0f;
+	vec2 clip_polygon_p1 = (vec2){-size, -size};
+	vec2 clip_polygon_p2 = (vec2){size, -size};
+	vec2 clip_polygon_p3 = (vec2){size, size};
+	vec2 clip_polygon_p4 = (vec2){-size, size};
+	array_push(clip_polygon, clip_polygon_p1);
+	array_push(clip_polygon, clip_polygon_p2);
+	array_push(clip_polygon, clip_polygon_p3);
+	array_push(clip_polygon, clip_polygon_p4);
+
+	for (u32 i = 0; i < array_length(clip_polygon); ++i) {
+		vec2 current = clip_polygon[i];
+		vec2 next = clip_polygon[(i == array_length(clip_polygon) - 1) ? 0 : i + 1];
+
+		Vertex* vertices = array_new(Vertex);
+		Vertex v;
+		v.position = gm_vec2_scalar_product(0.1f, current);
+		array_push(vertices, v);
+		v.position = gm_vec2_scalar_product(0.1f, next);
+		array_push(vertices, v);
+		u32* indices = array_new(u32);
+		array_push(indices, 0);
+		array_push(indices, 1);
+
+		Mesh m = graphics_mesh_create(vertices, indices);
+		Entity e;
+		graphics_entity_create_with_color(&e, m, (vec2){0.0f, 0.0f}, (vec3){1.0f, 0.3f, 0.3f});
+		array_push(clip_polygon_edges, e);
+	}
+
 	menu_register_dummy_callback(menu_dummy_callback);
 	return 0;
 }
@@ -270,6 +352,13 @@ void core_update(r32 delta_time)
 		graphics_entity_create_with_color(&e, circle_mesh, norm_point, (vec3){1.0f, 1.0f, 1.0f});	
 		array_push(entities, e);
 	}
+
+	for (u32 i = 0; i < array_length(clipped_polygon); ++i) {
+		vec2 point = clipped_polygon[i];
+		vec2 norm_point = (vec2){point.x / 10.0f, point.y / 10.0f};
+		graphics_entity_create_with_color(&e, circle_mesh, norm_point, (vec3){0.0f, 1.0f, 1.0f});	
+		array_push(entities, e);
+	}
 }
 
 void core_render()
@@ -280,6 +369,14 @@ void core_render()
 
 	for (u32 i = 0; i < array_length(edges); ++i) {
 		graphics_entity_render_basic_shader(&edges[i]);
+	}
+
+	for (u32 i = 0; i < array_length(clip_polygon_edges); ++i) {
+		graphics_entity_render_basic_shader(&clip_polygon_edges[i]);
+	}
+
+	for (u32 i = 0; i < array_length(clipped_polygon_edges); ++i) {
+		graphics_entity_render_basic_shader(&clipped_polygon_edges[i]);
 	}
 }
 
@@ -307,6 +404,31 @@ void core_input_process(boolean* key_state, r32 delta_time)
 			Entity e;
 			graphics_entity_create_with_color(&e, m, (vec2){0.0f, 0.0f}, (vec3){1.0f, 1.0f, 1.0f});
 			array_push(edges, e);
+
+			printf("<%.3f, %.3f>\n", current.x, current.y);
+		}
+
+		clipped_polygon = sutherland_hodgman(hull, clip_polygon);
+		printf("Sutherland-Hodgman\n");
+
+		for (u32 i = 0; i < array_length(clipped_polygon); ++i) {
+			vec2 current = clipped_polygon[i];
+			vec2 next = clipped_polygon[(i == array_length(clipped_polygon) - 1) ? 0 : i + 1];
+
+			Vertex* vertices = array_new(Vertex);
+			Vertex v;
+			v.position = gm_vec2_scalar_product(0.1f, current);
+			array_push(vertices, v);
+			v.position = gm_vec2_scalar_product(0.1f, next);
+			array_push(vertices, v);
+			u32* indices = array_new(u32);
+			array_push(indices, 0);
+			array_push(indices, 1);
+
+			Mesh m = graphics_mesh_create(vertices, indices);
+			Entity e;
+			graphics_entity_create_with_color(&e, m, (vec2){0.0f, 0.0f}, (vec3){0.0f, 1.0f, 1.0f});
+			array_push(clipped_polygon_edges, e);
 
 			printf("<%.3f, %.3f>\n", current.x, current.y);
 		}
