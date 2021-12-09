@@ -179,21 +179,56 @@ Mesh graphics_quad_create()
 		sizeof(indices) / sizeof(u32), 0);
 }
 
-static void add_index_to_one_ring(u32 indice, u32** one_ring) {
-	for (u32 i = 0; i < array_length(*one_ring); ++i) {
-		if ((*one_ring)[i] == indice) {
-			return;
-		}
+static int vertex_compare(const void *key1, const void *key2) {
+	vec3 v1 = *(vec3*)key1;
+	vec3 v2 = *(vec3*)key2;
+	if (v1.x == v2.x && v1.y == v2.y && v1.z == v2.z) {
+		return 1;
 	}
 
-	array_push(*one_ring, indice);
+	return 0;
 }
 
-static u32** collect_one_rings(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size) {
-	u32** one_rings = array_new(u32*);
+static unsigned int vertex_hash(const void *key) {
+	vec3 v1 = *(vec3*)key;
+	return (unsigned int)((v1.x + v1.y + v1.z) * 100000.0f); // fodase
+}
+
+static int idx_compare(const void *key1, const void *key2) {
+	u32 i1 = *(u32*)key1;
+	u32 i2 = *(u32*)key1;
+
+	return i1 == i2;
+}
+
+static unsigned int idx_hash(const void *key) {
+	u32 i1 = *(u32*)key;
+	return i1;
+}
+
+static One_Rings collect_one_rings(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size) {
+	One_Rings one_rings;
+	const u32 ONE_RING_MAX_SIZE = 1024; // just for now... to avoid light_array reallocation issues...
+	hash_map_create(&one_rings.vertex_to_indices, 64, sizeof(vec3), sizeof(u32*), vertex_compare, vertex_hash);
+	hash_map_create(&one_rings.index_to_one_ring, 64, sizeof(u32), sizeof(u32*), idx_compare, idx_hash);
 	for (u32 i = 0; i < array_length(vertices); ++i) {
-		u32* v = array_new(u32);
-		array_push(one_rings, v);
+		vec3 v = gm_vec4_to_vec3(vertices[i].position);
+		u32* ii = array_new_len(u32, ONE_RING_MAX_SIZE);
+		hash_map_put(&one_rings.vertex_to_indices, &v, &ii);
+	}
+
+	for (u32 i = 0; i < array_length(indices); ++i) {
+		u32* ii = array_new_len(u32, ONE_RING_MAX_SIZE);
+		//assert(i == indices[i]);
+		hash_map_put(&one_rings.index_to_one_ring, &indices[i], &ii);
+	}
+
+	for (u32 i = 0; i < array_length(vertices); ++i) {
+		vec3 v = gm_vec4_to_vec3(vertices[i].position);
+		u32* idxs;
+		assert(hash_map_get(&one_rings.vertex_to_indices, &v, &idxs) == 0);
+		array_push(idxs, i);
+		assert(array_length(idxs) < ONE_RING_MAX_SIZE);
 	}
 
 	for (u32 i = 0; i < array_length(indices); i += 3) {
@@ -201,12 +236,47 @@ static u32** collect_one_rings(Vertex* vertices, s32 vertices_size, u32* indices
 		u32 i2 = indices[i + 1];
 		u32 i3 = indices[i + 2];
 
-		add_index_to_one_ring(i2, &one_rings[i1]);
-		add_index_to_one_ring(i3, &one_rings[i1]);
-		add_index_to_one_ring(i1, &one_rings[i2]);
-		add_index_to_one_ring(i3, &one_rings[i2]);
-		add_index_to_one_ring(i2, &one_rings[i3]);
-		add_index_to_one_ring(i3, &one_rings[i3]);
+		vec3 v1 = gm_vec4_to_vec3(vertices[i1].position);
+		vec3 v2 = gm_vec4_to_vec3(vertices[i2].position);
+		vec3 v3 = gm_vec4_to_vec3(vertices[i3].position);
+
+		u32* i1_indices;
+		u32* i2_indices;
+		u32* i3_indices;
+
+		assert(hash_map_get(&one_rings.vertex_to_indices, &v1, &i1_indices) == 0);
+		assert(hash_map_get(&one_rings.vertex_to_indices, &v2, &i2_indices) == 0);
+		assert(hash_map_get(&one_rings.vertex_to_indices, &v3, &i3_indices) == 0);
+
+		for (u32 j = 0; j < array_length(i1_indices); ++j) {
+			u32 index = i1_indices[j];
+			u32* one_ring_array;
+			assert(hash_map_get(&one_rings.index_to_one_ring, &index, &one_ring_array) == 0);
+			array_push(one_ring_array, i2);
+			assert(array_length(one_ring_array) < ONE_RING_MAX_SIZE);
+			array_push(one_ring_array, i3);
+			assert(array_length(one_ring_array) < ONE_RING_MAX_SIZE);
+		}
+
+		for (u32 j = 0; j < array_length(i2_indices); ++j) {
+			u32 index = i2_indices[j];
+			u32* one_ring_array;
+			assert(hash_map_get(&one_rings.index_to_one_ring, &index, &one_ring_array) == 0);
+			array_push(one_ring_array, i1);
+			assert(array_length(one_ring_array) < ONE_RING_MAX_SIZE);
+			array_push(one_ring_array, i3);
+			assert(array_length(one_ring_array) < ONE_RING_MAX_SIZE);
+		}
+
+		for (u32 j = 0; j < array_length(i3_indices); ++j) {
+			u32 index = i3_indices[j];
+			u32* one_ring_array;
+			assert(hash_map_get(&one_rings.index_to_one_ring, &index, &one_ring_array) == 0);
+			array_push(one_ring_array, i2);
+			assert(array_length(one_ring_array) < ONE_RING_MAX_SIZE);
+			array_push(one_ring_array, i3);
+			assert(array_length(one_ring_array) < ONE_RING_MAX_SIZE);
+		}
 	}
 
 	return one_rings;
@@ -333,6 +403,13 @@ void graphics_mesh_render(Shader shader, Mesh mesh)
 	glDrawElements(GL_TRIANGLES, mesh.indexes_size, GL_UNSIGNED_INT, 0);
 	glUseProgram(0);
 	glBindVertexArray(0);
+}
+
+const u32* graphics_get_one_rings(One_Rings* one_ring, u32 idx)
+{
+	u32* result;
+	assert(hash_map_get(&one_ring->index_to_one_ring, &idx, &result) == 0);
+	return result;
 }
 
 void graphics_entity_change_diffuse_map(Entity* entity, u32 diffuse_map, boolean delete_diffuse_map)

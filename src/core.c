@@ -169,7 +169,7 @@ int core_init()
 	//graphics_entity_create_with_color(&cube, m, (vec4){-0.201f, 0.904f, 1.225f, 1.0f}, (Quaternion){0.095f, -0.386f, 0.080f, 0.914f},
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
 
-	// bug (sphere)
+	// bug (sphere) -> incorrect collision
 	//Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	//graphics_entity_create_with_color(&plane, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
@@ -177,11 +177,20 @@ int core_init()
 	//graphics_entity_create_with_color(&cube, m, (vec4){-0.846f, 0.998, 0.677f, 1.0f}, (Quaternion){0.095f, -0.386f, 0.080f, 0.914f},
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){0.095f, -0.386f, 0.080f, 0.914f}, 10.0f);
 
+	// bug (ico) -> expected collision not being reported
+	//Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	//graphics_entity_create_with_color(&plane, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
+	//m = graphics_mesh_create_from_obj("./res/ico_low.obj", 0);
+	//graphics_entity_create_with_color(&cube, m, (vec4){0.461, 0.895, 1.100, 1.0f}, (Quaternion){0.095, -0.386, 0.080, 0.914},
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){0.095f, -0.386f, 0.080f, 0.914f}, 10.0f);
+
+	// bug (ico) -> incorrect collision
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&plane, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
 	m = graphics_mesh_create_from_obj("./res/ico_low.obj", 0);
-	graphics_entity_create_with_color(&cube, m, (vec4){0.461, 0.895, 1.100, 1.0f}, (Quaternion){0.095, -0.386, 0.080, 0.914},
+	graphics_entity_create_with_color(&cube, m, (vec4){-0.167, 1.248, -0.273, 1.0f}, (Quaternion){-0.326, -0.314, 0.239, 0.859},
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){0.095f, -0.386f, 0.080f, 0.914f}, 10.0f);
 
 	//menu_register_dummy_callback(menu_dummy_callback);
@@ -228,7 +237,7 @@ void core_update(r32 delta_time)
 	if (collision_gjk_collides(&simplex, &cube_bs, &plane_bs)) {
 		cube.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
 		plane.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
-		pm = collision_epa(simplex.simplex, &cube_bs, &plane_bs, cube.mesh.one_rings, plane.mesh.one_rings);
+		pm = collision_epa(simplex.simplex, &cube_bs, &plane_bs, &cube.mesh, &plane.mesh);
 		collision = true;
 	} else {
 		cube.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
@@ -384,6 +393,12 @@ void core_input_process(boolean* key_state, r32 delta_time)
 	if (key_state[GLFW_KEY_P]) {
 		render_debug_plane_with_penetration = !render_debug_plane_with_penetration;
 		key_state[GLFW_KEY_P] = false;
+	}
+	if (key_state[GLFW_KEY_U]) {
+		vec3 delta = gm_vec3_scalar_product(-pppenetration, nnn);
+		vec3 pos = gm_vec3_add(gm_vec4_to_vec3(cube.world_position), delta);
+		graphics_entity_set_position(&cube, (vec4){pos.x, pos.y, pos.z, 1.0f});
+		key_state[GLFW_KEY_U] = false;
 	}
 }
 

@@ -5,6 +5,35 @@
 #include "convex_bary_coords.h"
 #include <sys/time.h>
 
+boolean collision_check_point_side_of_triangle(vec3 point, vec3 t1, vec3 t2, vec3 t3) {
+	vec3 v1 = gm_vec3_subtract(t2, t1);
+	vec3 v2 = gm_vec3_subtract(t3, t1);
+	vec3 plane_normal = gm_vec3_cross(v1, v2);
+	r32 k = -(plane_normal.x * t1.x + plane_normal.y * t1.y + plane_normal.z * t1.z);
+	// plane equation: plane_normal.x * x + plane_normal.y * y + plane_normal.z * z + k = 0
+
+	r32 point_applied_on_eq = plane_normal.x * point.x + plane_normal.y * point.y + plane_normal.z * point.z + k;
+	return point_applied_on_eq >= 0; // true -> "outside" | false -> "inside"
+}
+
+boolean is_vertex_inside_mesh(vec3 point, Mesh* m) {
+	for (u32 i = 0; i < array_length(m->indices); ++i) {
+		u32 i1 = m->indices[i + 0];
+		u32 i2 = m->indices[i + 1];
+		u32 i3 = m->indices[i + 2];
+
+		vec3 v1 = gm_vec4_to_vec3(m->vertices[i1].position);
+		vec3 v2 = gm_vec4_to_vec3(m->vertices[i2].position);
+		vec3 v3 = gm_vec4_to_vec3(m->vertices[i3].position);
+
+		if (collision_check_point_side_of_triangle(point, v1, v2, v3)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 Collision_Point* collision_get_plane_cube_points(Entity* cube, r32 plane_y) {
 	Collision_Point* collision_points = array_new(Collision_Point);
 	for (u32 i = 0; i < array_length(cube->mesh.vertices); ++i) {
@@ -440,7 +469,7 @@ static vec3 find_ortho(vec3 v) {
 	}
 }
 
-Support_Point
+int
 collision_gjk_individual_support(Bounding_Shape* b, vec3 direction)
 {
   float max = -FLT_MAX;
@@ -455,61 +484,63 @@ collision_gjk_individual_support(Bounding_Shape* b, vec3 direction)
 	}
   }
 
-  Support_Point sup_point = {
-	.v = b->vertices[index],
-	.sup = b->vertices[index]
-  };
-  return sup_point;
+//  Support_Point sup_point = {
+//	.v = b->vertices[index],
+//	.sup = b->vertices[index]
+//  };
+  return index;
 }
 
-static void add_to_result_array(vec3** result, vec3 v) {
+static boolean add_to_result_array(vec3** result, vec3 v) {
 	for (u32 i = 0; i < array_length(*result); ++i) {
 		if ((*result)[i].x == v.x && (*result)[i].y == v.y && (*result)[i].z == v.z) {
-			return;
+			return false;
 		}
 	}
 
 	array_push(*result, v);
+	return true;
 }
 
 vec3 nnn = (vec3){1.0f, 0.0f, 0.0f};
 vec3 ppp = (vec3){1.0f, 0.0f, 0.0f};
 r32 pppenetration;
 
-vec3* get_points_after_collision_plane(Bounding_Shape* b, vec3 normal, r32 penetration, vec3 lul) {
-	vec3* result = array_new(vec3);
+static void collect_recursively(Bounding_Shape* b, vec3 normal, r32 penetration, s32 target_vertex_idx, vec3 support,
+	One_Rings* one_rings, Mesh* other_mesh, vec3** result, vec3** neighbors) {
 
-	vec3 inverted_normal = gm_vec3_scalar_product(-1.0f, normal);
-	Support_Point support = collision_gjk_individual_support(b, normal);
-	r32 len = gm_vec3_length(support.v);
-	//array_push(result, support.v);
+	const u32* one_ring = graphics_get_one_rings(one_rings, target_vertex_idx);
+
+	for (u32 i = 0; i < array_length(one_ring); ++i) {
+		vec3 vertex_to_test = b->vertices[one_ring[i]];
+		r32 distance = gm_vec3_dot(normal, gm_vec3_subtract(vertex_to_test, support));
+		if (-distance < penetration) {
+			// inside plane, collect recursively
+			if (add_to_result_array(result, b->vertices[one_ring[i]])) {
+				collect_recursively(b, normal, penetration, one_ring[i], support, one_rings, other_mesh, result, neighbors);
+			}
+		} else {
+			// outside plane, add to neighbor arrays
+			add_to_result_array(neighbors, b->vertices[one_ring[i]]);
+		}
+	}
+}
+
+vec3* get_points_after_collision_plane(Bounding_Shape* b, vec3 normal, r32 penetration, Mesh* current_mesh, Mesh* other_mesh, vec3** neighbors) {
+	vec3* result = array_new(vec3);
+	(*neighbors) = array_new(vec3);
+
+	int support_idx = collision_gjk_individual_support(b, normal);
+	r32 len = gm_vec3_length(b->vertices[support_idx]);
+	array_push(result, b->vertices[support_idx]);
 
 	if (b->vertex_count == 72) {
 		nnn = normal;
-		ppp = support.v;
+		ppp = b->vertices[support_idx];
 		pppenetration = penetration;
 	}
 
-	r32 support_weight = gm_vec3_dot(support.v, normal);
-	for (u32 i = 0; i < b->vertex_count; ++i) {
-		//r32 weight = gm_vec3_dot(b->vertices[i], normal);
-		//r32 diff = support_weight - weight;
-		//assert(support_weight >= weight);
-		//if (support_weight - weight < penetration) {
-		//	add_to_result_array(&result, b->vertices[i]);
-		//}
-
-		r32 distance = gm_vec3_dot(normal, gm_vec3_subtract(b->vertices[i], support.v));
-		if (-distance < penetration) {
-			add_to_result_array(&result, b->vertices[i]);
-		}
-
-		//vec3 pn = gm_vec3_subtract(support.v, gm_vec3_scalar_product(penetration, normal));
-		//r32 distance = gm_vec3_dot(normal, gm_vec3_subtract(b->vertices[i], pn));
-		//if (distance > 0.0f) {
-		//	add_to_result_array(&result, b->vertices[i]);
-		//}
-	}
+	collect_recursively(b, normal, penetration, support_idx, b->vertices[support_idx], &current_mesh->one_rings, other_mesh, &result, neighbors);
 
 	return result;
 }
@@ -651,7 +682,7 @@ boolean collect_intersection(Projected_Support_Point a1, Projected_Support_Point
 }
 
 Persistent_Manifold_Point* clip_support_points(Projected_Support_Point* polygon1, Projected_Support_Point* polygon2,
-	vec3 normal) {
+	Projected_Support_Point* polygon1_with_neighbors, Projected_Support_Point* polygon2_with_neighbors, vec3 normal) {
 	Persistent_Manifold_Point* persistent_manifold_points = array_new(Persistent_Manifold_Point);
 
 	vec3 center1 = (vec3){0.0f, 0.0f, 0.0f};
@@ -683,6 +714,7 @@ Persistent_Manifold_Point* clip_support_points(Projected_Support_Point* polygon1
 		}
 	}
 
+#if 1
 	// check if polygon1 edges intersect with polygon2 edges
 	for (u32 i = 0; i < array_length(polygon1); ++i) {
 		Projected_Support_Point a1 = polygon1[i];
@@ -696,7 +728,36 @@ Persistent_Manifold_Point* clip_support_points(Projected_Support_Point* polygon1
 			}
 		}
 	}
+#else
+	// check if polygon1 edges intersect with polygon2 edges
+	//for (u32 i = 0; i < array_length(polygon1); ++i) {
+	//	Projected_Support_Point a1 = polygon1[i];
+	//	Projected_Support_Point a2 = polygon1[(i == array_length(polygon1) - 1) ? 0 : i + 1];
+	//	for (u32 j = 0; j < array_length(polygon2_with_neighbors); ++j) {
+	//		Projected_Support_Point b1 = polygon2_with_neighbors[j];
+	//		Projected_Support_Point b2 = polygon2_with_neighbors[(j == array_length(polygon2_with_neighbors) - 1) ? 0 : j + 1];
+	//		Persistent_Manifold_Point out;
+	//		if (collect_intersection(a1, a2, b1, b2, &out)) {
+	//			array_push(persistent_manifold_points, out);
+	//		}
+	//	}
+	//}
 
+	// check if polygon1 edges intersect with polygon2 edges
+	for (u32 i = 0; i < array_length(polygon1_with_neighbors); ++i) {
+		Projected_Support_Point a1 = polygon1_with_neighbors[i];
+		Projected_Support_Point a2 = polygon1_with_neighbors[(i == array_length(polygon1_with_neighbors) - 1) ? 0 : i + 1];
+		for (u32 j = 0; j < array_length(polygon2); ++j) {
+			Projected_Support_Point b1 = polygon2[j];
+			Projected_Support_Point b2 = polygon2[(j == array_length(polygon2) - 1) ? 0 : j + 1];
+			Persistent_Manifold_Point out;
+			if (collect_intersection(a1, a2, b1, b2, &out)) {
+				array_push(persistent_manifold_points, out);
+			}
+		}
+	}
+#endif
+	
 	return persistent_manifold_points;
 }
 
@@ -745,28 +806,44 @@ static vec2 get_center_of_polygon(Projected_Support_Point* polygon) {
 
 int tmp = 0;
 
-Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shape* b2, vec3 normal, r32 penetration, u32** one_rings1, u32** one_rings2) {
+Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shape* b2, vec3 normal, r32 penetration, Mesh* m1, Mesh* m2) {
 	Persistent_Manifold pm;
 	pm.normal = normal;
 	pm.collision_points1 = array_new(vec3);
 	pm.collision_points2 = array_new(vec3);
 	r32 strength = 0.09f;
 
-	  struct timeval tv;
-		gettimeofday(&tv,NULL);
-		unsigned long start = 1000000 * tv.tv_sec + tv.tv_usec;
-	Support_Point lul1 = collision_gjk_individual_support(b1, normal);
-	Support_Point lul2 = collision_gjk_individual_support(b2, gm_vec3_scalar_product(-1.0f, normal));
-	vec3* support_points1 = get_points_after_collision_plane(b1, normal, penetration, lul2.v);
-	vec3* support_points2 = get_points_after_collision_plane(b2, gm_vec3_scalar_product(-1.0f, normal), penetration, lul1.v);
+	int s1 = collision_gjk_individual_support(b1, normal);
+	int s2 = collision_gjk_individual_support(b2, gm_vec3_scalar_product(-1.0f, normal));
+	r32 proj1 = gm_vec3_dot(b1->vertices[s1], normal);
+	r32 proj2 = gm_vec3_dot(b2->vertices[s2], normal);
+	r32 diff = proj1 - proj2;
+
+	vec3* neighbors1;
+	vec3* neighbors2;
+	vec3* support_points1 = get_points_after_collision_plane(b1, normal, penetration, m1, m2, &neighbors1);
+	vec3* support_points2 = get_points_after_collision_plane(b2, gm_vec3_scalar_product(-1.0f, normal), penetration, m2, m1, &neighbors2);
 
 	Projected_Support_Point* proj_support_points1 = project_support_points_onto_normal_plane(support_points1, normal);
 	Projected_Support_Point* proj_support_points2 = project_support_points_onto_normal_plane(support_points2, normal);
+	Projected_Support_Point* proj_neighbors1 = project_support_points_onto_normal_plane(neighbors1, normal);
+	Projected_Support_Point* proj_neighbors2 = project_support_points_onto_normal_plane(neighbors2, normal);
+
+	Projected_Support_Point* proj_support_points_with_neighbors1 = array_copy(proj_support_points1);
+	Projected_Support_Point* proj_support_points_with_neighbors2 = array_copy(proj_support_points2);
+	for (u32 i = 0; i < array_length(proj_neighbors1); ++i) {
+		array_push(proj_support_points_with_neighbors1, proj_neighbors1[i]);
+	}
+	for (u32 i = 0; i < array_length(proj_neighbors2); ++i) {
+		array_push(proj_support_points_with_neighbors2, proj_neighbors2[i]);
+	}
 
 	Projected_Support_Point* polygon1 = jarvis_march(proj_support_points1);
 	Projected_Support_Point* polygon2 = jarvis_march(proj_support_points2);
+	Projected_Support_Point* polygon_with_neighbors1 = jarvis_march(proj_support_points_with_neighbors1);
+	Projected_Support_Point* polygon_with_neighbors2 = jarvis_march(proj_support_points_with_neighbors2);
 
-	Persistent_Manifold_Point* persistent_manifold_points = clip_support_points(polygon1, polygon2, normal);
+	Persistent_Manifold_Point* persistent_manifold_points = clip_support_points(polygon1, polygon2, polygon_with_neighbors1, polygon_with_neighbors2, normal);
 
 	if (tmp) {
 		persistent_manifold_points = array_new(Persistent_Manifold_Point);
@@ -777,6 +854,14 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 			pmp.wc2 = (vec3){-9999.0f, -9999.0f, -9999.0f};
 			array_push(persistent_manifold_points, pmp);
 		}
+
+		//for (u32 i = 0; i < array_length(neighbors1); ++i) {
+		//	Persistent_Manifold_Point pmp;
+		//	pmp.pv2 = (vec2){0.0f, 0.0f};
+		//	pmp.wc1 = neighbors1[i];
+		//	pmp.wc2 = (vec3){-9999.0f, -9999.0f, -9999.0f};
+		//	array_push(persistent_manifold_points, pmp);
+		//}
 
 		for (u32 i = 0; i < array_length(support_points2); ++i) {
 			Persistent_Manifold_Point pmp;
@@ -823,13 +908,10 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 		array_push(pm.collision_points2, persistent_manifold_points[i].wc2);
 	}
 
-		gettimeofday(&tv,NULL);
-		unsigned long now = 1000000 * tv.tv_sec + tv.tv_usec;
-	  printf("Took %.3f.\n", (now - start) / (1000.0f));
 	return pm;
 }
 
-Persistent_Manifold collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, u32** one_rings1, u32** one_rings2) {
+Persistent_Manifold collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, Mesh* m1, Mesh* m2) {
   int index = -1;
   Face *faces = array_new_len(Face, 4);
   array_length(faces) = 4;
@@ -867,8 +949,7 @@ Persistent_Manifold collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bo
 
 	  array_free(faces);
 
-	  Persistent_Manifold pm = create_persistent_manifold(b1, b2, gm_vec3_normalize(faces[index].normal),
-	  	faces[index].distance, one_rings1, one_rings2);
+	  Persistent_Manifold pm = create_persistent_manifold(b1, b2, gm_vec3_normalize(faces[index].normal), faces[index].distance, m1, m2);
 	  return pm;
 	}
 	// Expand polytope

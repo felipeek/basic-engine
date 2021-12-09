@@ -2,6 +2,7 @@
 #define BASIC_ENGINE_GRAPHICS_H
 #include "gm.h"
 #include "camera.h"
+#include <hash_map.h>
 
 typedef u32 Shader;
 
@@ -28,6 +29,11 @@ typedef struct
 	vec4 diffuse_color;
 } Diffuse_Info;
 
+typedef struct {
+	Hash_Map vertex_to_indices;
+	Hash_Map index_to_one_ring;
+} One_Rings;
+
 typedef struct
 {
 	u32 VAO, VBO, EBO;
@@ -35,7 +41,7 @@ typedef struct
 	Normal_Mapping_Info normal_info;
 	Vertex* vertices;
 	u32* indices;
-	u32** one_rings;
+	One_Rings one_rings;
 } Mesh;
 
 typedef struct
@@ -85,6 +91,7 @@ Mesh graphics_quad_create();
 Mesh graphics_mesh_create(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info);
 Mesh graphics_mesh_create_from_obj(const s8* obj_path, Normal_Mapping_Info* normal_info);
 void graphics_mesh_render(Shader shader, Mesh mesh);
+const u32* graphics_get_one_rings(One_Rings* one_rings, u32 idx);
 void graphics_entity_create_with_color(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, vec4 color, r32 mass);
 void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec4 world_position, Quaternion world_rotation, vec3 world_scale, u32 texture, r32 mass);
 void graphics_entity_destroy(Entity* entity);
