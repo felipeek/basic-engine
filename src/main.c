@@ -164,5 +164,5 @@ s32 main(s32 argc, s8** argv)
 
 	menu_destroy();
 	core_destroy();
-	glfwTerminate();
+	//glfwTerminate();
 }

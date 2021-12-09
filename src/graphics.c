@@ -179,6 +179,39 @@ Mesh graphics_quad_create()
 		sizeof(indices) / sizeof(u32), 0);
 }
 
+static void add_index_to_one_ring(u32 indice, u32** one_ring) {
+	for (u32 i = 0; i < array_length(*one_ring); ++i) {
+		if ((*one_ring)[i] == indice) {
+			return;
+		}
+	}
+
+	array_push(*one_ring, indice);
+}
+
+static u32** collect_one_rings(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size) {
+	u32** one_rings = array_new(u32*);
+	for (u32 i = 0; i < array_length(vertices); ++i) {
+		u32* v = array_new(u32);
+		array_push(one_rings, v);
+	}
+
+	for (u32 i = 0; i < array_length(indices); i += 3) {
+		u32 i1 = indices[i + 0];
+		u32 i2 = indices[i + 1];
+		u32 i3 = indices[i + 2];
+
+		add_index_to_one_ring(i2, &one_rings[i1]);
+		add_index_to_one_ring(i3, &one_rings[i1]);
+		add_index_to_one_ring(i1, &one_rings[i2]);
+		add_index_to_one_ring(i3, &one_rings[i2]);
+		add_index_to_one_ring(i2, &one_rings[i3]);
+		add_index_to_one_ring(i3, &one_rings[i3]);
+	}
+
+	return one_rings;
+}
+
 Mesh graphics_mesh_create(Vertex* vertices, s32 vertices_size, u32* indices, s32 indices_size, Normal_Mapping_Info* normal_info)
 {
 	Mesh mesh;
@@ -215,6 +248,7 @@ Mesh graphics_mesh_create(Vertex* vertices, s32 vertices_size, u32* indices, s32
 	mesh.VBO = VBO;
 	mesh.EBO = EBO;
 	mesh.indexes_size = indices_size;
+	mesh.one_rings = collect_one_rings(vertices, vertices_size, indices, indices_size);
 
 	if (!normal_info)
 	{

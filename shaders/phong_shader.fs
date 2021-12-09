@@ -110,4 +110,6 @@ void main()
 		final_color.y += point_color.y;
 		final_color.z += point_color.z;
 	}
+
+	final_color.a = diffuse_info.diffuse_color.a;
 }

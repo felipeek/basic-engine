@@ -17,12 +17,89 @@ static Light* lights;
 static Entity plane;
 static Entity cube;
 static Physics_Force* forces;
+static Entity debug_plane, debug_plane_with_penetration;
 
 static Bounding_Shape cube_bs, plane_bs;
 
 static boolean is_mouse_bound_to_joint_target_position;
 static Entity* bound_entity;
 static Render_Primitives_Context r_ctx;
+
+static vec3 find_ortho(vec3 v) {
+	// tricky problem: https://math.stackexchange.com/questions/137362/how-to-find-perpendicular-vector-to-another-vector
+
+	r32 v1 = v.z * v.z + v.y * v.y;
+	r32 v2 = v.z * v.z + v.x * v.x;
+	r32 v3 = v.y * v.y + v.x * v.x;
+
+	if (v1 > v2 && v1 > v3) {
+		return gm_vec3_normalize((vec3){0.0f, v.z, -v.y});
+	} else if (v2 > v3) {
+		return gm_vec3_normalize((vec3){-v.z, 0.0f, v.x});
+	} else {
+		return gm_vec3_normalize((vec3){-v.y, v.x, 0.0f});
+	}
+}
+
+static Entity createPlane(vec3 point, vec3 normal, vec4 color) {
+	Entity e;
+	Mesh m;
+
+	vec3 ortho = find_ortho(normal);
+	vec3 c = gm_vec3_cross(normal, ortho);
+
+	ortho = gm_vec3_scalar_product(1000.0f, ortho);
+	c = gm_vec3_scalar_product(1000.0f, c);
+
+	vec3 p1 = gm_vec3_add(c, ortho);
+	vec3 p2 = gm_vec3_add(c, gm_vec3_scalar_product(-1.0f, ortho));
+	vec3 p3 = gm_vec3_add(gm_vec3_scalar_product(-1.0f, c), ortho);
+	vec3 p4 = gm_vec3_add(gm_vec3_scalar_product(-1.0f, c), gm_vec3_scalar_product(-1.0f, ortho));
+	
+	vec3 q1 = gm_vec3_add(gm_vec3_subtract(p1,
+			gm_vec3_scalar_product(gm_vec3_dot(normal, p1), normal)), point);
+	vec3 q2 = gm_vec3_add(gm_vec3_subtract(p2,
+			gm_vec3_scalar_product(gm_vec3_dot(normal, p2), normal)), point);
+	vec3 q3 = gm_vec3_add(gm_vec3_subtract(p3,
+			gm_vec3_scalar_product(gm_vec3_dot(normal, p3), normal)), point);
+	vec3 q4 = gm_vec3_add(gm_vec3_subtract(p4,
+			gm_vec3_scalar_product(gm_vec3_dot(normal, p4), normal)), point);
+	Vertex* vertices = array_new(Vertex);
+	Vertex v1, v2, v3, v4;
+	v1.normal = (vec4){normal.x, normal.y, normal.z, 0.0f};
+	v1.position = (vec4){q1.x, q1.y, q1.z, 1.0f};
+	v1.texture_coordinates = (vec2){0.0f, 0.0f};
+	v2.normal = (vec4){normal.x, normal.y, normal.z, 0.0f};
+	v2.position = (vec4){q2.x, q2.y, q2.z, 1.0f};
+	v2.texture_coordinates = (vec2){0.0f, 0.0f};
+	v3.normal = (vec4){normal.x, normal.y, normal.z, 0.0f};
+	v3.position = (vec4){q3.x, q3.y, q3.z, 1.0f};
+	v3.texture_coordinates = (vec2){0.0f, 0.0f};
+	v4.normal = (vec4){normal.x, normal.y, normal.z, 0.0f};
+	v4.position = (vec4){q4.x, q4.y, q4.z, 1.0f};
+	v4.texture_coordinates = (vec2){0.0f, 0.0f};
+	array_push(vertices, v1);
+	array_push(vertices, v2);
+	array_push(vertices, v3);
+	array_push(vertices, v4);
+
+	u32* indices = array_new(u32);
+	array_push(indices, 0);
+	array_push(indices, 1);
+	array_push(indices, 2);
+	array_push(indices, 1);
+	array_push(indices, 3);
+	array_push(indices, 2);
+
+	m = graphics_mesh_create(vertices, array_length(vertices), indices, array_length(indices), 0);
+	m.vertices = vertices;
+	m.indices = indices;
+	m.indexes_size = array_length(indices);
+	graphics_entity_create_with_color(&e, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, color, 1.0f);
+
+	return e;
+}
 
 static Perspective_Camera create_camera()
 {
@@ -69,12 +146,12 @@ int core_init()
 	// Create light
 	lights = create_lights();
 
-	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&plane, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
-	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&cube, m, (vec4){-1.272, -0.059, -0.221}, (Quaternion){-0.381, -0.008, -0.434, 0.816},
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
+	//Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	//graphics_entity_create_with_color(&plane, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
+	//m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	//graphics_entity_create_with_color(&cube, m, (vec4){-1.272, -0.059, -0.221}, (Quaternion){-0.381, -0.008, -0.434, 0.816},
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
 
 	// bug 1
 	//Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
@@ -88,9 +165,24 @@ int core_init()
 	//Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	//graphics_entity_create_with_color(&plane, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
-	//m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	//m = graphics_mesh_create_from_obj("./res/sphere.obj", 0);
 	//graphics_entity_create_with_color(&cube, m, (vec4){-0.201f, 0.904f, 1.225f, 1.0f}, (Quaternion){0.095f, -0.386f, 0.080f, 0.914f},
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
+
+	// bug (sphere)
+	//Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	//graphics_entity_create_with_color(&plane, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
+	//m = graphics_mesh_create_from_obj("./res/sphere.obj", 0);
+	//graphics_entity_create_with_color(&cube, m, (vec4){-0.846f, 0.998, 0.677f, 1.0f}, (Quaternion){0.095f, -0.386f, 0.080f, 0.914f},
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){0.095f, -0.386f, 0.080f, 0.914f}, 10.0f);
+
+	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	graphics_entity_create_with_color(&plane, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
+	m = graphics_mesh_create_from_obj("./res/ico_low.obj", 0);
+	graphics_entity_create_with_color(&cube, m, (vec4){0.461, 0.895, 1.100, 1.0f}, (Quaternion){0.095, -0.386, 0.080, 0.914},
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){0.095f, -0.386f, 0.080f, 0.914f}, 10.0f);
 
 	//menu_register_dummy_callback(menu_dummy_callback);
 
@@ -119,6 +211,9 @@ void core_destroy()
 
 static boolean collision;
 static Persistent_Manifold pm;
+extern vec3 nnn;
+extern vec3 ppp;
+extern r32 pppenetration;
 
 void core_update(r32 delta_time)
 {
@@ -133,7 +228,7 @@ void core_update(r32 delta_time)
 	if (collision_gjk_collides(&simplex, &cube_bs, &plane_bs)) {
 		cube.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
 		plane.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
-		pm = collision_epa(simplex.simplex, &cube_bs, &plane_bs);
+		pm = collision_epa(simplex.simplex, &cube_bs, &plane_bs, cube.mesh.one_rings, plane.mesh.one_rings);
 		collision = true;
 	} else {
 		cube.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
@@ -146,10 +241,20 @@ void core_update(r32 delta_time)
 
 	//physics_simulate(&cube, &plane, PLANE_Y, delta_time, forces);
 	//array_clear(forces);
+
+	vec3 point_is = gm_vec3_subtract(ppp, gm_vec3_scalar_product(pppenetration, nnn));
+	debug_plane = createPlane(ppp, nnn, (vec4){1.0f, 0.0f, 1.0f, 0.0f});
+	debug_plane_with_penetration = createPlane(point_is, nnn, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
 }
 
+boolean render_debug_plane;
+boolean render_debug_plane_with_penetration;
 void core_render()
 {
+	if (render_debug_plane)
+		graphics_entity_render_phong_shader(&camera, &debug_plane, lights);
+	if (render_debug_plane_with_penetration)
+		graphics_entity_render_phong_shader(&camera, &debug_plane_with_penetration, lights);
 	graphics_entity_render_phong_shader(&camera, &plane, lights);
 	graphics_entity_render_phong_shader(&camera, &cube, lights);
 
@@ -169,6 +274,9 @@ void core_render()
 				(vec4){0.5f, 1.0f, 0.5f, 1.0f});
 			graphics_renderer_primitives_flush(&r_ctx, &camera);
 		}
+
+		vec3 aaa = gm_vec3_scalar_product(0.582058f, (vec3){-0.540517f, 0.818457f, 0.194857f});
+		graphics_renderer_debug_points(&r_ctx, &aaa, 1, (vec4){0.0f, 1.0f, 1.0f, 1.0f});
 	}
 }
 
@@ -267,6 +375,15 @@ void core_input_process(boolean* key_state, r32 delta_time)
 	if (key_state[GLFW_KEY_SPACE]) {
 		tmp = !tmp;
 		key_state[GLFW_KEY_SPACE] = false;
+	}
+
+	if (key_state[GLFW_KEY_O]) {
+		render_debug_plane = !render_debug_plane;
+		key_state[GLFW_KEY_O] = false;
+	}
+	if (key_state[GLFW_KEY_P]) {
+		render_debug_plane_with_penetration = !render_debug_plane_with_penetration;
+		key_state[GLFW_KEY_P] = false;
 	}
 }
 

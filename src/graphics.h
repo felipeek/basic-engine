@@ -35,6 +35,7 @@ typedef struct
 	Normal_Mapping_Info normal_info;
 	Vertex* vertices;
 	u32* indices;
+	u32** one_rings;
 } Mesh;
 
 typedef struct

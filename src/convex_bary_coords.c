@@ -252,10 +252,10 @@ boolean convex_bary_coords_get(vec2 point, vec2 *hull, r32 **bary_coords)
 	{
 		return get_barycentric_coords_relative_to_line(point, hull[0], hull[1], bary_coords);
 	}
-	else if (array_length(hull) == 3)
-	{
-		return get_barycentric_coords_relative_to_triangle(point, hull[0], hull[1], hull[2], bary_coords);
-	}
+	//else if (array_length(hull) == 3)
+	//{
+	//	return get_barycentric_coords_relative_to_triangle(point, hull[0], hull[1], hull[2], bary_coords);
+	//}
 
 	return get_barycentric_coords_relative_to_arbitrary_convex_hull(point, hull, bary_coords);
 }

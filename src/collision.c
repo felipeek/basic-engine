@@ -462,40 +462,55 @@ collision_gjk_individual_support(Bounding_Shape* b, vec3 direction)
   return sup_point;
 }
 
-vec3* get_support_points_with_perturbation(Bounding_Shape* b, vec3 direction, r32 strength) {
-	vec3* result = array_new(vec3);
-
-	Support_Point support = collision_gjk_individual_support(b, direction);
-	array_push(result, support.v);
-
-	const int NUM_ITERATIONS = 16;
-	r32 angle = 360.0f / NUM_ITERATIONS;
-	vec3 ortho = gm_vec3_scalar_product(strength, find_ortho(direction));
-	printf("=============\n");
-	for (int i = 0; i < NUM_ITERATIONS; ++i) {
-		Quaternion rotation_around_support_direction = quaternion_new(direction, angle * i);
-		mat3 m = quaternion_get_matrix3(&rotation_around_support_direction);
-		vec3 rotated_ortho = gm_mat3_multiply_vec3(&m, ortho);
-		vec3 perturbed_support_direction1 = gm_vec3_add(direction, rotated_ortho);
-		printf("<%.3f, %.3f, %.3f>\n", perturbed_support_direction1.x, perturbed_support_direction1.y, perturbed_support_direction1.z);
-
-		Support_Point support = collision_gjk_individual_support(b, perturbed_support_direction1);
-
-		boolean duplicated = false;
-		for (int j = 0; j < array_length(result); ++j) {
-			vec3 current = result[j];
-			if (support.v.x == current.x && support.v.y == current.y && support.v.z == current.z) {
-				duplicated = true;
-				break;
-			}
-		}
-
-		if (!duplicated) {
-			array_push(result, support.v);
+static void add_to_result_array(vec3** result, vec3 v) {
+	for (u32 i = 0; i < array_length(*result); ++i) {
+		if ((*result)[i].x == v.x && (*result)[i].y == v.y && (*result)[i].z == v.z) {
+			return;
 		}
 	}
 
-	printf("=============\n");
+	array_push(*result, v);
+}
+
+vec3 nnn = (vec3){1.0f, 0.0f, 0.0f};
+vec3 ppp = (vec3){1.0f, 0.0f, 0.0f};
+r32 pppenetration;
+
+vec3* get_points_after_collision_plane(Bounding_Shape* b, vec3 normal, r32 penetration, vec3 lul) {
+	vec3* result = array_new(vec3);
+
+	vec3 inverted_normal = gm_vec3_scalar_product(-1.0f, normal);
+	Support_Point support = collision_gjk_individual_support(b, normal);
+	r32 len = gm_vec3_length(support.v);
+	//array_push(result, support.v);
+
+	if (b->vertex_count == 72) {
+		nnn = normal;
+		ppp = support.v;
+		pppenetration = penetration;
+	}
+
+	r32 support_weight = gm_vec3_dot(support.v, normal);
+	for (u32 i = 0; i < b->vertex_count; ++i) {
+		//r32 weight = gm_vec3_dot(b->vertices[i], normal);
+		//r32 diff = support_weight - weight;
+		//assert(support_weight >= weight);
+		//if (support_weight - weight < penetration) {
+		//	add_to_result_array(&result, b->vertices[i]);
+		//}
+
+		r32 distance = gm_vec3_dot(normal, gm_vec3_subtract(b->vertices[i], support.v));
+		if (-distance < penetration) {
+			add_to_result_array(&result, b->vertices[i]);
+		}
+
+		//vec3 pn = gm_vec3_subtract(support.v, gm_vec3_scalar_product(penetration, normal));
+		//r32 distance = gm_vec3_dot(normal, gm_vec3_subtract(b->vertices[i], pn));
+		//if (distance > 0.0f) {
+		//	add_to_result_array(&result, b->vertices[i]);
+		//}
+	}
+
 	return result;
 }
 
@@ -730,7 +745,7 @@ static vec2 get_center_of_polygon(Projected_Support_Point* polygon) {
 
 int tmp = 0;
 
-Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shape* b2, vec3 normal) {
+Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shape* b2, vec3 normal, r32 penetration, u32** one_rings1, u32** one_rings2) {
 	Persistent_Manifold pm;
 	pm.normal = normal;
 	pm.collision_points1 = array_new(vec3);
@@ -740,8 +755,10 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 	  struct timeval tv;
 		gettimeofday(&tv,NULL);
 		unsigned long start = 1000000 * tv.tv_sec + tv.tv_usec;
-	vec3* support_points1 = get_support_points_with_perturbation(b1, normal, strength);
-	vec3* support_points2 = get_support_points_with_perturbation(b2, gm_vec3_scalar_product(-1.0f, normal), strength);
+	Support_Point lul1 = collision_gjk_individual_support(b1, normal);
+	Support_Point lul2 = collision_gjk_individual_support(b2, gm_vec3_scalar_product(-1.0f, normal));
+	vec3* support_points1 = get_points_after_collision_plane(b1, normal, penetration, lul2.v);
+	vec3* support_points2 = get_points_after_collision_plane(b2, gm_vec3_scalar_product(-1.0f, normal), penetration, lul1.v);
 
 	Projected_Support_Point* proj_support_points1 = project_support_points_onto_normal_plane(support_points1, normal);
 	Projected_Support_Point* proj_support_points2 = project_support_points_onto_normal_plane(support_points2, normal);
@@ -750,24 +767,6 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 	Projected_Support_Point* polygon2 = jarvis_march(proj_support_points2);
 
 	Persistent_Manifold_Point* persistent_manifold_points = clip_support_points(polygon1, polygon2, normal);
-
-	for (u32 i = 0; i < 0; ++i) {
-		if (array_length(persistent_manifold_points) != 0) {
-			break;
-		}
-
-		strength += 0.01f;
-		support_points1 = get_support_points_with_perturbation(b1, normal, strength);
-		support_points2 = get_support_points_with_perturbation(b2, gm_vec3_scalar_product(-1.0f, normal), strength);
-
-		proj_support_points1 = project_support_points_onto_normal_plane(support_points1, normal);
-		proj_support_points2 = project_support_points_onto_normal_plane(support_points2, normal);
-
-		polygon1 = jarvis_march(proj_support_points1);
-		polygon2 = jarvis_march(proj_support_points2);
-
-		persistent_manifold_points = clip_support_points(polygon1, polygon2, normal);
-	}
 
 	if (tmp) {
 		persistent_manifold_points = array_new(Persistent_Manifold_Point);
@@ -830,8 +829,7 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 	return pm;
 }
 
-Persistent_Manifold collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
-{
+Persistent_Manifold collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, u32** one_rings1, u32** one_rings2) {
   int index = -1;
   Face *faces = array_new_len(Face, 4);
   array_length(faces) = 4;
@@ -869,7 +867,8 @@ Persistent_Manifold collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bo
 
 	  array_free(faces);
 
-	  Persistent_Manifold pm = create_persistent_manifold(b1, b2, gm_vec3_normalize(faces[index].normal));
+	  Persistent_Manifold pm = create_persistent_manifold(b1, b2, gm_vec3_normalize(faces[index].normal),
+	  	faces[index].distance, one_rings1, one_rings2);
 	  return pm;
 	}
 	// Expand polytope
