@@ -440,7 +440,7 @@ static vec3 find_ortho(vec3 v) {
 	}
 }
 
-Support_Point
+s32
 collision_gjk_individual_support(Bounding_Shape* b, vec3 direction)
 {
   float max = -FLT_MAX;
@@ -455,47 +455,165 @@ collision_gjk_individual_support(Bounding_Shape* b, vec3 direction)
 	}
   }
 
-  Support_Point sup_point = {
-	.v = b->vertices[index],
-	.sup = b->vertices[index]
-  };
-  return sup_point;
+//  Support_Point sup_point = {
+//	.v = b->vertices[index],
+//	.sup = b->vertices[index]
+//  };
+  return index;
 }
 
-vec3* get_support_points_with_perturbation(Bounding_Shape* b, vec3 direction, r32 strength) {
-	vec3* result = array_new(vec3);
+static vec3 get_normal_of_triangle(vec3 t1, vec3 t2, vec3 t3) {
+	vec3 t12 = gm_vec3_subtract(t2, t1);
+	vec3 t13 = gm_vec3_subtract(t3, t1);
+	return gm_vec3_normalize(gm_vec3_cross(t12, t13));
+}
 
-	Support_Point support = collision_gjk_individual_support(b, direction);
-	array_push(result, support.v);
+static boolean same_vector(vec3 a, vec3 b) {
+	return a.x == b.x && a.y == b.y && a.z == b.z;
+}
 
-	const int NUM_ITERATIONS = 16;
-	r32 angle = 360.0f / NUM_ITERATIONS;
-	vec3 ortho = gm_vec3_scalar_product(strength, find_ortho(direction));
-	printf("=============\n");
-	for (int i = 0; i < NUM_ITERATIONS; ++i) {
-		Quaternion rotation_around_support_direction = quaternion_new(direction, angle * i);
-		mat3 m = quaternion_get_matrix3(&rotation_around_support_direction);
-		vec3 rotated_ortho = gm_mat3_multiply_vec3(&m, ortho);
-		vec3 perturbed_support_direction1 = gm_vec3_add(direction, rotated_ortho);
-		printf("<%.3f, %.3f, %.3f>\n", perturbed_support_direction1.x, perturbed_support_direction1.y, perturbed_support_direction1.z);
+static vec3 find_the_other_neighbor(Bounding_Shape* b, Mesh* m, vec3 target1, vec3 target2, vec3 target3, vec3 normal, vec3* neighbor) {
+	boolean found = false;
+	r32 max_dot;
+	vec3 chosen_neighbor, chosen_normal;
 
-		Support_Point support = collision_gjk_individual_support(b, perturbed_support_direction1);
+	for (u32 i = 0; i < array_length(m->indices); i += 3) {
+		u32 i1 = m->indices[i + 0];
+		u32 i2 = m->indices[i + 1];
+		u32 i3 = m->indices[i + 2];
 
-		boolean duplicated = false;
-		for (int j = 0; j < array_length(result); ++j) {
-			vec3 current = result[j];
-			if (support.v.x == current.x && support.v.y == current.y && support.v.z == current.z) {
-				duplicated = true;
-				break;
+		vec3 v1 = b->vertices[i1];
+		vec3 v2 = b->vertices[i2];
+		vec3 v3 = b->vertices[i3];
+
+		if (same_vector(v1, target1) || same_vector(v1, target2) || same_vector(v1, target3)) {
+			if (same_vector(v2, target1) || same_vector(v2, target2) || same_vector(v2, target3)) {
+				if (!same_vector(v3, target1) && !same_vector(v3, target2) && !same_vector(v3, target3)) {
+					// v3
+					vec3 n = get_normal_of_triangle(v1, v2, v3);
+					r32 dot = gm_vec3_dot(n, normal);
+					if (!found || dot > max_dot) {
+						found = true;
+						max_dot = dot;
+						chosen_neighbor = v3;
+						chosen_normal = n;
+					}
+				}
+			} else {
+				if (same_vector(v3, target1) || same_vector(v3, target2) || same_vector(v3, target3)) {
+					// v2
+					vec3 n = get_normal_of_triangle(v1, v2, v3);
+					r32 dot = gm_vec3_dot(n, normal);
+					if (!found || dot > max_dot) {
+						found = true;
+						max_dot = dot;
+						chosen_neighbor = v2;
+						chosen_normal = n;
+					}
+				}
 			}
-		}
-
-		if (!duplicated) {
-			array_push(result, support.v);
+		} else {
+			if (same_vector(v2, target1) || same_vector(v2, target2) || same_vector(v2, target3)) {
+				if (same_vector(v3, target1) || same_vector(v3, target2) || same_vector(v3, target3)) {
+					// v1
+					vec3 n = get_normal_of_triangle(v1, v2, v3);
+					r32 dot = gm_vec3_dot(n, normal);
+					if (!found || dot > max_dot) {
+						found = true;
+						max_dot = dot;
+						chosen_neighbor = v1;
+						chosen_normal = n;
+					}
+				}
+			}
 		}
 	}
 
-	printf("=============\n");
+
+	assert(found);
+	*neighbor = chosen_neighbor;
+	return chosen_normal;
+}
+
+static vec3 get_triangle_with_most_fitting_normal(Bounding_Shape* b, vec3 normal, Mesh* m, s32 vertex_idx, vec3* _v1, vec3* _v2) {
+	boolean found = false;
+	r32 max_dot;
+	vec3 chosen_neighbor1, chosen_neighbor2, chosen_normal;
+
+	vec3 vertex_of_interest = b->vertices[vertex_idx];
+
+	for (u32 i = 0; i < array_length(m->indices); i += 3) {
+		u32 i1 = m->indices[i + 0];
+		u32 i2 = m->indices[i + 1];
+		u32 i3 = m->indices[i + 2];
+
+		vec3 v1 = b->vertices[i1];
+		vec3 v2 = b->vertices[i2];
+		vec3 v3 = b->vertices[i3];
+
+		if (v1.x == vertex_of_interest.x && v1.y == vertex_of_interest.y && v1.z == vertex_of_interest.z) {
+			vec3 n = get_normal_of_triangle(v1, v2, v3);
+			r32 dot = gm_vec3_dot(n, normal);
+			if (!found || dot > max_dot) {
+				found = true;
+				max_dot = dot;
+				chosen_neighbor1 = v2;
+				chosen_neighbor2 = v3;
+				chosen_normal = n;
+			}
+		} else if (v2.x == vertex_of_interest.x && v2.y == vertex_of_interest.y && v2.z == vertex_of_interest.z) {
+			vec3 n = get_normal_of_triangle(v1, v2, v3);
+			r32 dot = gm_vec3_dot(n, normal);
+			if (!found || dot > max_dot) {
+				found = true;
+				max_dot = dot;
+				chosen_neighbor1 = v1;
+				chosen_neighbor2 = v3;
+				chosen_normal = n;
+			}
+		} else if (v3.x == vertex_of_interest.x && v3.y == vertex_of_interest.y && v3.z == vertex_of_interest.z) {
+			vec3 n = get_normal_of_triangle(v1, v2, v3);
+			r32 dot = gm_vec3_dot(n, normal);
+			if (!found || dot > max_dot) {
+				found = true;
+				max_dot = dot;
+				chosen_neighbor1 = v2;
+				chosen_neighbor2 = v3;
+				chosen_normal = n;
+			}
+		}
+	}
+
+	assert(found);
+	*_v1 = chosen_neighbor1;
+	*_v2 = chosen_neighbor2;
+	return chosen_normal;
+}
+
+static vec3* get_relevant_support_points(Bounding_Shape* b, vec3 normal, Mesh* m, vec3* face_normal) {
+	const r32 EPSILON = 0.000001f;
+	vec3* result = array_new(vec3);
+	s32 support_idx = collision_gjk_individual_support(b, normal);
+
+	vec3 v1, v2;
+	vec3 chosen_normal = get_triangle_with_most_fitting_normal(b, normal, m, support_idx, &v1, &v2);
+
+	vec3 other_neighbor;
+	vec3 other_neighbor_normal = find_the_other_neighbor(b, m, v1, v2, b->vertices[support_idx], normal, &other_neighbor);
+
+	// @TODO: check winding order
+	array_push(result, b->vertices[support_idx]);
+	array_push(result, v1);
+	array_push(result, v2);
+
+	r32 proj = gm_vec3_dot(chosen_normal, other_neighbor_normal);
+
+	if ((proj - 1.0f) > -EPSILON && (proj - 1.0f) < EPSILON) {
+		array_push(result, other_neighbor);
+	}
+
+	*face_normal = chosen_normal;
+
 	return result;
 }
 
@@ -730,18 +848,24 @@ static vec2 get_center_of_polygon(Projected_Support_Point* polygon) {
 
 int tmp = 0;
 
-Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shape* b2, vec3 normal) {
+Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shape* b2, vec3 normal, Mesh* m1, Mesh* m2) {
 	Persistent_Manifold pm;
 	pm.normal = normal;
 	pm.collision_points1 = array_new(vec3);
 	pm.collision_points2 = array_new(vec3);
-	r32 strength = 0.09f;
 
-	  struct timeval tv;
-		gettimeofday(&tv,NULL);
-		unsigned long start = 1000000 * tv.tv_sec + tv.tv_usec;
-	vec3* support_points1 = get_support_points_with_perturbation(b1, normal, strength);
-	vec3* support_points2 = get_support_points_with_perturbation(b2, gm_vec3_scalar_product(-1.0f, normal), strength);
+	vec3 inverted_normal = gm_vec3_scalar_product(-1.0f, normal);
+
+	vec3 chosen_normal1, chosen_normal2;
+	vec3* support_points1 = get_relevant_support_points(b1, normal, m1, &chosen_normal1);
+	vec3* support_points2 = get_relevant_support_points(b2, inverted_normal, m2, &chosen_normal2);
+
+	r32 chosen_normal1_dot = gm_vec3_dot(chosen_normal1, normal);
+	r32 chosen_normal2_dot = gm_vec3_dot(chosen_normal2, inverted_normal);
+
+	boolean is_normal1_more_parallel = chosen_normal1_dot > chosen_normal2_dot;
+	vec3* reference_face_support_points = is_normal1_more_parallel ? support_points1 : support_points2;
+	vec3* incident_face_support_points = is_normal1_more_parallel ? support_points2 : support_points1;
 
 	Projected_Support_Point* proj_support_points1 = project_support_points_onto_normal_plane(support_points1, normal);
 	Projected_Support_Point* proj_support_points2 = project_support_points_onto_normal_plane(support_points2, normal);
@@ -750,24 +874,6 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 	Projected_Support_Point* polygon2 = jarvis_march(proj_support_points2);
 
 	Persistent_Manifold_Point* persistent_manifold_points = clip_support_points(polygon1, polygon2, normal);
-
-	for (u32 i = 0; i < 0; ++i) {
-		if (array_length(persistent_manifold_points) != 0) {
-			break;
-		}
-
-		strength += 0.01f;
-		support_points1 = get_support_points_with_perturbation(b1, normal, strength);
-		support_points2 = get_support_points_with_perturbation(b2, gm_vec3_scalar_product(-1.0f, normal), strength);
-
-		proj_support_points1 = project_support_points_onto_normal_plane(support_points1, normal);
-		proj_support_points2 = project_support_points_onto_normal_plane(support_points2, normal);
-
-		polygon1 = jarvis_march(proj_support_points1);
-		polygon2 = jarvis_march(proj_support_points2);
-
-		persistent_manifold_points = clip_support_points(polygon1, polygon2, normal);
-	}
 
 	if (tmp) {
 		persistent_manifold_points = array_new(Persistent_Manifold_Point);
@@ -824,13 +930,10 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 		array_push(pm.collision_points2, persistent_manifold_points[i].wc2);
 	}
 
-		gettimeofday(&tv,NULL);
-		unsigned long now = 1000000 * tv.tv_sec + tv.tv_usec;
-	  printf("Took %.3f.\n", (now - start) / (1000.0f));
 	return pm;
 }
 
-Persistent_Manifold collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2)
+Persistent_Manifold collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, Mesh* m1, Mesh* m2)
 {
   int index = -1;
   Face *faces = array_new_len(Face, 4);
@@ -869,7 +972,7 @@ Persistent_Manifold collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bo
 
 	  array_free(faces);
 
-	  Persistent_Manifold pm = create_persistent_manifold(b1, b2, gm_vec3_normalize(faces[index].normal));
+	  Persistent_Manifold pm = create_persistent_manifold(b1, b2, gm_vec3_normalize(faces[index].normal), m1, m2);
 	  return pm;
 	}
 	// Expand polytope

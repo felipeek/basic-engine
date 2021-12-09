@@ -42,6 +42,6 @@ typedef struct {
 Collision_Point* collision_get_plane_cube_points(Entity* cube, r32 plane_y);
 
 boolean collision_gjk_collides(GJK_Support_List* sup_list, Bounding_Shape* b1, Bounding_Shape* b2);
-Persistent_Manifold collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2);
+Persistent_Manifold collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, Mesh* m1, Mesh* m2);
 
 #endif
