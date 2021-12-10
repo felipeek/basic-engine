@@ -69,11 +69,19 @@ int core_init()
 	// Create light
 	lights = create_lights();
 
+	// bug EPA
+	//Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	//graphics_entity_create_with_color(&plane, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
+	//m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	//graphics_entity_create_with_color(&cube, m, (vec4){0.0f, 0.5f, 0.5f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
+
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&plane, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
 	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&cube, m, (vec4){-1.272, -0.059, -0.221}, (Quaternion){-0.381, -0.008, -0.434, 0.816},
+	graphics_entity_create_with_color(&cube, m, (vec4){0.226056, 0.610431, 0.736639, 1.0f}, (Quaternion){-0.236703, -0.255289, -0.064614, 0.935213},
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
 
 	// bug 1
@@ -81,7 +89,7 @@ int core_init()
 	//graphics_entity_create_with_color(&plane, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
 	//m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	//graphics_entity_create_with_color(&cube, m, (vec4){0.0f, 0.7f, 0.5f, 1.0f}, quaternion_new((vec3){3.0f, 1.0f, 0.5f}, 0.0f),
+	//graphics_entity_create_with_color(&cube, m, (vec4){0.770566, 1.077505, 0.137003, 1.0f}, (Quaternion){-0.578769, -0.489877, -0.130215, -0.638973},
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
 
 	// bug2
@@ -141,8 +149,8 @@ void core_update(r32 delta_time)
 		collision = false;
 	}
 
-	printf("wc: %.3f, %.3f, %.3f\n", cube.world_position.x, cube.world_position.y, cube.world_position.z);
-	printf("q: %.3f, %.3f, %.3f, %.3f\n", cube.world_rotation.x, cube.world_rotation.y, cube.world_rotation.z, cube.world_rotation.w);
+	printf("wc: %f, %f, %f\n", cube.world_position.x, cube.world_position.y, cube.world_position.z);
+	printf("q: %f, %f, %f, %f\n", cube.world_rotation.x, cube.world_rotation.y, cube.world_rotation.z, cube.world_rotation.w);
 
 	//physics_simulate(&cube, &plane, PLANE_Y, delta_time, forces);
 	//array_clear(forces);

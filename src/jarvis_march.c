@@ -2,6 +2,9 @@
 #include <float.h>
 #include <light_array.h>
 
+#define max(a,b)    (((a) > (b)) ? (a) : (b))
+#define min(a,b)    (((a) < (b)) ? (a) : (b))
+
 typedef struct {
 	vec2 point;
 	int selected_index;
@@ -47,6 +50,7 @@ static int get_leftest_point(Projected_Support_Point* points) {
 	return selected_index;
 }
 
+// Returns points in CCW winding
 Projected_Support_Point* jarvis_march(Projected_Support_Point* points) {
 	// Corner-cases
 	if (array_length(points) == 0 || array_length(points) == 1 || array_length(points) == 2) {
@@ -106,7 +110,7 @@ Projected_Support_Point* jarvis_march(Projected_Support_Point* points) {
 				candidate_point = current_point;
 				// Clear the colinear points since they were related to the last candidate point - they don't apply anymore.
 				array_clear(colinear_points);
-			} else if (cross == 0.0f) {
+			} else if (cross == 0.0f) { // This test determines whether the output will be CW or CCW
 				// In this case, the current point and the candidate point are colinear points. We need to handle them specially.
 				// We check the which one is closer to the last selected point. The closer one goes to the colinear_points array.
 				if (current_point.last_selected_point_to_me_distance > candidate_point.last_selected_point_to_me_distance) {
@@ -164,4 +168,170 @@ Projected_Support_Point* jarvis_march(Projected_Support_Point* points) {
 	array_free(points_to_process);
 	array_free(colinear_points);
 	return convex_hull;
+}
+
+static vec2 intersection_line_line(vec2 p1, vec2 p2, vec2 p3, vec2 p4) {
+	vec2 result;
+
+	r32 D = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
+
+	result.x = ((((p1.x * p2.y) - (p1.y * p2.x)) * (p3.x - p4.x)) - ((p1.x - p2.x) * ((p3.x * p4.y) - (p3.y * p4.x)))) / D;
+	result.y = ((((p1.x * p2.y) - (p1.y * p2.x)) * (p3.y - p4.y)) - ((p1.y - p2.y) * ((p3.x * p4.y) - (p3.y * p4.x)))) / D;
+
+	return result;
+}
+
+// Accepts points in CCW winding and returns points in CCW winding
+vec2* sutherland_hodgman(vec2* subject, vec2* clip) {
+	vec2* output_list = array_copy(subject);
+
+	for (u32 i = 0; i < array_length(clip); ++i) {
+		vec2 e1 = clip[i];
+		vec2 e2 = clip[(i == array_length(clip) - 1) ? 0 : i + 1];
+		vec2 edge = gm_vec2_subtract(e2, e1);
+
+		vec2* input_list = array_copy(output_list);
+		array_clear(output_list);
+
+		for (u32 j = 0; j < array_length(input_list); ++j) {
+			vec2 current_point = input_list[j];
+			vec2 prev_point = input_list[(j == 0) ? (array_length(input_list) - 1): j - 1];
+
+			vec2 e1_to_current_point = gm_vec2_subtract(current_point, e1);
+			vec2 e1_to_prev_point = gm_vec2_subtract(prev_point, e1);
+			if (gm_vec2_cross(edge, e1_to_current_point) >= 0.0f) {
+				if (gm_vec2_cross(edge, e1_to_prev_point) < 0.0f) {
+					vec2 intersecting_point = intersection_line_line(prev_point, current_point, e1, e2);
+					array_push(output_list, intersecting_point);
+				}
+				array_push(output_list, current_point);
+			} else if (gm_vec2_cross(edge, e1_to_prev_point) >= 0.0f) {
+				vec2 intersecting_point = intersection_line_line(prev_point, current_point, e1, e2);
+				array_push(output_list, intersecting_point);
+			}
+		}
+	}
+
+	return output_list;
+}
+
+boolean PointInPlane(const Plane* plane, vec3 position) {
+	float distance = -gm_vec3_dot(plane->normal, plane->point);
+	if (gm_vec3_dot(position, plane->normal) + distance < 0.0f) {
+		return false;
+	}
+
+	return true;
+}
+
+boolean PlaneEdgeIntersection(
+	const Plane* plane,
+	const vec3 start,
+	const vec3 end,
+	vec3* out_point)
+{
+	vec3 ab = gm_vec3_subtract(end, start);
+
+	//Check that the edge and plane are not parallel and thus never intersect
+	// We do this by projecting the line (start - A, End - B) ab along the plane
+	float ab_p = gm_vec3_dot(plane->normal, ab);
+	if (fabs(ab_p) > 1e-6f)
+	{
+		//Generate a random point on the plane (any point on the plane will suffice)
+		float distance = -gm_vec3_dot(plane->normal, plane->point);
+		vec3 p_co = gm_vec3_scalar_product(-distance, plane->normal);
+
+		//Work out the edge factor to scale edge by
+		// e.g. how far along the edge to traverse before it meets the plane.
+		//      This is computed by: -proj<plane_nrml>(edge_start - any_planar_point) / proj<plane_nrml>(edge_start - edge_end)
+		float fac = -gm_vec3_dot(plane->normal, gm_vec3_subtract(start, p_co)) / ab_p;
+
+		//Stop any large floating point divide issues with almost parallel planes
+		fac = min(max(fac, 0.0f), 1.0f); 
+
+		//Return point on edge
+		*out_point = gm_vec3_add(start, gm_vec3_scalar_product(fac, ab));
+		return true;
+	}
+
+	return false;
+}
+
+//Performs sutherland hodgman clipping algorithm to clip the provided mesh
+//    or polygon in regards to each of the provided clipping planes.
+void SutherlandHodgmanClipping(
+	vec3* input_polygon,
+	int num_clip_planes,
+	const Plane* clip_planes,
+	vec3** out_polygon,
+	boolean removeNotClipToPlane)
+{
+	assert(out_polygon != NULL);
+	assert(num_clip_planes > 0);
+
+	//Create temporary list of vertices
+	// - We will keep ping-pong'ing between the two lists updating them as we go.
+	vec3* input = array_copy(input_polygon);
+	vec3* output = array_new(vec3);
+
+	//Iterate over each clip_plane provided
+	for (int i = 0; i < num_clip_planes; ++i)
+	{
+		//If every single point on our shape has already been removed previously, just exit
+		if (array_length(input) == 0)
+			break;
+
+		const Plane* plane = &clip_planes[i];
+
+		//Loop through each edge of the polygon (see line_loop from gfx) and clip
+		// that edge against the current plane.
+		vec3 tempPoint, startPoint = input[array_length(input) - 1];
+		for (u32 j = 0; j < array_length(input); ++j)
+		{
+			vec3 endPoint = input[j];
+			boolean startInPlane = PointInPlane(plane, startPoint);
+			boolean endInPlane = PointInPlane(plane, endPoint);
+
+			//If it's the final pass, just remove all points outside the reference plane
+			// - This won't return a true polygon if set, but is needed for the last step
+			//   we do in the manifold generation
+			if (removeNotClipToPlane)
+			{
+				if (endInPlane)
+					array_push(output, endPoint);
+			}
+			else
+			{
+				//If the edge is entirely within the clipping plane, keep it as it is
+				if (startInPlane && endInPlane)
+				{
+					array_push(output, endPoint);
+				}
+				//If the edge interesects the clipping plane, cut the edge along clip plane
+				else if (startInPlane && !endInPlane)
+				{
+					if (PlaneEdgeIntersection(plane, startPoint, endPoint, &tempPoint))
+						array_push(output, tempPoint);
+				}
+				else if (!startInPlane && endInPlane)
+				{
+					if (PlaneEdgeIntersection(plane, startPoint, endPoint, &tempPoint))
+						array_push(output, tempPoint);
+
+					array_push(output, endPoint);
+				}
+			}
+			//..otherwise the edge is entirely outside the clipping plane and should be removed/ignored
+
+			startPoint = endPoint;
+		}
+
+		//Swap input/output polygons, and clear output list for us to generate afresh
+		vec3* tmp = input;
+		input = output;
+		output = tmp;
+		array_clear(output);
+	}
+
+	*out_polygon = input;
 }

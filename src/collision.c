@@ -472,10 +472,65 @@ static boolean same_vector(vec3 a, vec3 b) {
 	return a.x == b.x && a.y == b.y && a.z == b.z;
 }
 
-static vec3 find_the_other_neighbor(Bounding_Shape* b, Mesh* m, vec3 target1, vec3 target2, vec3 target3, vec3 normal, vec3* neighbor) {
+static Plane* find_boundary_planes(Bounding_Shape* b, Mesh* m, vec3* points) {
+	Plane* result = array_new(Plane);
+
+	for (u32 i = 0; i < array_length(m->indices); i += 3) {
+		u32 i1 = m->indices[i + 0];
+		u32 i2 = m->indices[i + 1];
+		u32 i3 = m->indices[i + 2];
+
+		vec3 v1 = b->vertices[i1];
+		vec3 v2 = b->vertices[i2];
+		vec3 v3 = b->vertices[i3];
+
+		boolean found_v1 = false;
+		boolean found_v2 = false;
+		boolean found_v3 = false;
+
+		for (u32 j = 0; j < array_length(points); ++j) {
+			vec3 point = points[j];
+			if (same_vector(v1, points[j])) {
+				found_v1 = true;
+			}
+			if (same_vector(v2, points[j])) {
+				found_v2 = true;
+			}
+			if (same_vector(v3, points[j])) {
+				found_v3 = true;
+			}
+		}
+
+		if (found_v1 && found_v2 && !found_v3) {
+			Plane p;
+			p.point = v3;
+			p.normal = gm_vec3_scalar_product(-1.0f, get_normal_of_triangle(v1, v2, v3));
+			array_push(result, p);
+		} else if (found_v1 && !found_v2 && found_v3) {
+			Plane p;
+			p.point = v2;
+			p.normal = gm_vec3_scalar_product(-1.0f, get_normal_of_triangle(v1, v2, v3));
+			array_push(result, p);
+		} else if (!found_v1 && found_v2 && found_v3) {
+			Plane p;
+			p.point = v1;
+			p.normal = gm_vec3_scalar_product(-1.0f, get_normal_of_triangle(v1, v2, v3));
+			array_push(result, p);
+		}
+	}
+
+	return result;
+}
+
+static vec3* get_triangle_of_most_fitting_neighbor(Bounding_Shape* b, Mesh* m, vec3* most_fitting_triangle, vec3 normal, vec3* neighbor_normal) {
+	vec3* result = array_new(vec3);
 	boolean found = false;
 	r32 max_dot;
-	vec3 chosen_neighbor, chosen_normal;
+	vec3 chosen_normal;
+
+	vec3 target1 = most_fitting_triangle[0];
+	vec3 target2 = most_fitting_triangle[1];
+	vec3 target3 = most_fitting_triangle[2];
 
 	for (u32 i = 0; i < array_length(m->indices); i += 3) {
 		u32 i1 = m->indices[i + 0];
@@ -495,7 +550,10 @@ static vec3 find_the_other_neighbor(Bounding_Shape* b, Mesh* m, vec3 target1, ve
 					if (!found || dot > max_dot) {
 						found = true;
 						max_dot = dot;
-						chosen_neighbor = v3;
+						array_clear(result);
+						array_push(result, v1);
+						array_push(result, v2);
+						array_push(result, v3);
 						chosen_normal = n;
 					}
 				}
@@ -507,7 +565,10 @@ static vec3 find_the_other_neighbor(Bounding_Shape* b, Mesh* m, vec3 target1, ve
 					if (!found || dot > max_dot) {
 						found = true;
 						max_dot = dot;
-						chosen_neighbor = v2;
+						array_clear(result);
+						array_push(result, v1);
+						array_push(result, v2);
+						array_push(result, v3);
 						chosen_normal = n;
 					}
 				}
@@ -521,7 +582,10 @@ static vec3 find_the_other_neighbor(Bounding_Shape* b, Mesh* m, vec3 target1, ve
 					if (!found || dot > max_dot) {
 						found = true;
 						max_dot = dot;
-						chosen_neighbor = v1;
+						array_clear(result);
+						array_push(result, v1);
+						array_push(result, v2);
+						array_push(result, v3);
 						chosen_normal = n;
 					}
 				}
@@ -531,14 +595,16 @@ static vec3 find_the_other_neighbor(Bounding_Shape* b, Mesh* m, vec3 target1, ve
 
 
 	assert(found);
-	*neighbor = chosen_neighbor;
-	return chosen_normal;
+	*neighbor_normal = chosen_normal;
+	return result;
 }
 
-static vec3 get_triangle_with_most_fitting_normal(Bounding_Shape* b, vec3 normal, Mesh* m, s32 vertex_idx, vec3* _v1, vec3* _v2) {
+static vec3* get_triangle_with_most_fitting_normal(Bounding_Shape* b, vec3 normal, Mesh* m, s32 vertex_idx, vec3* triangle_normal) {
+	vec3* result = array_new(vec3);
+
 	boolean found = false;
 	r32 max_dot;
-	vec3 chosen_neighbor1, chosen_neighbor2, chosen_normal;
+	vec3 chosen_normal;
 
 	vec3 vertex_of_interest = b->vertices[vertex_idx];
 
@@ -557,8 +623,10 @@ static vec3 get_triangle_with_most_fitting_normal(Bounding_Shape* b, vec3 normal
 			if (!found || dot > max_dot) {
 				found = true;
 				max_dot = dot;
-				chosen_neighbor1 = v2;
-				chosen_neighbor2 = v3;
+				array_clear(result);
+				array_push(result, v1);
+				array_push(result, v2);
+				array_push(result, v3);
 				chosen_normal = n;
 			}
 		} else if (v2.x == vertex_of_interest.x && v2.y == vertex_of_interest.y && v2.z == vertex_of_interest.z) {
@@ -567,8 +635,10 @@ static vec3 get_triangle_with_most_fitting_normal(Bounding_Shape* b, vec3 normal
 			if (!found || dot > max_dot) {
 				found = true;
 				max_dot = dot;
-				chosen_neighbor1 = v1;
-				chosen_neighbor2 = v3;
+				array_clear(result);
+				array_push(result, v1);
+				array_push(result, v2);
+				array_push(result, v3);
 				chosen_normal = n;
 			}
 		} else if (v3.x == vertex_of_interest.x && v3.y == vertex_of_interest.y && v3.z == vertex_of_interest.z) {
@@ -577,44 +647,86 @@ static vec3 get_triangle_with_most_fitting_normal(Bounding_Shape* b, vec3 normal
 			if (!found || dot > max_dot) {
 				found = true;
 				max_dot = dot;
-				chosen_neighbor1 = v2;
-				chosen_neighbor2 = v3;
+				array_clear(result);
+				array_push(result, v1);
+				array_push(result, v2);
+				array_push(result, v3);
 				chosen_normal = n;
 			}
 		}
 	}
 
 	assert(found);
-	*_v1 = chosen_neighbor1;
-	*_v2 = chosen_neighbor2;
-	return chosen_normal;
+	*triangle_normal = chosen_normal;
+	return result;
 }
 
-static vec3* get_relevant_support_points(Bounding_Shape* b, vec3 normal, Mesh* m, vec3* face_normal) {
-	const r32 EPSILON = 0.000001f;
+static vec3* merge_triangles(vec3* triangle1, vec3* triangle2) {
 	vec3* result = array_new(vec3);
-	s32 support_idx = collision_gjk_individual_support(b, normal);
 
-	vec3 v1, v2;
-	vec3 chosen_normal = get_triangle_with_most_fitting_normal(b, normal, m, support_idx, &v1, &v2);
+	boolean found = false;
+	vec3 different_vertex_triangle_2;
 
-	vec3 other_neighbor;
-	vec3 other_neighbor_normal = find_the_other_neighbor(b, m, v1, v2, b->vertices[support_idx], normal, &other_neighbor);
+	for (u32 i = 0; i < 3; ++i) {
+		boolean same = false;
+		for (u32 j = 0; j < 3; ++j) {
+			if (same_vector(triangle2[i], triangle1[j])) {
+				same = true;
+				break;
+			}
+		}
 
-	// @TODO: check winding order
-	array_push(result, b->vertices[support_idx]);
-	array_push(result, v1);
-	array_push(result, v2);
-
-	r32 proj = gm_vec3_dot(chosen_normal, other_neighbor_normal);
-
-	if ((proj - 1.0f) > -EPSILON && (proj - 1.0f) < EPSILON) {
-		array_push(result, other_neighbor);
+		if (!same) {
+			different_vertex_triangle_2 = triangle2[i];
+			found = true;
+			break;
+		}
 	}
 
-	*face_normal = chosen_normal;
+	assert(found);
+	found = false;
 
+	for (u32 i = 0; i < 3; ++i) {
+		boolean same = false;
+		for (u32 j = 0; j < 3; ++j) {
+			if (same_vector(triangle1[i], triangle2[j])) {
+				same = true;
+				break;
+			}
+		}
+
+		if (!same) {
+			array_push(result, triangle1[i]);
+			array_push(result, triangle1[((int)i + 1) % 3]);
+			array_push(result, different_vertex_triangle_2);
+			array_push(result, triangle1[((int)i + 2) % 3]);
+			found = true;
+			break;
+		}
+	}
+
+	assert(found);
 	return result;
+}
+
+static vec3* get_face_with_most_fitting_normal_in_winding_order(Bounding_Shape* b, vec3 normal, Mesh* m, vec3* face_normal) {
+	const r32 EPSILON = 0.000001f;
+	s32 support_idx = collision_gjk_individual_support(b, normal);
+	vec3 most_fitting_normal;
+	vec3* most_fitting_triangle = get_triangle_with_most_fitting_normal(b, normal, m, support_idx, &most_fitting_normal);
+	vec3 neighbor_normal;
+	vec3* most_fitting_neighbor = get_triangle_of_most_fitting_neighbor(b, m, most_fitting_triangle, normal, &neighbor_normal);
+
+	// need to test most_fitting_normal against neighbor_normal since we wanna assert whether we are dealing with the same plane
+	r32 proj = gm_vec3_dot(most_fitting_normal, neighbor_normal);
+
+	if ((proj - 1.0f) > -EPSILON && (proj - 1.0f) < EPSILON) {
+		most_fitting_triangle = merge_triangles(most_fitting_triangle, most_fitting_neighbor);
+	}
+
+	*face_normal = most_fitting_normal;
+
+	return most_fitting_triangle;
 }
 
 // @TODO This can be merged with the get_support_points_with_perturbation function. Keeping it separated to ease debugging
@@ -857,8 +969,8 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 	vec3 inverted_normal = gm_vec3_scalar_product(-1.0f, normal);
 
 	vec3 chosen_normal1, chosen_normal2;
-	vec3* support_points1 = get_relevant_support_points(b1, normal, m1, &chosen_normal1);
-	vec3* support_points2 = get_relevant_support_points(b2, inverted_normal, m2, &chosen_normal2);
+	vec3* support_points1 = get_face_with_most_fitting_normal_in_winding_order(b1, normal, m1, &chosen_normal1);
+	vec3* support_points2 = get_face_with_most_fitting_normal_in_winding_order(b2, inverted_normal, m2, &chosen_normal2);
 
 	r32 chosen_normal1_dot = gm_vec3_dot(chosen_normal1, normal);
 	r32 chosen_normal2_dot = gm_vec3_dot(chosen_normal2, inverted_normal);
@@ -866,6 +978,19 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 	boolean is_normal1_more_parallel = chosen_normal1_dot > chosen_normal2_dot;
 	vec3* reference_face_support_points = is_normal1_more_parallel ? support_points1 : support_points2;
 	vec3* incident_face_support_points = is_normal1_more_parallel ? support_points2 : support_points1;
+
+	Plane* boundary_planes = is_normal1_more_parallel ? find_boundary_planes(b1, m1, support_points1) :
+		find_boundary_planes(b2, m2, support_points2);
+
+	vec3* out_polygon;
+	SutherlandHodgmanClipping(incident_face_support_points, array_length(boundary_planes), boundary_planes, &out_polygon, false);
+
+	Plane reference_plane;
+	reference_plane.normal = is_normal1_more_parallel ? gm_vec3_scalar_product(-1.0f, chosen_normal1) :
+		gm_vec3_scalar_product(-1.0f, chosen_normal2);
+	reference_plane.point = reference_face_support_points[0];
+
+	SutherlandHodgmanClipping(out_polygon, 1, &reference_plane, &out_polygon, true);
 
 	Projected_Support_Point* proj_support_points1 = project_support_points_onto_normal_plane(support_points1, normal);
 	Projected_Support_Point* proj_support_points2 = project_support_points_onto_normal_plane(support_points2, normal);
@@ -877,21 +1002,39 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 
 	if (tmp) {
 		persistent_manifold_points = array_new(Persistent_Manifold_Point);
-		for (u32 i = 0; i < array_length(support_points1); ++i) {
-			Persistent_Manifold_Point pmp;
-			pmp.pv2 = (vec2){0.0f, 0.0f};
-			pmp.wc1 = support_points1[i];
-			pmp.wc2 = (vec3){-9999.0f, -9999.0f, -9999.0f};
-			array_push(persistent_manifold_points, pmp);
-		}
+		//for (u32 i = 0; i < array_length(support_points1); ++i) {
+		//	Persistent_Manifold_Point pmp;
+		//	pmp.pv2 = (vec2){0.0f, 0.0f};
+		//	pmp.wc1 = support_points1[i];
+		//	pmp.wc2 = (vec3){-9999.0f, -9999.0f, -9999.0f};
+		//	array_push(persistent_manifold_points, pmp);
+		//}
 
-		for (u32 i = 0; i < array_length(support_points2); ++i) {
+		//for (u32 i = 0; i < array_length(support_points2); ++i) {
+		//	Persistent_Manifold_Point pmp;
+		//	pmp.pv2 = (vec2){0.0f, 0.0f};
+		//	pmp.wc1 = (vec3){-9999.0f, -9999.0f, -9999.0f};
+		//	pmp.wc2 = support_points2[i];
+		//	array_push(persistent_manifold_points, pmp);
+		//}
+
+#if 0
+		for (u32 i = 0; i < array_length(reference_face_support_points); ++i) {
 			Persistent_Manifold_Point pmp;
 			pmp.pv2 = (vec2){0.0f, 0.0f};
 			pmp.wc1 = (vec3){-9999.0f, -9999.0f, -9999.0f};
-			pmp.wc2 = support_points2[i];
+			pmp.wc2 = reference_face_support_points[i];
 			array_push(persistent_manifold_points, pmp);
 		}
+#else
+		for (u32 i = 0; i < array_length(out_polygon); ++i) {
+			Persistent_Manifold_Point pmp;
+			pmp.pv2 = (vec2){0.0f, 0.0f};
+			pmp.wc1 = (vec3){-9999.0f, -9999.0f, -9999.0f};
+			pmp.wc2 = out_polygon[i];
+			array_push(persistent_manifold_points, pmp);
+		}
+#endif
 	} else {
 		// Clear duplicated points
 		const r32 EPSILON = 0.000001f;
