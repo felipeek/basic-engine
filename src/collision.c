@@ -375,7 +375,7 @@ static Plane* find_boundary_planes(Bounding_Shape* b, Mesh* m, vec3* points) {
 		for (u32 j = i + 1; j < array_length(result); ++j) {
 			Plane* p1 = &result[i];
 			Plane* p2 = &result[j];
-			const r32 EPSILON = 0.0000001f;
+			const r32 EPSILON = 0.0001f;
 			r32 proj1 = gm_vec3_dot(p1->point, p1->normal);
 			r32 proj2 = gm_vec3_dot(p2->point, p2->normal);
 			if (fabsf(proj1 - proj2) < EPSILON) {
@@ -885,7 +885,7 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 	}
 
 	if (array_length(persistent_manifold_points) > 4) {
-		printf("maior q 4\n");
+		//printf("maior q 4\n");
 	}
 
 	for (u32 i = 0; i < array_length(persistent_manifold_points); ++i) {

@@ -37,9 +37,9 @@ void pmc_render(Perspective_Camera* camera) {
 			mat3 rot_matrix = quaternion_get_matrix3(&contact->e2->world_rotation);
 			vec3 collision_point = gm_vec3_add(gm_mat3_multiply_vec3(&rot_matrix, contact->r2_lc), contact->e2->world_position);
 			//vec3 collision_point = gm_vec3_add(contact->e2->world_position, contact->r2_wc);
-			//graphics_renderer_debug_points(&collision_point, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
-			//graphics_renderer_debug_vector(collision_point,
-			//	gm_vec3_add(collision_point, contact->normal), (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+			graphics_renderer_debug_points(&collision_point, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+			graphics_renderer_debug_vector(collision_point,
+				gm_vec3_add(collision_point, contact->normal), (vec4){1.0f, 1.0f, 1.0f, 1.0f});
 			//collision_point = gm_vec3_add(contact->e1->world_position, contact->r1_wc);
 			rot_matrix = quaternion_get_matrix3(&contact->e1->world_rotation);
 			collision_point = gm_vec3_add(gm_mat3_multiply_vec3(&rot_matrix, contact->r1_lc), contact->e1->world_position);

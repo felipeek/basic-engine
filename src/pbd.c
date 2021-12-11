@@ -255,6 +255,16 @@ void pbd_simulate(r32 dt, Entity* entities) {
 					boolean found_cp = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs, &cp);
 					if (found_cp) {
 						PMC_Contact* contacts = collision_get_convex_convex_points(e1, e2, cp.normal);
+						//if (array_length(contacts) > 4) {
+						//	paused = true;
+						//	collision_get_convex_convex_points(e1, e2, cp.normal);
+						//	return;
+						//}
+						//if (array_length(contacts) == 0) {
+						//	paused = true;
+						//	collision_get_convex_convex_points(e1, e2, cp.normal);
+						//	return;
+						//}
 						for (u32 l = 0; l < array_length(contacts); ++l) {
 							pmc_add(contacts[l]);
 							//paused = true;

@@ -43,6 +43,13 @@ static Light* create_lights()
 	graphics_light_create(&light, light_position, ambient_color, diffuse_color, specular_color);
 	array_push(lights, light);
 
+	light_position = (vec3) {0.0f, 0.0f, -15.0f};
+	ambient_color = (vec4) {0.1f, 0.1f, 0.1f, 1.0f};
+	diffuse_color = (vec4) {0.8, 0.8, 0.8, 1.0f};
+	specular_color = (vec4) {0.5f, 0.5f, 0.5f, 1.0f};
+	graphics_light_create(&light, light_position, ambient_color, diffuse_color, specular_color);
+	array_push(lights, light);
+
 	return lights;
 }
 
@@ -82,7 +89,7 @@ int core_init()
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 1.0f, 1.0f, 1.0f}, 5.0f);
 	//array_push(entities, e);
 
-#if 0
+#if 1
 #if 0
 	//graphics_entity_create_with_color(&e, m, (vec3){-2.5f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
@@ -101,10 +108,10 @@ int core_init()
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
 	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
 	array_push(entities, e);
-	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 7.4f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
-	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
-	array_push(entities, e);
+	//graphics_entity_create_with_color(&e, m, (vec3){0.0f, 7.4f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
+	////e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
+	//array_push(entities, e);
 #endif
 #endif
 
@@ -152,6 +159,7 @@ int paused = 0;
 void core_update(r32 delta_time)
 {
 	//delta_time = 0.015f; // 100 subs
+	//delta_time = 0.005f;
 	if (paused) {
 		run_collision_only(entities);
 		return;
