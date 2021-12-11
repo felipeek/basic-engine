@@ -296,6 +296,12 @@ vec3 GetClosestPointPolygon(vec3 position, vec3* polygon)
 	return final_closest_point;
 }
 
+vec3 GetClosestPointPolygon2(vec3 position, Plane* reference_plane) {
+	r32 d = gm_vec3_dot(gm_vec3_scalar_product(-1.0f, reference_plane->normal), reference_plane->point);
+	return gm_vec3_subtract(position,
+		gm_vec3_scalar_product(gm_vec3_dot(reference_plane->normal, position) + d, reference_plane->normal));
+}
+
 static vec3 get_normal_of_triangle(vec3 t1, vec3 t2, vec3 t3) {
 	vec3 t12 = gm_vec3_subtract(t2, t1);
 	vec3 t13 = gm_vec3_subtract(t3, t1);
@@ -788,7 +794,8 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 
 		for (u32 i = 0; i < array_length(out_polygon); ++i) {
 			vec3 point = out_polygon[i];
-			vec3 closest_point = GetClosestPointPolygon(point, reference_face_support_points);
+			//vec3 closest_point = GetClosestPointPolygon(point, reference_face_support_points);
+			vec3 closest_point = GetClosestPointPolygon2(point, &reference_plane);
 			vec3 point_diff = gm_vec3_subtract(point, closest_point);
 			r32 contact_penetration;
 

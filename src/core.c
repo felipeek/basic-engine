@@ -77,11 +77,12 @@ int core_init()
 	//graphics_entity_create_with_color(&e, m3, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f),
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 1.0f, 1.0f}, 50.0f);
 	//array_push(entities, e);
-	graphics_entity_create_with_color(&e, m4, (vec3){0.368596107, 3.0f, -1.01607966}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 45.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 1.0f, 1.0f, 1.0f}, 5.0f);
-	array_push(entities, e);
 
-#if 1
+	//graphics_entity_create_with_color(&e, m4, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 45.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 1.0f, 1.0f, 1.0f}, 5.0f);
+	//array_push(entities, e);
+
+#if 0
 #if 0
 	//graphics_entity_create_with_color(&e, m, (vec3){-2.5f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
@@ -92,18 +93,18 @@ int core_init()
 	////e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
 	//array_push(entities, e);
 #else
-	//graphics_entity_create_with_color(&e, m, (vec3){0.0f, 3.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
-	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
-	////e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
-	//array_push(entities, e);
-	//graphics_entity_create_with_color(&e, m, (vec3){0.0f, 5.2f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
-	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
-	////e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
-	//array_push(entities, e);
-	//graphics_entity_create_with_color(&e, m, (vec3){0.0f, 7.4f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
-	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
-	////e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
-	//array_push(entities, e);
+	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 3.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
+	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
+	array_push(entities, e);
+	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 5.2f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
+	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
+	array_push(entities, e);
+	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 7.4f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
+	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
+	array_push(entities, e);
 #endif
 #endif
 
@@ -147,13 +148,12 @@ static void run_collision_only(Entity* entities) {
 	}
 }
 
-int paused = 1;
+int paused = 0;
 void core_update(r32 delta_time)
 {
-	//delta_time = 0.019f; 10 sub
-	delta_time = 0.015f; // 100 subs
+	//delta_time = 0.015f; // 100 subs
 	if (paused) {
-		//run_collision_only(entities);
+		run_collision_only(entities);
 		return;
 	}
 
@@ -278,9 +278,9 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		char* mesh_name;
 		int r = rand();
 		if (r % 3 == 0) {
-			mesh_name = "./res/cube.obj";
+			mesh_name = "./res/ico.obj";
 		} else if (r % 3 == 1) {
-			mesh_name = "./res/cube.obj";
+			mesh_name = "./res/ico.obj";
 		} else {
 			mesh_name = "./res/cube.obj";
 		}

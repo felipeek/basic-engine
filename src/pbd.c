@@ -7,7 +7,7 @@
 #include "pmc.h"
 #include <hash_map.h>
 
-#define NUM_SUBSTEPS 100
+#define NUM_SUBSTEPS 10
 #define NUM_POS_ITERS 1
 
 extern int paused;
@@ -157,18 +157,18 @@ static void create_constraints_for_contacts(PMC* pmc, Constraint** constraints) 
 		vec3 p2 = calculate_p(contact->e2, contact->r2_lc);
 		r32 d = gm_vec3_dot(gm_vec3_subtract(p1, p2), contact->normal);
 		constraint.positional_constraint.delta_x = gm_vec3_scalar_product(d, contact->normal);
-		printf("%.4f\n", d);
-		printf("contacts: %d\n", array_length(pmc->contacts));
-		printf("r1_lc: <%.3f, %.3f, %.3f>\n", contact->r1_lc.x, contact->r1_lc.y, contact->r1_lc.z);
-		printf("r2_lc: <%.3f, %.3f, %.3f>\n", contact->r2_lc.x, contact->r2_lc.y, contact->r2_lc.z);
-		printf("r1_wc: <%.3f, %.3f, %.3f>\n", contact->r1_wc.x, contact->r1_wc.y, contact->r1_wc.z);
-		printf("r2_wc: <%.3f, %.3f, %.3f>\n", contact->r2_wc.x, contact->r2_wc.y, contact->r2_wc.z);
-		printf("normal: <%.3f, %.3f, %.3f>\n", contact->normal.x, contact->normal.y, contact->normal.z);
-		if (d > 0.001f) {
-			paused = true;
-			array_clear(*constraints);
-			return;
-		}
+		//printf("%.4f\n", d);
+		//printf("contacts: %d\n", array_length(pmc->contacts));
+		//printf("r1_lc: <%.3f, %.3f, %.3f>\n", contact->r1_lc.x, contact->r1_lc.y, contact->r1_lc.z);
+		//printf("r2_lc: <%.3f, %.3f, %.3f>\n", contact->r2_lc.x, contact->r2_lc.y, contact->r2_lc.z);
+		//printf("r1_wc: <%.3f, %.3f, %.3f>\n", contact->r1_wc.x, contact->r1_wc.y, contact->r1_wc.z);
+		//printf("r2_wc: <%.3f, %.3f, %.3f>\n", contact->r2_wc.x, contact->r2_wc.y, contact->r2_wc.z);
+		//printf("normal: <%.3f, %.3f, %.3f>\n", contact->normal.x, contact->normal.y, contact->normal.z);
+		//if (d > 0.001f) {
+		//	paused = true;
+		//	array_clear(*constraints);
+		//	return;
+		//}
 		if (d > 0.0f) {
 			// if 'd' is greater than 0.0, we add the constraint.
 			array_push(*constraints, constraint);
@@ -287,9 +287,6 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				create_constraints_for_contacts(pmc, &constraints);
 			}
 
-			if (paused)
-				return;
-
 			// Now, solve the constraints
 
 #if 0
@@ -390,7 +387,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				vec3 delta_v = (vec3){0.0f, 0.0f, 0.0f};
 				
 				// we start by applying Coloumb's dynamic friction force
-				const r32 dynamic_friction_coefficient = 1.0f;
+				const r32 dynamic_friction_coefficient = 0.8f;
 				r32 fn = lambda_n / (h * h);
 				// @NOTE: equation (30) was modified here
 				r32 fact = MIN(-h * dynamic_friction_coefficient * fn, gm_vec3_length(vt));
@@ -405,7 +402,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				vec3 v_til = gm_vec3_subtract(gm_vec3_add(old_v1, gm_vec3_cross(old_w1, r1_wc)), gm_vec3_add(old_v2, gm_vec3_cross(old_w2, r2_wc)));
 				r32 vn_til = gm_vec3_dot(n, v_til);
 				//r32 e = (fabsf(vn) > 2.0f * GRAVITY * h) ? 0.8f : 0.0f;
-				r32 e = 0.2f;
+				r32 e = 0.0f;
 				// @NOTE: equation (34) was modified here
 				fact = -vn + MIN(-e * vn_til, 0.0f);
 				// update delta_v
