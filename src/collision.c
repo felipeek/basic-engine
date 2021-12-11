@@ -519,6 +519,12 @@ vec3 GetClosestPointPolygon(vec3 position, vec3* polygon)
 	return final_closest_point;
 }
 
+vec3 GetClosestPointPolygon2(vec3 position, Plane* reference_plane) {
+	r32 d = gm_vec3_dot(gm_vec3_scalar_product(-1.0f, reference_plane->normal), reference_plane->point);
+	return gm_vec3_subtract(position,
+		gm_vec3_scalar_product(gm_vec3_dot(reference_plane->normal, position) + d, reference_plane->normal));
+}
+
 static vec3 get_normal_of_triangle(vec3 t1, vec3 t2, vec3 t3) {
 	vec3 t12 = gm_vec3_subtract(t2, t1);
 	vec3 t13 = gm_vec3_subtract(t3, t1);
@@ -587,6 +593,22 @@ static Plane* find_boundary_planes(Bounding_Shape* b, Mesh* m, vec3* points) {
 #endif
 	}
 
+	// filter planes
+	for (u32 i = 0; i < array_length(result); ++i) {
+		for (u32 j = i + 1; j < array_length(result); ++j) {
+			Plane* p1 = &result[i];
+			Plane* p2 = &result[j];
+			const r32 EPSILON = 0.0000001f;
+			r32 proj1 = gm_vec3_dot(p1->point, p1->normal);
+			r32 proj2 = gm_vec3_dot(p2->point, p2->normal);
+			if (fabsf(proj1 - proj2) < EPSILON) {
+				if (gm_vec3_length(gm_vec3_subtract(p1->normal, p2->normal)) < EPSILON) {
+					array_remove(result, j);
+					--j;
+				}
+			}
+		}
+	}
 	return result;
 }
 
@@ -995,7 +1017,8 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 
 		for (u32 i = 0; i < array_length(out_polygon); ++i) {
 			vec3 point = out_polygon[i];
-			vec3 closest_point = GetClosestPointPolygon(point, reference_face_support_points);
+			//vec3 closest_point = GetClosestPointPolygon(point, reference_face_support_points);
+			vec3 closest_point = GetClosestPointPolygon2(point, &reference_plane);
 			vec3 point_diff = gm_vec3_subtract(point, closest_point);
 			r32 contact_penetration;
 

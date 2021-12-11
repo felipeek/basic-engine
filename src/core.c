@@ -77,12 +77,12 @@ int core_init()
 	//graphics_entity_create_with_color(&cube, m, (vec4){0.0f, 0.5f, 0.5f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
 
-	//Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	//graphics_entity_create_with_color(&plane, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
-	//m = graphics_mesh_create_from_obj("./res/ico_low.obj", 0);
-	//graphics_entity_create_with_color(&cube, m, (vec4){0.226056, 0.610431, 0.736639, 1.0f}, (Quaternion){-0.236703, -0.255289, -0.064614, 0.935213},
-	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
+	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	graphics_entity_create_with_color(&plane, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
+	m = graphics_mesh_create_from_obj("./res/ico_low.obj", 0);
+	graphics_entity_create_with_color(&cube, m, (vec4){0.226056, 0.610431, 0.736639, 1.0f}, (Quaternion){-0.236703, -0.255289, -0.064614, 0.935213},
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 10.0f);
 
 	// edge bug (fix using Edge Contact -> https://ubm-twvideo01.s3.amazonaws.com/o1/vault/gdc2013/slides/822403Gregorius_Dirk_TheSeparatingAxisTest.pdf)
 	//Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
@@ -91,13 +91,6 @@ int core_init()
 	//m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	//graphics_entity_create_with_color(&cube, m, (vec4){0.253117, 0.682969, 1.092548, 1.0f}, (Quaternion){-0.236703, -0.255289, -0.064614, 0.935213},
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){0.298033, 0.735882, 1.052557, 1.0f}, 10.0f);
-
-	Mesh m = graphics_mesh_create_from_obj("./res/floor.obj", 0);
-	graphics_entity_create_with_color(&plane, m, (vec4){0.0f, -1.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
-	m = graphics_mesh_create_from_obj("./res/ico_low.obj", 0);
-	graphics_entity_create_with_color(&cube, m, (vec4){4.9364, -0.1989, 4.6309, 1.0f}, (Quaternion){-0.6197, 0.4, 0.1458, 0.6592},
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){0.393084, 0.993931, 0.055659, 1.0}, 10.0f);
 
 	// bug 1
 	//Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
