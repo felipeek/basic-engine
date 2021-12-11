@@ -38,6 +38,10 @@ void pmc_render(Perspective_Camera* camera) {
 			graphics_renderer_debug_points(&collision_point, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
 			graphics_renderer_debug_vector(collision_point,
 				gm_vec3_add(collision_point, contact->normal), (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+			collision_point = gm_vec3_add(contact->e1->world_position, contact->r1_wc);
+			graphics_renderer_debug_points(&collision_point, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+			graphics_renderer_debug_vector(collision_point,
+				gm_vec3_add(collision_point, contact->normal), (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 		}
 	}
 	graphics_renderer_primitives_flush(camera);

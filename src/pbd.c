@@ -7,8 +7,8 @@
 #include "pmc.h"
 #include <hash_map.h>
 
-#define NUM_SUBSTEPS 10
-#define NUM_POS_ITERS 10
+#define NUM_SUBSTEPS 1
+#define NUM_POS_ITERS 1
 
 // Calculate the sum of all external forces acting on an entity
 static vec3 calculate_external_force(Entity* e) {
@@ -223,7 +223,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 			e->world_rotation = quaternion_normalize(&e->world_rotation);
 		}
 
-		//pmc_clear_all();
+		pmc_clear_all();
 		pmc_update();
 #if 1
 		// As explained in sec 3.5, in each substep we need to check for collisions
@@ -245,7 +245,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 						PMC_Contact* contacts = collision_get_convex_convex_points(e1, e2, cp.normal);
 						for (u32 l = 0; l < array_length(contacts); ++l) {
 							pmc_add(contacts[l]);
-							paused = true;
+							//paused = true;
 						}
 						//pmc_perturb(e1, e2, contact.normal);
 						//pmc_update(); // check if necessary

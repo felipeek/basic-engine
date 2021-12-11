@@ -122,6 +122,7 @@ void core_destroy()
 int paused;
 void core_update(r32 delta_time)
 {
+	//delta_time = delta_time / 1.0f;
 	if (paused) return;
 	for (u32 i = 0; i < array_length(entities); ++i) {
 		Physics_Force pf;
@@ -254,10 +255,10 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		//graphics_entity_create_with_color(&e, m, cube_position, quaternion_new((vec3){0.35f, 0.44f, 0.12f}, 33.0f),
 		//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, 1.0f}, 10.0f);
 		graphics_entity_create_with_color(&e, m, cube_position, quaternion_new((vec3){0.35f, 0.44f, 0.12f}, 0.0f),
-			(vec3){1.0f, 1.0f, 1.0f}, (vec4){rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, 1.0f}, 100.0f);
+			(vec3){1.0f, 1.0f, 1.0f}, (vec4){rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, 1.0f}, 5.0f);
 
 		Physics_Force force;
-		force.force = gm_vec3_scalar_product(100000.0f, gm_vec3_scalar_product(-1.0f, camera_z));
+		force.force = gm_vec3_scalar_product(1000.0f, gm_vec3_scalar_product(-1.0f, camera_z));
 		force.position = (vec3) {0.0f, 0.0f, 0.0f};
 		array_push(e.forces, force);
 
