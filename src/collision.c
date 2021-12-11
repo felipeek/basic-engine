@@ -364,6 +364,22 @@ static Plane* find_boundary_planes(Bounding_Shape* b, Mesh* m, vec3* points) {
 #endif
 	}
 
+	// filter planes
+	for (u32 i = 0; i < array_length(result); ++i) {
+		for (u32 j = i + 1; j < array_length(result); ++j) {
+			Plane* p1 = &result[i];
+			Plane* p2 = &result[j];
+			const r32 EPSILON = 0.0000001f;
+			r32 proj1 = gm_vec3_dot(p1->point, p1->normal);
+			r32 proj2 = gm_vec3_dot(p2->point, p2->normal);
+			if (fabsf(proj1 - proj2) < EPSILON) {
+				if (gm_vec3_length(gm_vec3_subtract(p1->normal, p2->normal)) < EPSILON) {
+					array_remove(result, j);
+					--j;
+				}
+			}
+		}
+	}
 	return result;
 }
 
@@ -713,7 +729,7 @@ collision_distance_between_skew_lines(vec3 p1, vec3 d1, vec3 p2, vec3 d2, vec3 *
 
   return true;
 }
-
+extern int paused;
 Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shape* b2, vec3 normal, Mesh* m1, Mesh* m2) {
 	Persistent_Manifold pm;
 	pm.normal = normal;
@@ -859,6 +875,10 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 		//assert(find_world_coords_for_vertex_within_polygon(center2, polygon2, &pmp.wc2) == true);
 		//pmp.pv2 = (vec2){0.0f, 0.0f};
 		//array_push(persistent_manifold_points, pmp);
+	}
+
+	if (array_length(persistent_manifold_points) > 4) {
+		printf("maior q 4\n");
 	}
 
 	for (u32 i = 0; i < array_length(persistent_manifold_points); ++i) {

@@ -7,7 +7,7 @@
 #include "pmc.h"
 #include <hash_map.h>
 
-#define NUM_SUBSTEPS 1
+#define NUM_SUBSTEPS 10
 #define NUM_POS_ITERS 1
 
 // Calculate the sum of all external forces acting on an entity
@@ -390,7 +390,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				vec3 v_til = gm_vec3_subtract(gm_vec3_add(old_v1, gm_vec3_cross(old_w1, r1_wc)), gm_vec3_add(old_v2, gm_vec3_cross(old_w2, r2_wc)));
 				r32 vn_til = gm_vec3_dot(n, v_til);
 				//r32 e = (fabsf(vn) > 2.0f * GRAVITY * h) ? 0.8f : 0.0f;
-				r32 e = 0.0f;
+				r32 e = 0.2f;
 				// @NOTE: equation (34) was modified here
 				fact = -vn + MIN(-e * vn_til, 0.0f);
 				// update delta_v

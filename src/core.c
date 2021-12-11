@@ -66,7 +66,7 @@ int core_init()
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	Mesh m2 = graphics_mesh_create_from_obj("./res/cyl.obj", 0);
 	Mesh m3 = graphics_mesh_create_from_obj("./res/platform.obj", 0);
-	Mesh m4 = graphics_mesh_create_from_obj("./res/ico.obj", 0);
+	Mesh m4 = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	//u32 tex = graphics_texture_create("./res/tex.png");
 	graphics_entity_create_with_color_fixed(&e, floorm, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 			(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
@@ -77,9 +77,9 @@ int core_init()
 	//graphics_entity_create_with_color(&e, m3, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f),
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 1.0f, 1.0f}, 50.0f);
 	//array_push(entities, e);
-	//graphics_entity_create_with_color(&e, m4, (vec3){2.0f, 4.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 0.0f}, 30.0f),
-	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 50.0f);
-	//array_push(entities, e);
+	graphics_entity_create_with_color(&e, m4, (vec3){0.368596107, 3.0f, -1.01607966}, (Quaternion){0, -0.721648753, 0, 0.69225949},
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 1.0f, 1.0f, 1.0f}, 5.0f);
+	array_push(entities, e);
 
 #if 1
 #if 0
@@ -118,12 +118,44 @@ void core_destroy()
 {
 	array_free(lights);
 }
+#include "gjk.h"
+static void run_collision_only(Entity* entities) {
+	pmc_clear_all();
+	for (u32 j = 0; j < array_length(entities); ++j) {
+		for (u32 k = j + 1; k < array_length(entities); ++k) {
+			Entity* e1 = &entities[j];
+			Entity* e2 = &entities[k];
 
-int paused;
+			graphics_entity_update_bounding_shapes(e1);
+			graphics_entity_update_bounding_shapes(e2);
+
+			Collision_Point cp;
+			GJK_Support_List gjk_sl = {0};
+			if (collision_gjk_collides(&gjk_sl, &e1->bs, &e2->bs)) {
+				boolean found_cp = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs, &cp);
+				if (found_cp) {
+					PMC_Contact* contacts = collision_get_convex_convex_points(e1, e2, cp.normal);
+					for (u32 l = 0; l < array_length(contacts); ++l) {
+						pmc_add(contacts[l]);
+						//paused = true;
+					}
+					//pmc_perturb(e1, e2, contact.normal);
+					//pmc_update(); // check if necessary
+				}
+			}
+		}
+	}
+}
+
+int paused = 1;
 void core_update(r32 delta_time)
 {
 	//delta_time = delta_time / 1.0f;
-	if (paused) return;
+	if (paused) {
+		run_collision_only(entities);
+		return;
+	}
+
 	for (u32 i = 0; i < array_length(entities); ++i) {
 		Physics_Force pf;
 		pf.force = (vec3){0.0f, -GRAVITY * 1.0f / entities[i].inverse_mass, 0.0f};
@@ -245,11 +277,11 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		char* mesh_name;
 		int r = rand();
 		if (r % 3 == 0) {
-			mesh_name = "./res/ico.obj";
+			mesh_name = "./res/cube.obj";
 		} else if (r % 3 == 1) {
-			mesh_name = "./res/ico.obj";
+			mesh_name = "./res/cube.obj";
 		} else {
-			mesh_name = "./res/ico.obj";
+			mesh_name = "./res/cube.obj";
 		}
 		Mesh m = graphics_mesh_create_from_obj(mesh_name, 0);
 		//graphics_entity_create_with_color(&e, m, cube_position, quaternion_new((vec3){0.35f, 0.44f, 0.12f}, 33.0f),
