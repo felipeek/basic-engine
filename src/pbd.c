@@ -182,6 +182,8 @@ static void create_constraints_for_contacts(PMC* pmc, Constraint** constraints) 
 	}
 }
 
+extern int paused;
+
 void pbd_simulate(r32 dt, Entity* entities) {
 	if (dt <= 0.0f) return;
 	r32 h = dt / NUM_SUBSTEPS;
@@ -221,6 +223,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 			e->world_rotation = quaternion_normalize(&e->world_rotation);
 		}
 
+		//pmc_clear_all();
 		pmc_update();
 #if 1
 		// As explained in sec 3.5, in each substep we need to check for collisions
@@ -234,34 +237,18 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				graphics_entity_update_bounding_shapes(e1);
 				graphics_entity_update_bounding_shapes(e2);
 
-				Collision_Point cp1, cp2;
+				Collision_Point cp;
 				GJK_Support_List gjk_sl = {0};
 				if (collision_gjk_collides(&gjk_sl, &e1->bs, &e2->bs)) {
-					boolean found_cp = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs, &cp1);
-					gjk_sl = (GJK_Support_List){0};
-					if (found_cp && collision_gjk_collides(&gjk_sl, &e2->bs, &e1->bs)) {
-						found_cp = collision_epa(gjk_sl.simplex, &e2->bs, &e1->bs, &cp2);
-						if (found_cp) {
-							PMC_Contact contact = (PMC_Contact){0};
-							contact.e1 = e1;
-							contact.e2 = e2;
-							contact.normal = gm_vec3_normalize(cp2.normal); // why cp1 though?
-							contact.r1_wc = gm_vec3_subtract(cp1.collision_point, e1->world_position);
-							contact.r2_wc = gm_vec3_subtract(cp2.collision_point, e2->world_position);
-
-							Quaternion q1_inv = quaternion_inverse(&e1->world_rotation);
-							mat3 q1_mat = quaternion_get_matrix3(&q1_inv);
-							contact.r1_lc = gm_mat3_multiply_vec3(&q1_mat, contact.r1_wc);
-
-							Quaternion q2_inv = quaternion_inverse(&e2->world_rotation);
-							mat3 q2_mat = quaternion_get_matrix3(&q2_inv);
-							contact.r2_lc = gm_mat3_multiply_vec3(&q2_mat, contact.r2_wc);
-							pmc_add(contact);
-
-							pmc_perturb(e1, e2, contact.normal);
-
-							//pmc_update(); // check if necessary
+					boolean found_cp = collision_epa(gjk_sl.simplex, &e1->bs, &e2->bs, &cp);
+					if (found_cp) {
+						PMC_Contact* contacts = collision_get_convex_convex_points(e1, e2, cp.normal);
+						for (u32 l = 0; l < array_length(contacts); ++l) {
+							pmc_add(contacts[l]);
+							paused = true;
 						}
+						//pmc_perturb(e1, e2, contact.normal);
+						//pmc_update(); // check if necessary
 					}
 				}
 			}
@@ -403,7 +390,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 				vec3 v_til = gm_vec3_subtract(gm_vec3_add(old_v1, gm_vec3_cross(old_w1, r1_wc)), gm_vec3_add(old_v2, gm_vec3_cross(old_w2, r2_wc)));
 				r32 vn_til = gm_vec3_dot(n, v_til);
 				//r32 e = (fabsf(vn) > 2.0f * GRAVITY * h) ? 0.8f : 0.0f;
-				r32 e = 0.2f;
+				r32 e = 0.0f;
 				// @NOTE: equation (34) was modified here
 				fact = -vn + MIN(-e * vn_til, 0.0f);
 				// update delta_v

@@ -66,6 +66,7 @@ int core_init()
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	Mesh m2 = graphics_mesh_create_from_obj("./res/cyl.obj", 0);
 	Mesh m3 = graphics_mesh_create_from_obj("./res/platform.obj", 0);
+	Mesh m4 = graphics_mesh_create_from_obj("./res/ico.obj", 0);
 	//u32 tex = graphics_texture_create("./res/tex.png");
 	graphics_entity_create_with_color_fixed(&e, floorm, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 			(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
@@ -76,20 +77,20 @@ int core_init()
 	//graphics_entity_create_with_color(&e, m3, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f),
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 1.0f, 1.0f}, 50.0f);
 	//array_push(entities, e);
-	graphics_entity_create_with_color(&e, m, (vec3){2.0f, 4.0f, 0.0f}, quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 50.0f);
-	array_push(entities, e);
+	//graphics_entity_create_with_color(&e, m4, (vec3){2.0f, 4.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 0.0f}, 30.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 50.0f);
+	//array_push(entities, e);
 
 #if 1
 #if 0
-	graphics_entity_create_with_color(&e, m, (vec3){-2.5f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
-	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
-	array_push(entities, e);
-	graphics_entity_create_with_color(&e, m, (vec3){2.5f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
-	//e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
-	array_push(entities, e);
+	//graphics_entity_create_with_color(&e, m, (vec3){-2.5f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
+	////e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
+	//array_push(entities, e);
+	//graphics_entity_create_with_color(&e, m, (vec3){2.5f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
+	////e.angular_velocity = (vec3){1.0f, 0.0f, 0.0f};
+	//array_push(entities, e);
 #else
 	//graphics_entity_create_with_color(&e, m, (vec3){0.0f, 3.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
@@ -243,11 +244,11 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		char* mesh_name;
 		int r = rand();
 		if (r % 3 == 0) {
-			mesh_name = "./res/cube.obj";
+			mesh_name = "./res/ico.obj";
 		} else if (r % 3 == 1) {
 			mesh_name = "./res/ico.obj";
 		} else {
-			mesh_name = "./res/cube.obj";
+			mesh_name = "./res/ico.obj";
 		}
 		Mesh m = graphics_mesh_create_from_obj(mesh_name, 0);
 		//graphics_entity_create_with_color(&e, m, cube_position, quaternion_new((vec3){0.35f, 0.44f, 0.12f}, 33.0f),

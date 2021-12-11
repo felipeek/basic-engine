@@ -4,6 +4,7 @@
 #include "graphics.h"
 
 //#define USE_RESERVE
+#define IGNORE_PMC
 
 int key_compare(const void* _key1, const void* _key2) {
 	const PMC_Map_Key key1 = *(PMC_Map_Key*)_key1;
@@ -81,6 +82,9 @@ static boolean is_contact_still_valid(PMC_Contact contact) {
 }
 
 void pmc_update() {
+#ifdef IGNORE_PMC
+	return;
+#endif
 	PMC_Map_Key key;
 	PMC* pmc;
 	Hash_Map_Iterator iterator = hash_map_get_iterator(&pmc_map);
@@ -227,6 +231,11 @@ void pmc_add(PMC_Contact contact) {
 	PMC* pmc = get_pmc_for_entity_pair(contact.e1, contact.e2);
 	//printf("size: %ld\n", array_length(pmc->reserve));
 
+#ifdef IGNORE_PMC
+	array_push(pmc->contacts, contact);
+	return;
+#endif
+
 	if (!is_contact_still_valid(contact)) {
 #ifdef USE_RESERVE
 		array_push(pmc->reserve, contact);
@@ -249,6 +258,22 @@ void pmc_add(PMC_Contact contact) {
 
 	int insert_index = sort_cached_points(pmc, contact);
 	pmc->contacts[insert_index] = contact;
+}
+
+void pmc_clear(Entity* e1, Entity* e2) {
+	PMC* pmc = get_pmc_for_entity_pair(e1, e2);
+	array_clear(pmc->contacts);
+	array_clear(pmc->reserve);
+}
+
+void pmc_clear_all() {
+	PMC_Map_Key key;
+	PMC* pmc;
+	Hash_Map_Iterator iterator = hash_map_get_iterator(&pmc_map);
+	while ((iterator = hash_map_iterator_next(&pmc_map, iterator, &key, &pmc)) != HASH_MAP_ITERATOR_END) {
+		array_clear(pmc->contacts);
+		array_clear(pmc->reserve);
+	}
 }
 
 void pmc_perturb(Entity* e1, Entity* e2, vec3 normal) {
