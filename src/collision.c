@@ -462,6 +462,63 @@ collision_gjk_individual_support(Bounding_Shape* b, vec3 direction)
   return index;
 }
 
+
+#define max(a,b)    (((a) > (b)) ? (a) : (b))
+#define min(a,b)    (((a) < (b)) ? (a) : (b))
+int tmp = 0;
+
+// Gets the closest point x on the line (edge) to point (pos)
+vec3 GetClosestPoint(vec3 pos, vec3 e1, vec3 e2)
+{
+	//As we have a line not two points, the final value could be anywhere between the edge points A/B
+	//	We solve this by projecting the point (pos) onto the line described by the edge, and then
+	//  clamping it so can it has to be between the line's start and end points.
+	//  - Notation: A - Line Start, B - Line End, P - Point not on the line we want to project
+	vec3 diff_AP = gm_vec3_subtract(pos, e1);
+	vec3 diff_AB = gm_vec3_subtract(e2, e1);
+
+	//Distance along the line of point 'pos' in world distance 
+	float ABAPproduct = gm_vec3_dot(diff_AP, diff_AB);
+	float magnitudeAB = gm_vec3_dot(diff_AB, diff_AB);
+
+	//Distance along the line of point 'pos' between 0-1 where 0 is line start and 1 is line end
+	float distance = ABAPproduct / magnitudeAB;
+
+	//Clamp distance so it cant go beyond the line's start/end in either direction
+	distance = max(min(distance, 1.0f), 0.0f);
+
+	//Use distance from line start (0-1) to compute the actual position
+	return gm_vec3_add(e1, gm_vec3_scalar_product(distance, diff_AB));
+}
+
+vec3 GetClosestPointPolygon(vec3 position, vec3* polygon)
+{
+	vec3 final_closest_point = (vec3){0.0f, 0.0f, 0.0f};
+	float final_closest_distsq = FLT_MAX;
+
+	vec3 last = polygon[array_length(polygon) - 1];
+	for (u32 i = 0; i < array_length(polygon); ++i)
+	{
+		vec3 next = polygon[i];
+		vec3 edge_closest_point = GetClosestPoint(position, last, next);
+
+		//Compute the distance of the closest point on the line to the actual point
+		vec3 diff = gm_vec3_subtract(position, edge_closest_point);
+		float temp_distsq = gm_vec3_dot(diff, diff);
+
+		//Only store the closest point if it's closer than all the other line's closest points
+		if (temp_distsq < final_closest_distsq)
+		{
+			final_closest_distsq = temp_distsq;
+			final_closest_point = edge_closest_point;
+		}
+
+		last = next;
+	}
+
+	return final_closest_point;
+}
+
 static vec3 get_normal_of_triangle(vec3 t1, vec3 t2, vec3 t3) {
 	vec3 t12 = gm_vec3_subtract(t2, t1);
 	vec3 t13 = gm_vec3_subtract(t3, t1);
@@ -501,6 +558,16 @@ static Plane* find_boundary_planes(Bounding_Shape* b, Mesh* m, vec3* points) {
 			}
 		}
 
+#if 1
+		if (found_v1 || found_v2 || found_v3) {
+			if (!(found_v1 && found_v2 && found_v3)) {
+				Plane p;
+				p.point = v3;
+				p.normal = gm_vec3_scalar_product(-1.0f, get_normal_of_triangle(v1, v2, v3));
+				array_push(result, p);
+			}
+		}
+#else
 		if (found_v1 && found_v2 && !found_v3) {
 			Plane p;
 			p.point = v3;
@@ -517,6 +584,7 @@ static Plane* find_boundary_planes(Bounding_Shape* b, Mesh* m, vec3* points) {
 			p.normal = gm_vec3_scalar_product(-1.0f, get_normal_of_triangle(v1, v2, v3));
 			array_push(result, p);
 		}
+#endif
 	}
 
 	return result;
@@ -729,236 +797,145 @@ static vec3* get_face_with_most_fitting_normal_in_winding_order(Bounding_Shape* 
 	return most_fitting_triangle;
 }
 
-// @TODO This can be merged with the get_support_points_with_perturbation function. Keeping it separated to ease debugging
-Projected_Support_Point* project_support_points_onto_normal_plane(vec3* support_points, vec3 normal) {
-	Projected_Support_Point* projected_support_points = array_new(Projected_Support_Point);
-
-	for (u32 i = 0; i < array_length(support_points); ++i) {
-		Projected_Support_Point psp;
-		psp.p = gm_vec3_subtract(support_points[i],
-			gm_vec3_scalar_product(gm_vec3_dot(normal, support_points[i]), normal));
-		psp.world_coords = support_points[i];
-		vec3 e1 = find_ortho(normal);
-		vec3 e2 = gm_vec3_cross(e1, normal);
-		psp.pv2.x = gm_vec3_dot(e1, support_points[i]);
-		psp.pv2.y = gm_vec3_dot(e2, support_points[i]);
-
-		array_push(projected_support_points, psp);
-	}
-
-	return projected_support_points;
-}
-
 typedef struct {
 	vec2 pv2;
 	vec3 wc1;
 	vec3 wc2;
 } Persistent_Manifold_Point;
 
-static boolean find_world_coords_for_vertex_within_polygon(vec2 point_to_test, Projected_Support_Point* polygon, vec3* wc) {
-	vec2* hull = array_new(vec2);
-	for (u32 i = 0; i < array_length(polygon); ++i) {
-		array_push(hull, polygon[i].pv2);
-	}
-	r32* weights;
-	boolean inside = convex_bary_coords_get(point_to_test, hull, &weights);
-	if (!inside) {
-		array_free(hull);
-		return false;
+static vec3* collect_all_edges_of_support(Bounding_Shape* b, Mesh* m, vec3 support) {
+	vec3* edges = array_new(vec3);
+
+	for (u32 i = 0; i < array_length(m->indices); i += 3) {
+		vec3 v1 = b->vertices[m->indices[i + 0]];
+		vec3 v2 = b->vertices[m->indices[i + 1]];
+		vec3 v3 = b->vertices[m->indices[i + 2]];
+
+		if (!same_vector(support, v1) && !same_vector(support, v2) && !same_vector(support, v3)) {
+			continue;
+		}
+
+		vec3 m_last, m_next;
+
+		if (same_vector(support, v1)) {
+			m_last = v3;
+			m_next = v2;
+		} else if (same_vector(support, v2)) {
+			m_last = v1;
+			m_next = v3;
+		} else {
+			m_last = v2;
+			m_next = v1;
+		}
+
+		// each triangle defines 2 edges!
+		array_push(edges, m_last);
+		array_push(edges, support);
+		array_push(edges, support);
+		array_push(edges, m_next);
+
+		// we are actually duplicating a lot of edges here because each edge appear in 2 different triangles...
+		// but with different winding orders...
+		// when we have a proper implementation, we need to take a careful look at the winding of the edges
+		// for now, we know that at for each duplicated edge duo, one of them will have the correct winding
 	}
 
-	*wc = (vec3){0.0f, 0.0f, 0.0f};
-	for (u32 i = 0; i < array_length(polygon); ++i) {
-		vec3 current = polygon[i].world_coords;
-		*wc = gm_vec3_add(gm_vec3_scalar_product(weights[i], current), *wc);
-	}
-
-	array_free(hull);
-	array_free(weights);
-	return true;
+	return edges;
 }
 
-static boolean collect_inside(Projected_Support_Point point_to_test, Projected_Support_Point* polygon,
-	vec3 polygon_center, vec3 polygon_normal, boolean isPolygon1, Persistent_Manifold_Point* out) {
+vec3* get_edge_with_most_fitting_normal(Bounding_Shape* b1, Bounding_Shape* b2, Mesh* m1, Mesh* m2, vec3 normal, vec3* edge_normal) {
+	vec3 inverted_normal = gm_vec3_scalar_product(-1.0f, normal);
+	s32 support1_idx = collision_gjk_individual_support(b1, normal);
+	s32 support2_idx = collision_gjk_individual_support(b2, inverted_normal);
 
-/*
-	boolean inside_polygon = true;
-	vec3 point_in_polygon_wc = (vec3){0.0f, 0.0f, 0.0f};
+	vec3 support1 = b1->vertices[support1_idx];
+	vec3 support2 = b2->vertices[support2_idx];
 
-	for (u32 j = 0; j < array_length(polygon); ++j) {
-		Projected_Support_Point* current = &polygon[j];
-		Projected_Support_Point* next = &polygon[(j == array_length(polygon) - 1) ? 0 : j + 1];
-		vec3 e_i = gm_vec3_subtract(next->p, current->p);
-		vec3 u_i = gm_vec3_cross(polygon_normal, e_i);
-		vec3 v_i = gm_vec3_subtract(current->p, point_to_test.p);
-		vec3 w_i = gm_vec3_subtract(current->p, polygon_center);
-		r32 x_i = gm_vec3_dot(v_i, u_i) * gm_vec3_dot(w_i, u_i);
-		if (x_i < 0) {
-			return false;
-		}
-	}
-*/
+	vec3* edges1 = collect_all_edges_of_support(b1, m1, support1);
+	vec3* edges2 = collect_all_edges_of_support(b2, m2, support2);
 
-	vec3 wc;
-	if (!find_world_coords_for_vertex_within_polygon(point_to_test.pv2, polygon, &wc)) {
-		// outside poly
-		return false;
-	}
+	vec3* result = array_new(vec3);
+	r32 max_dot = -FLT_MAX;
 
-	out->pv2 = point_to_test.pv2;
-	if (isPolygon1) {
-		out->wc1 = wc;
-		out->wc2 = point_to_test.world_coords;
-	} else {
-		out->wc1 = point_to_test.world_coords;
-		out->wc2 = wc;
-	}
+	for (u32 i = 0; i < array_length(edges1); i += 2) {
+		vec3 e1_last = edges1[i];
+		vec3 e1_current = edges1[i + 1];
+		vec3 edge1 = gm_vec3_subtract(e1_current, e1_last);
+		for (u32 j = 0; j < array_length(edges2); j += 2) {
+			vec3 e2_last = edges2[j];
+			vec3 e2_current = edges2[j + 1];
+			vec3 edge2 = gm_vec3_subtract(e2_current, e2_last);
 
-	return true;
-}
+			vec3 current_normal = gm_vec3_normalize(gm_vec3_cross(edge1, edge2));
 
-// Returns 1 if the lines intersect, otherwise 0. In addition, if the lines 
-// intersect the intersection point may be stored in the floats i_x and i_y.
-// https://stackoverflow.com/a/1968345/3513453
-static boolean get_line_intersection(vec2 p0, vec2 p1, vec2 p2, vec2 p3, vec2* intersection, r32* t1, r32* t2) {
-	vec2 s1, s2;
-    s1.x = p1.x - p0.x;
-	s1.y = p1.y - p0.y;
-    s2.x = p3.x - p2.x;
-	s2.y = p3.y - p2.y;
-
-    r32 s, t;
-	r32 denom = (-s2.x * s1.y + s1.x * s2.y);
-    s = (-s1.y * (p0.x - p2.x) + s1.x * (p0.y - p2.y)) / (-s2.x * s1.y + s1.x * s2.y);
-    t = ( s2.x * (p0.y - p2.y) - s2.y * (p0.x - p2.x)) / (-s2.x * s1.y + s1.x * s2.y);
-
-    if (s >= 0.0f && s <= 1.0f && t >= 0.0f && t <= 1.0f)
-    {
-        // Collision detected
-        if (intersection != NULL) {
-            intersection->x = p0.x + (t * s1.x);
-            intersection->y = p0.y + (t * s1.y);
-		}
-		if (t1 != NULL && t2 != NULL) {
-			*t1 = t;
-			*t2 = s;
-		}
-        return true;
-    }
-
-    return false; // No collision
-}
-
-boolean collect_intersection(Projected_Support_Point a1, Projected_Support_Point a2,
-	Projected_Support_Point b1, Projected_Support_Point b2, Persistent_Manifold_Point* out) {
-
-	vec2 i;
-	r32 t1, t2;
-	
-	if (get_line_intersection(a1.pv2, a2.pv2, b1.pv2, b2.pv2, &i, &t1, &t2)) {
-		out->pv2 = gm_vec2_add(a1.pv2, gm_vec2_scalar_product(t1, gm_vec2_subtract(a2.pv2, a1.pv2)));
-		out->wc1 = gm_vec3_add(a1.world_coords, gm_vec3_scalar_product(t1, gm_vec3_subtract(a2.world_coords, a1.world_coords)));
-		out->wc2 = gm_vec3_add(b1.world_coords, gm_vec3_scalar_product(t2, gm_vec3_subtract(b2.world_coords, b1.world_coords)));
-		return true;
-	}
-
-	return false;
-}
-
-Persistent_Manifold_Point* clip_support_points(Projected_Support_Point* polygon1, Projected_Support_Point* polygon2,
-	vec3 normal) {
-	Persistent_Manifold_Point* persistent_manifold_points = array_new(Persistent_Manifold_Point);
-
-	vec3 center1 = (vec3){0.0f, 0.0f, 0.0f};
-	vec3 center2 = (vec3){0.0f, 0.0f, 0.0f};
-	for (u32 i = 0; i < array_length(polygon1); ++i) {
-		center1 = gm_vec3_add(center1, polygon1[i].p);
-	}
-	for (u32 i = 0; i < array_length(polygon2); ++i) {
-		center2 = gm_vec3_add(center2, polygon2[i].p);
-	}
-	center1 = gm_vec3_scalar_product(1.0f / array_length(polygon1), center1);
-	center2 = gm_vec3_scalar_product(1.0f / array_length(polygon2), center2);
-
-	// check if points in polygon1 are inside polygon2
-	for (u32 i = 0; i < array_length(polygon1); ++i) {
-		Projected_Support_Point point_to_test = polygon1[i];
-		Persistent_Manifold_Point out;
-		if (collect_inside(point_to_test, polygon2, center2, normal, false, &out)) {
-			array_push(persistent_manifold_points, out);
-		}
-	}
-
-	// check if points in polygon2 are inside polygon1
-	for (u32 i = 0; i < array_length(polygon2); ++i) {
-		Projected_Support_Point point_to_test = polygon2[i];
-		Persistent_Manifold_Point out;
-		if (collect_inside(point_to_test, polygon1, center1, normal, true, &out)) {
-			array_push(persistent_manifold_points, out);
-		}
-	}
-
-	// check if polygon1 edges intersect with polygon2 edges
-	for (u32 i = 0; i < array_length(polygon1); ++i) {
-		Projected_Support_Point a1 = polygon1[i];
-		Projected_Support_Point a2 = polygon1[(i == array_length(polygon1) - 1) ? 0 : i + 1];
-		for (u32 j = 0; j < array_length(polygon2); ++j) {
-			Projected_Support_Point b1 = polygon2[j];
-			Projected_Support_Point b2 = polygon2[(j == array_length(polygon2) - 1) ? 0 : j + 1];
-			Persistent_Manifold_Point out;
-			if (collect_intersection(a1, a2, b1, b2, &out)) {
-				array_push(persistent_manifold_points, out);
+			r32 dot = gm_vec3_dot(current_normal, normal);
+			if (dot > max_dot) {
+				max_dot = dot;
+				array_clear(result);
+				array_push(result, e1_last);
+				array_push(result, e1_current);
+				array_push(result, e2_last);
+				array_push(result, e2_current);
+				*edge_normal = current_normal;
 			}
 		}
 	}
 
-	return persistent_manifold_points;
+	return result;
 }
 
-static vec2 get_center_of_polygon(Projected_Support_Point* polygon) {
-	const r32 EPSILON = 0.000001f;
-	vec2 center = (vec2){0.0f, 0.0f};
-	r32 area = 0.0f;
+// Solve 2x2 linear system
+// a1*x + b1*y = c1
+// a2*x + b2*y = c2
+// Outputs: x and y
+static boolean
+solve_2x2_linear_system(r32 a1, r32 b1, r32 c1, r32 a2, r32 b2, r32 c2, r32* x, r32* y)
+{
+  if ((a1 * b2) - (a2 * b1) == 0)
+    return false;
 
-	vec2 min = (vec2){FLT_MAX, FLT_MAX};
-	vec2 max = (vec2){-FLT_MAX, -FLT_MAX};
+  if (x)
+    *x = ((c1 * b2) - (c2 * b1)) / ((a1 * b2) - (a2 * b1));
 
-	for (u32 i = 0; i < array_length(polygon); ++i) {
-		vec2 current = polygon[i].pv2;
-		vec2 next = polygon[(i == array_length(polygon) - 1) ? 0 : i + 1].pv2;
+  if (y)
+    *y = ((a1 * c2) - (a2 * c1)) / ((a1 * b2) - (a2 * b1));
 
-		r32 tmp = current.x * next.y - next.x * current.y;
-		area += 0.5f * tmp;
-
-		r32 cx = (current.x + next.x) * tmp;
-		r32 cy = (current.y + next.y) * tmp;
-
-		center = gm_vec2_add(center, (vec2){cx, cy});
-
-		if (current.x < min.x) {
-			min.x = current.x;
-		}
-		if (current.x > max.x) {
-			max.x = current.x;
-		}
-		if (current.y < min.y) {
-			min.y = current.y;
-		}
-		if (current.y > max.y) {
-			max.y = current.y;
-		}
-	}
-
-	if (area > -EPSILON && area < EPSILON) {
-		// degenerate case, polygon is a line
-		return (vec2){(min.x + max.x) / 2.0f, (min.y + max.y) / 2.0f};
-	}
-
-	center = gm_vec2_scalar_product(1.0f / (6.0f * area), center);
-	return center;
+  return true;
 }
 
-int tmp = 0;
+// This function calculates the distance between two indepedent skew lines in the 3D world
+// The first line is given by a known point P1 and a direction vector D1
+// The second line is given by a known point P2 and a direction vector D2
+// Outputs:
+// L1 is the closest POINT to the second line that belongs to the first line
+// L2 is the closest POINT to the first line that belongs to the second line
+// _N is the number that satisfies L1 = P1 + _N * D1
+// _M is the number that satisfies L2 = P2 + _M * D2
+boolean
+collision_distance_between_skew_lines(vec3 p1, vec3 d1, vec3 p2, vec3 d2, vec3 * l1, vec3 * l2, r32 * _n, r32 * _m)
+{
+  r32 n1 = d1.x * d2.x + d1.y * d2.y + d1.z * d2.z;
+  r32 n2 = d2.x * d2.x + d2.y * d2.y + d2.z * d2.z;
+  r32 m1 = -d1.x * d1.x - d1.y * d1.y - d1.z * d1.z;
+  r32 m2 = -d2.x * d1.x - d2.y * d1.y - d2.z * d1.z;
+  r32 r1 = -d1.x * p2.x + d1.x * p1.x - d1.y * p2.y + d1.y * p1.y - d1.z * p2.z + d1.z * p1.z;
+  r32 r2 = -d2.x * p2.x + d2.x * p1.x - d2.y * p2.y + d2.y * p1.y - d2.z * p2.z + d2.z * p1.z;
+
+  r32 m, n;
+  if (!solve_2x2_linear_system(n1, m1, r1, n2, m2, r2, &n, &m))
+    return false;
+
+  if (l1)
+    *l1 = gm_vec3_add(p1, gm_vec3_scalar_product(m, d1));
+  if (l2)
+    *l2 = gm_vec3_add(p2, gm_vec3_scalar_product(n, d2));
+  if (_n)
+    *_n = n;
+  if (_m)
+    *_m = m;
+
+  return true;
+}
 
 Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shape* b2, vec3 normal, Mesh* m1, Mesh* m2) {
 	Persistent_Manifold pm;
@@ -966,40 +943,82 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 	pm.collision_points1 = array_new(vec3);
 	pm.collision_points2 = array_new(vec3);
 
+	Persistent_Manifold_Point* persistent_manifold_points = array_new(Persistent_Manifold_Point);
+
 	vec3 inverted_normal = gm_vec3_scalar_product(-1.0f, normal);
 
-	vec3 chosen_normal1, chosen_normal2;
+	vec3 chosen_normal1, chosen_normal2, edge_normal;
 	vec3* support_points1 = get_face_with_most_fitting_normal_in_winding_order(b1, normal, m1, &chosen_normal1);
 	vec3* support_points2 = get_face_with_most_fitting_normal_in_winding_order(b2, inverted_normal, m2, &chosen_normal2);
+	vec3* selected_edges = get_edge_with_most_fitting_normal(b1, b2, m1, m2, normal, &edge_normal);
 
 	r32 chosen_normal1_dot = gm_vec3_dot(chosen_normal1, normal);
 	r32 chosen_normal2_dot = gm_vec3_dot(chosen_normal2, inverted_normal);
+	r32 edge_normal_dot = gm_vec3_dot(edge_normal, normal);
 
-	boolean is_normal1_more_parallel = chosen_normal1_dot > chosen_normal2_dot;
-	vec3* reference_face_support_points = is_normal1_more_parallel ? support_points1 : support_points2;
-	vec3* incident_face_support_points = is_normal1_more_parallel ? support_points2 : support_points1;
+	r32 EPSILON = 0.0001f;
+	//if (edge_normal_dot > chosen_normal1_dot && edge_normal_dot > chosen_normal2_dot) {
+	if (edge_normal_dot > chosen_normal1_dot + EPSILON && edge_normal_dot > chosen_normal2_dot + EPSILON) {
+		printf("edge contact\n");
+		Persistent_Manifold_Point pmp;
+		vec3 l1, l2;
+		vec3 p1 = selected_edges[0];
+		vec3 d1 = gm_vec3_subtract(selected_edges[1], selected_edges[0]);
+		vec3 p2 = selected_edges[2];
+		vec3 d2 = gm_vec3_subtract(selected_edges[3], selected_edges[2]);
+		assert(collision_distance_between_skew_lines(p1, d1, p2, d2, &l1, &l2, 0, 0));
+		//pmp.wc1 = p1;
+		//pmp.wc2 = gm_vec3_add(d1, p1);
+		//pmp.wc1 = p2;
+		//pmp.wc2 = gm_vec3_add(d2, p2);
+		pmp.wc1 = l1;
+		pmp.wc2 = l2;
+		array_push(persistent_manifold_points, pmp);
+	} else {
+		printf("face contact\n");
+		boolean is_normal1_more_parallel = chosen_normal1_dot > chosen_normal2_dot;
+		vec3* reference_face_support_points = is_normal1_more_parallel ? support_points1 : support_points2;
+		vec3* incident_face_support_points = is_normal1_more_parallel ? support_points2 : support_points1;
 
-	Plane* boundary_planes = is_normal1_more_parallel ? find_boundary_planes(b1, m1, support_points1) :
-		find_boundary_planes(b2, m2, support_points2);
+		Plane* boundary_planes = is_normal1_more_parallel ? find_boundary_planes(b1, m1, support_points1) :
+			find_boundary_planes(b2, m2, support_points2);
 
-	vec3* out_polygon;
-	SutherlandHodgmanClipping(incident_face_support_points, array_length(boundary_planes), boundary_planes, &out_polygon, false);
+		vec3* out_polygon;
+		SutherlandHodgmanClipping(incident_face_support_points, array_length(boundary_planes), boundary_planes, &out_polygon, false);
 
-	Plane reference_plane;
-	reference_plane.normal = is_normal1_more_parallel ? gm_vec3_scalar_product(-1.0f, chosen_normal1) :
-		gm_vec3_scalar_product(-1.0f, chosen_normal2);
-	reference_plane.point = reference_face_support_points[0];
+		Plane reference_plane;
+		reference_plane.normal = is_normal1_more_parallel ? gm_vec3_scalar_product(-1.0f, chosen_normal1) :
+			gm_vec3_scalar_product(-1.0f, chosen_normal2);
+		reference_plane.point = reference_face_support_points[0];
 
-	SutherlandHodgmanClipping(out_polygon, 1, &reference_plane, &out_polygon, true);
+		SutherlandHodgmanClipping(out_polygon, 1, &reference_plane, &out_polygon, true);
 
-	Projected_Support_Point* proj_support_points1 = project_support_points_onto_normal_plane(support_points1, normal);
-	Projected_Support_Point* proj_support_points2 = project_support_points_onto_normal_plane(support_points2, normal);
+		for (u32 i = 0; i < array_length(out_polygon); ++i) {
+			vec3 point = out_polygon[i];
+			vec3 closest_point = GetClosestPointPolygon(point, reference_face_support_points);
+			vec3 point_diff = gm_vec3_subtract(point, closest_point);
+			r32 contact_penetration;
 
-	Projected_Support_Point* polygon1 = jarvis_march(proj_support_points1);
-	Projected_Support_Point* polygon2 = jarvis_march(proj_support_points2);
+			// we are projecting the points that are in the incident face on the reference planes
+			// so the points that we have are part of the incident object.
+			Persistent_Manifold_Point pmp;
+			if (is_normal1_more_parallel) {
+				contact_penetration = gm_vec3_dot(point_diff, normal);
+				pmp.wc1 = gm_vec3_subtract(point, gm_vec3_scalar_product(contact_penetration, normal));
+				pmp.wc2 = point;
+			} else {
+				contact_penetration = - gm_vec3_dot(point_diff, normal);
+				pmp.wc1 = point;
+				pmp.wc2 = gm_vec3_add(point, gm_vec3_scalar_product(contact_penetration, normal));
+			}
 
-	Persistent_Manifold_Point* persistent_manifold_points = clip_support_points(polygon1, polygon2, normal);
-
+			if (contact_penetration < 0.0f) {
+				array_push(persistent_manifold_points, pmp);
+			} else {
+				printf("not adding\n");
+			}
+		}
+	}
 	if (tmp) {
 		persistent_manifold_points = array_new(Persistent_Manifold_Point);
 		//for (u32 i = 0; i < array_length(support_points1); ++i) {
@@ -1027,42 +1046,42 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 			array_push(persistent_manifold_points, pmp);
 		}
 #else
-		for (u32 i = 0; i < array_length(out_polygon); ++i) {
-			Persistent_Manifold_Point pmp;
-			pmp.pv2 = (vec2){0.0f, 0.0f};
-			pmp.wc1 = (vec3){-9999.0f, -9999.0f, -9999.0f};
-			pmp.wc2 = out_polygon[i];
-			array_push(persistent_manifold_points, pmp);
-		}
+		//for (u32 i = 0; i < array_length(out_polygon); ++i) {
+		//	Persistent_Manifold_Point pmp;
+		//	pmp.pv2 = (vec2){0.0f, 0.0f};
+		//	pmp.wc1 = (vec3){-9999.0f, -9999.0f, -9999.0f};
+		//	pmp.wc2 = out_polygon[i];
+		//	array_push(persistent_manifold_points, pmp);
+		//}
 #endif
 	} else {
 		// Clear duplicated points
-		const r32 EPSILON = 0.000001f;
-		for (u32 i = 0; i < array_length(persistent_manifold_points); ++i) {
-			Persistent_Manifold_Point* pmp1 = &persistent_manifold_points[i];
-			for (u32 j = i + 1; j < array_length(persistent_manifold_points); ++j) {
-				Persistent_Manifold_Point* pmp2 = &persistent_manifold_points[j];
+		//const r32 EPSILON = 0.000001f;
+		//for (u32 i = 0; i < array_length(persistent_manifold_points); ++i) {
+		//	Persistent_Manifold_Point* pmp1 = &persistent_manifold_points[i];
+		//	for (u32 j = i + 1; j < array_length(persistent_manifold_points); ++j) {
+		//		Persistent_Manifold_Point* pmp2 = &persistent_manifold_points[j];
 
-				if (((pmp1->pv2.x - pmp2->pv2.x) > -EPSILON && (pmp1->pv2.x - pmp2->pv2.x) < EPSILON) &&
-					((pmp1->pv2.y - pmp2->pv2.y) > -EPSILON && (pmp1->pv2.y - pmp2->pv2.y) < EPSILON)) {
-					array_remove(persistent_manifold_points, j);
-					--j;
-				}
-			}
-		}
+		//		if (((pmp1->pv2.x - pmp2->pv2.x) > -EPSILON && (pmp1->pv2.x - pmp2->pv2.x) < EPSILON) &&
+		//			((pmp1->pv2.y - pmp2->pv2.y) > -EPSILON && (pmp1->pv2.y - pmp2->pv2.y) < EPSILON)) {
+		//			array_remove(persistent_manifold_points, j);
+		//			--j;
+		//		}
+		//	}
+		//}
 	}
 
 	if (array_length(persistent_manifold_points) == 0) {
 		// We didn't find any intersection :(
 		// in this case, we fall back to simply getting the center of the convex hull
 		printf("Warning: no intersection was found - falling back to center of convex hull (inaccurate)\n");
-		vec2 center1 = get_center_of_polygon(polygon1);
-		vec2 center2 = get_center_of_polygon(polygon2);
-		Persistent_Manifold_Point pmp;
-		assert(find_world_coords_for_vertex_within_polygon(center1, polygon1, &pmp.wc1) == true);
-		assert(find_world_coords_for_vertex_within_polygon(center2, polygon2, &pmp.wc2) == true);
-		pmp.pv2 = (vec2){0.0f, 0.0f};
-		array_push(persistent_manifold_points, pmp);
+		//vec2 center1 = get_center_of_polygon(polygon1);
+		//vec2 center2 = get_center_of_polygon(polygon2);
+		//Persistent_Manifold_Point pmp;
+		//assert(find_world_coords_for_vertex_within_polygon(center1, polygon1, &pmp.wc1) == true);
+		//assert(find_world_coords_for_vertex_within_polygon(center2, polygon2, &pmp.wc2) == true);
+		//pmp.pv2 = (vec2){0.0f, 0.0f};
+		//array_push(persistent_manifold_points, pmp);
 	}
 
 	for (u32 i = 0; i < array_length(persistent_manifold_points); ++i) {
