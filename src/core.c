@@ -95,7 +95,7 @@ int core_init()
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&plane, m, (vec4){0.0f, 0.0f, 0.0f, 1.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.5f, 0.0f, 1.0f}, 1000000000.0f);
-	m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	m = graphics_mesh_create_from_obj("./res/ico_low.obj", 0);
 	graphics_entity_create_with_color(&cube, m, (vec4){-0.100219, 0.722392, 1.093940, 1.0f}, (Quaternion){-0.034618, -0.915415, -0.121276, 0.382232},
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){0.393084, 0.993931, 0.055659, 1.0}, 10.0f);
 
