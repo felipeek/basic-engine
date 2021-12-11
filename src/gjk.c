@@ -410,6 +410,7 @@ collision_epa(Support_Point* simplex, Bounding_Shape* b1, Bounding_Shape* b2, Co
 	if (faces[index].distance == 0.0f)
 	{
 	  array_free(faces);
+	  printf("DISTANCE 0\n");
 	  return false;
 	}
 	// Find the new support in the normal direction of the closest face

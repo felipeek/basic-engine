@@ -752,7 +752,7 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 	r32 EPSILON = 0.0001f;
 	//if (edge_normal_dot > chosen_normal1_dot && edge_normal_dot > chosen_normal2_dot) {
 	if (edge_normal_dot > chosen_normal1_dot + EPSILON && edge_normal_dot > chosen_normal2_dot + EPSILON) {
-		printf("edge contact\n");
+		//printf("edge contact\n");
 		Persistent_Manifold_Point pmp;
 		vec3 l1, l2;
 		vec3 p1 = selected_edges[0];
@@ -768,7 +768,7 @@ Persistent_Manifold create_persistent_manifold(Bounding_Shape* b1, Bounding_Shap
 		pmp.wc2 = l2;
 		array_push(persistent_manifold_points, pmp);
 	} else {
-		printf("face contact\n");
+		//printf("face contact\n");
 		boolean is_normal1_more_parallel = chosen_normal1_dot > chosen_normal2_dot;
 		vec3* reference_face_support_points = is_normal1_more_parallel ? support_points1 : support_points2;
 		vec3* incident_face_support_points = is_normal1_more_parallel ? support_points2 : support_points1;
@@ -901,6 +901,9 @@ PMC_Contact* collision_get_convex_convex_points(Entity* e1, Entity* e2, vec3 nor
 	for (u32 i = 0; i < array_length(pm.collision_points1); ++i) {
 		vec3 cp1 = pm.collision_points1[i];
 		vec3 cp2 = pm.collision_points2[i];
+
+		//r32 lateral_distance = fabsf(cp1.x - cp2.x) + fabsf(cp1.y - cp2.y);
+		//printf("lateral distance: %.3f\n", lateral_distance);
 
 		PMC_Contact pmc_contact;
 		pmc_contact.e1 = e1;

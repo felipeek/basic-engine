@@ -7,8 +7,10 @@
 #include "pmc.h"
 #include <hash_map.h>
 
-#define NUM_SUBSTEPS 10
+#define NUM_SUBSTEPS 100
 #define NUM_POS_ITERS 1
+
+extern int paused;
 
 // Calculate the sum of all external forces acting on an entity
 static vec3 calculate_external_force(Entity* e) {
@@ -155,6 +157,18 @@ static void create_constraints_for_contacts(PMC* pmc, Constraint** constraints) 
 		vec3 p2 = calculate_p(contact->e2, contact->r2_lc);
 		r32 d = gm_vec3_dot(gm_vec3_subtract(p1, p2), contact->normal);
 		constraint.positional_constraint.delta_x = gm_vec3_scalar_product(d, contact->normal);
+		printf("%.4f\n", d);
+		printf("contacts: %d\n", array_length(pmc->contacts));
+		printf("r1_lc: <%.3f, %.3f, %.3f>\n", contact->r1_lc.x, contact->r1_lc.y, contact->r1_lc.z);
+		printf("r2_lc: <%.3f, %.3f, %.3f>\n", contact->r2_lc.x, contact->r2_lc.y, contact->r2_lc.z);
+		printf("r1_wc: <%.3f, %.3f, %.3f>\n", contact->r1_wc.x, contact->r1_wc.y, contact->r1_wc.z);
+		printf("r2_wc: <%.3f, %.3f, %.3f>\n", contact->r2_wc.x, contact->r2_wc.y, contact->r2_wc.z);
+		printf("normal: <%.3f, %.3f, %.3f>\n", contact->normal.x, contact->normal.y, contact->normal.z);
+		if (d > 0.001f) {
+			paused = true;
+			array_clear(*constraints);
+			return;
+		}
 		if (d > 0.0f) {
 			// if 'd' is greater than 0.0, we add the constraint.
 			array_push(*constraints, constraint);
@@ -181,8 +195,6 @@ static void create_constraints_for_contacts(PMC* pmc, Constraint** constraints) 
 		}
 	}
 }
-
-extern int paused;
 
 void pbd_simulate(r32 dt, Entity* entities) {
 	if (dt <= 0.0f) return;
@@ -274,6 +286,9 @@ void pbd_simulate(r32 dt, Entity* entities) {
 			while ((iterator = hash_map_iterator_next(&pmc_map, iterator, &key, &pmc)) != HASH_MAP_ITERATOR_END) {
 				create_constraints_for_contacts(pmc, &constraints);
 			}
+
+			if (paused)
+				return;
 
 			// Now, solve the constraints
 
