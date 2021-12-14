@@ -85,11 +85,11 @@ int core_init()
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 1.0f, 1.0f}, 50.0f);
 	//array_push(entities, e);
 
-	//graphics_entity_create_with_color(&e, m4, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 45.0f),
-	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 1.0f, 1.0f, 1.0f}, 5.0f);
-	//array_push(entities, e);
+	graphics_entity_create_with_color(&e, m4, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 45.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 1.0f, 1.0f, 1.0f}, 5.0f);
+	array_push(entities, e);
 
-#if 1
+#if 0
 #if 0
 	//graphics_entity_create_with_color(&e, m, (vec3){-2.5f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
