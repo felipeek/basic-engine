@@ -3,7 +3,7 @@
 #include <assert.h>
 #include "collision.h"
 
-#define NUM_SUBSTEPS 100
+#define NUM_SUBSTEPS 10
 #define NUM_POS_ITERS 1
 
 // Calculate the sum of all external forces acting on an entity
@@ -74,6 +74,20 @@ static void solve_positional_constraint(Constraint* constraint, r32 h) {
 	r32 til_compliance = compliance / (h * h);
 	r32 delta_lambda = (- c - til_compliance * lambda) / (w1 + w2 + til_compliance);
 	*constraint->positional_constraint.lambda += delta_lambda;
+
+	if (constraint->positional_constraint.is_static_friction_constraint) {
+		r32 lambda_t = *constraint->positional_constraint.lambda;
+		r32 lambda_n = *constraint->positional_constraint.normal_lambda;
+		r32 u_s = constraint->positional_constraint.static_friction_coefficient;
+
+		// @NOTE(fek): This inequation shown in 3.5 was changed because the lambdas will always be negative!
+		if (!(lambda_t > u_s * lambda_n)) {
+			//printf("NOT Applying static friction\n");
+			return;
+		}
+
+		//printf("Applying static friction\n");
+	}
 
 	// calculates the positional impulse
 	vec3 positional_impulse = gm_vec3_scalar_product(delta_lambda, n);
@@ -148,8 +162,8 @@ static vec3 calculate_p(Entity* e, vec3 r_lc) {
 			return gm_vec3_add(e->world_position, gm_mat3_multiply_vec3(&current_rot_matrix, r_lc));
 		} break;
 		case CUBE: {
-			mat3 previous_rot_matrix = quaternion_get_matrix3(&e->previous_world_rotation);
-			return gm_vec3_add(e->previous_world_position, gm_mat3_multiply_vec3(&previous_rot_matrix, r_lc));
+			mat3 current_rot_matrix = quaternion_get_matrix3(&e->world_rotation);
+			return gm_vec3_add(e->world_position, gm_mat3_multiply_vec3(&current_rot_matrix, r_lc));
 		} break;
 		default: assert(0);
 	}
@@ -177,24 +191,25 @@ static void create_constraints_for_collision(Collision_Info* ci, Constraint** co
 		array_push(*constraints, constraint);
 
 		// if 'd' is greater than 0.0, we should also add a constraint for static friction, but only if lambda_t < u_s * lambda_n
-		// the problem is that if NUM_POS_ITERS is 1, lambda_t and lambda_n will always be 0.0, so this will never be used.
-		const r32 static_friction_coefficient = 0.5f;
-		if (ci->lambda_t < static_friction_coefficient * ci->lambda_n) {
-			vec3 p1_til = calculate_p_til(ci->e1, ci->r1_lc);
-			vec3 p2_til = calculate_p_til(ci->e2, ci->r2_lc);
-			vec3 delta_p = gm_vec3_subtract(gm_vec3_subtract(p1, p1_til), gm_vec3_subtract(p2, p2_til));
-			vec3 delta_p_t = gm_vec3_subtract(delta_p, gm_vec3_scalar_product(gm_vec3_dot(delta_p, ci->normal), ci->normal));
-			Constraint constraint = {0};
-			constraint.type = POSITIONAL_CONSTRAINT;
-			constraint.positional_constraint.compliance = 0.0f;
-			constraint.positional_constraint.e1 = ci->e1;
-			constraint.positional_constraint.e2 = ci->e2;
-			constraint.positional_constraint.lambda = &ci->lambda_t;
-			constraint.positional_constraint.r1 = ci->r1_wc;
-			constraint.positional_constraint.r2 = ci->r2_wc;
-			constraint.positional_constraint.delta_x = delta_p_t;
-			array_push(*constraints, constraint);
-		}
+		// This is only known once the normal constraint is solved, so we delegate this check to the solver.
+		const r32 static_friction_coefficient = 1.0f;
+		vec3 p1_til = calculate_p_til(ci->e1, ci->r1_lc);
+		vec3 p2_til = calculate_p_til(ci->e2, ci->r2_lc);
+		vec3 delta_p = gm_vec3_subtract(gm_vec3_subtract(p1, p1_til), gm_vec3_subtract(p2, p2_til));
+		vec3 delta_p_t = gm_vec3_subtract(delta_p, gm_vec3_scalar_product(gm_vec3_dot(delta_p, ci->normal), ci->normal));
+		Constraint constraint = {0};
+		constraint.type = POSITIONAL_CONSTRAINT;
+		constraint.positional_constraint.compliance = 0.0f;
+		constraint.positional_constraint.e1 = ci->e1;
+		constraint.positional_constraint.e2 = ci->e2;
+		constraint.positional_constraint.lambda = &ci->lambda_t;
+		constraint.positional_constraint.r1 = ci->r1_wc;
+		constraint.positional_constraint.r2 = ci->r2_wc;
+		constraint.positional_constraint.delta_x = delta_p_t;
+		constraint.positional_constraint.is_static_friction_constraint = true;
+		constraint.positional_constraint.normal_lambda = &ci->lambda_n;
+		constraint.positional_constraint.static_friction_coefficient = static_friction_coefficient;
+		array_push(*constraints, constraint);
 	}
 }
 
@@ -348,7 +363,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 			vec3 delta_v = (vec3){0.0f, 0.0f, 0.0f};
 			
 			// we start by applying Coloumb's dynamic friction force
-			const r32 dynamic_friction_coefficient = 0.5f;
+			const r32 dynamic_friction_coefficient = 0.1f;
 			r32 fn = lambda_n / (h * h);
 			// @NOTE: equation (30) was modified here
 			r32 fact = MIN(-h * dynamic_friction_coefficient * fn, gm_vec3_length(vt));
@@ -363,7 +378,7 @@ void pbd_simulate(r32 dt, Entity* entities) {
 			vec3 v_til = gm_vec3_subtract(gm_vec3_add(old_v1, gm_vec3_cross(old_w1, r1_wc)), gm_vec3_add(old_v2, gm_vec3_cross(old_w2, r2_wc)));
 			r32 vn_til = gm_vec3_dot(n, v_til);
 			//r32 e = (fabsf(vn) > 2.0f * GRAVITY * h) ? 0.8f : 0.0f;
-			r32 e = 0.1f;
+			r32 e = 0.0f;
 			// @NOTE: equation (34) was modified here
 			fact = -vn + MIN(-e * vn_til, 0.0f);
 			// update delta_v

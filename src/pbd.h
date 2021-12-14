@@ -15,6 +15,11 @@ typedef struct {
 	vec3 delta_x;
 	
 	r32* lambda;
+
+	// Fields necessary to implement static friction.
+	boolean is_static_friction_constraint;
+	r32 static_friction_coefficient;
+	r32* normal_lambda;		// The 'lambda' calculated by the normal constraint (NOTE: during the solver, this must be calculated first!)
 } Positional_Constaint;
 
 typedef struct {
