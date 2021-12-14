@@ -139,6 +139,7 @@ s32 main(s32 argc, s8** argv)
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glClearColor(0.2074f, 0.3168f, 0.3615f, 1.0f);
 
+		//delta_time = 0.01f;
 		core_update(delta_time);
 		core_render();
 		if (!is_menu_visible)
