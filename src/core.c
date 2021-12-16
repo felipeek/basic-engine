@@ -72,7 +72,7 @@ int core_init()
 	Mesh floorm = graphics_mesh_create_from_obj("./res/floor.obj", 0);
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	Mesh m2 = graphics_mesh_create_from_obj("./res/cyl.obj", 0);
-	Mesh m3 = graphics_mesh_create_from_obj("./res/platform.obj", 0);
+	Mesh m3 = graphics_mesh_create_from_obj("./res/platform2.obj", 0);
 	Mesh m4 = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	//u32 tex = graphics_texture_create("./res/tex.png");
 	graphics_entity_create_with_color_fixed(&e, floorm, (vec3){0.0f, PLANE_Y, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
@@ -82,11 +82,11 @@ int core_init()
 	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 1.0f, 1.0f, 1.0f}, 50.0f);
 	//array_push(entities, e);
 	//graphics_entity_create_with_color(&e, m3, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f),
-	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 1.0f, 1.0f}, 50.0f);
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 1.0f, 1.0f}, 10.0f);
 	//array_push(entities, e);
 
-	//graphics_entity_create_with_color(&e, m4, (vec3){0.0f, 2.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 45.0f),
-	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 1.0f, 1.0f, 1.0f}, 5.0f);
+	//graphics_entity_create_with_color(&e, m4, (vec3){0.0f, 4.0f, 0.0f}, quaternion_new((vec3){1.0f, 1.0f, 1.0f}, 0.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 1.0f, 1.0f, 1.0f}, 2.0f);
 	//array_push(entities, e);
 
 #if 1
@@ -182,7 +182,7 @@ static void run_collision_only(Entity* entities) {
 int paused = 0;
 void core_update(r32 delta_time)
 {
-	//delta_time = 0.01f;
+	//delta_time = 0.02f;
 	if (paused) {
 		run_collision_only(entities);
 		return;
@@ -319,14 +319,20 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		//graphics_entity_create_with_color(&e, m, cube_position, quaternion_new((vec3){0.35f, 0.44f, 0.12f}, 33.0f),
 		//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, 1.0f}, 10.0f);
 		graphics_entity_create_with_color(&e, m, cube_position, quaternion_new((vec3){0.35f, 0.44f, 0.12f}, 0.0f),
-			(vec3){1.0f, 1.0f, 1.0f}, (vec4){rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, 1.0f}, 5.0f);
+			(vec3){1.0f, 1.0f, 1.0f}, (vec4){rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, rand() / (r32)RAND_MAX, 1.0f}, 1.0f);
 
-		Physics_Force force;
-		force.force = gm_vec3_scalar_product(5000.0f, gm_vec3_scalar_product(-1.0f, camera_z));
-		force.position = (vec3) {0.0f, 0.0f, 0.0f};
-		array_push(e.forces, force);
+		//Physics_Force force;
+		//force.force = gm_vec3_scalar_product(15000.0f, gm_vec3_scalar_product(-1.0f, camera_z));
+		//force.position = (vec3) {0.0f, 0.0f, 0.0f};
+		//array_push(e.forces, force);
 
-		array_push(entities, e);
+		e.linear_velocity = gm_vec3_scalar_product(10.0f, gm_vec3_scalar_product(-1.0f, camera_z));
+
+		//if (array_length(entities) == 2) {
+		//	entities[1] = e;
+		//} else {
+			array_push(entities, e);
+		//}
 
 		key_state[GLFW_KEY_SPACE] = false;
 	}

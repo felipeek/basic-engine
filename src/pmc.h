@@ -36,7 +36,7 @@ void pmc_init();
 void pmc_destroy();
 void pmc_render(Perspective_Camera* camera);
 void pmc_update();
-void pmc_add(PMC_Contact contact);
+PMC* pmc_add(PMC_Contact contact);
 void pmc_clear(Entity* e1, Entity* e2);
 void pmc_clear_all();
 void pmc_perturb(Entity* e1, Entity* e2, vec3 normal);

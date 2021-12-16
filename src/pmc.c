@@ -235,20 +235,20 @@ static PMC* get_pmc_for_entity_pair(Entity* e1, Entity* e2) {
 	return pmc;
 }
 
-void pmc_add(PMC_Contact contact) {
+PMC* pmc_add(PMC_Contact contact) {
 	PMC* pmc = get_pmc_for_entity_pair(contact.e1, contact.e2);
 	//printf("size: %ld\n", array_length(pmc->reserve));
 
 #ifdef IGNORE_PMC
 	array_push(pmc->contacts, contact);
-	return;
+	return pmc;
 #endif
 
 	if (!is_contact_still_valid(contact)) {
 #ifdef USE_RESERVE
 		array_push(pmc->reserve, contact);
 #endif
-		return;
+		return pmc;
 	}
 
 	vec3 received_collision_point2 = gm_vec3_add(contact.e2->world_position, contact.r2_wc);
@@ -256,12 +256,12 @@ void pmc_add(PMC_Contact contact) {
 
 	if (existing_entry >= 0) {
 		pmc->contacts[existing_entry] = contact;
-		return;
+		return pmc;
 	}
 
 	if (array_length(pmc->contacts) < 4) {
 		array_push(pmc->contacts, contact);
-		return;
+		return pmc;
 	}
 
 	int insert_index = sort_cached_points(pmc, contact);
