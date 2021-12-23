@@ -7,6 +7,8 @@
 #include "obj.h"
 #include "menu.h"
 #include "gjk.h"
+#include "ho_gjk.h"
+#include <time.h>
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
@@ -54,11 +56,11 @@ int core_init()
 	// Create light
 	lights = create_lights();
 
-	Mesh m = graphics_mesh_create_from_obj("./res/ico.obj", 0);
+	Mesh m = graphics_mesh_create_from_obj("./res/monkey_hull.obj", 0);
 	graphics_entity_create_with_color(&e1, m, (vec3){0.0f, 0.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 
-	Mesh m2 = graphics_mesh_create_from_obj("./res/ico.obj", 0);
+	Mesh m2 = graphics_mesh_create_from_obj("./res/perf_sphere.obj", 0);
 	graphics_entity_create_with_color(&e2, m2, (vec3){0.0f, 2.1f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 
@@ -104,6 +106,7 @@ void core_update(r32 delta_time)
 	vec3* e1_vertices = collect_vertices_of_entity(&e1);
 	vec3* e2_vertices = collect_vertices_of_entity(&e2);
 
+	clock_t begin = clock();
 	if (gjk_collides(e1_vertices, e2_vertices)) {
 		e1.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
 		e2.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
@@ -111,6 +114,17 @@ void core_update(r32 delta_time)
 		e1.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
 		e2.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
 	}
+
+	clock_t end = clock();
+	double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+	printf("MINE Time Spent: %f\n", time_spent);
+
+	//begin = clock();
+	//GJK_Support_List sup = {0};
+	//ho_gjk_collides(&sup, e1_vertices, e2_vertices);
+	//end = clock();
+	//time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+	//printf("HO Time Spent: %f\n", time_spent);
 
 	array_free(e1_vertices);
 	array_free(e2_vertices);
