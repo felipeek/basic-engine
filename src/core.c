@@ -8,6 +8,7 @@
 #include "menu.h"
 #include "gjk.h"
 #include "ho_gjk.h"
+#include "old_gjk.h"
 #include <time.h>
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
@@ -119,12 +120,18 @@ void core_update(r32 delta_time)
 	double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
 	printf("MINE Time Spent: %f\n", time_spent);
 
-	//begin = clock();
-	//GJK_Support_List sup = {0};
-	//ho_gjk_collides(&sup, e1_vertices, e2_vertices);
-	//end = clock();
-	//time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-	//printf("HO Time Spent: %f\n", time_spent);
+	begin = clock();
+	old_gjk_collides(e1_vertices, e2_vertices);
+	end = clock();
+	time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+	printf("MINE(OLD) Time Spent: %f\n", time_spent);
+
+	begin = clock();
+	GJK_Support_List sup = {0};
+	ho_gjk_collides(&sup, e1_vertices, e2_vertices);
+	end = clock();
+	time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+	printf("HO Time Spent: %f\n", time_spent);
 
 	array_free(e1_vertices);
 	array_free(e2_vertices);

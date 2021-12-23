@@ -176,92 +176,19 @@ static boolean do_simplex_4(GJK_Simplex* simplex, vec3* direction) {
 		} break;
 		case 0x1: {
 			// Triangle ABC
-			if (gm_vec3_dot(gm_vec3_cross(abc, ac), ao) >= 0.0f) {
-				if (gm_vec3_dot(ac, ao) >= 0.0f) {
-					// AC region
-					simplex->a = a;
-					simplex->b = c;
-					simplex->num = 2;
-					*direction = triple_cross(ac, ao, ac);
-				} else {
-					if (gm_vec3_dot(ab, ao) >= 0.0f) {
-						// AB region
-						simplex->a = a;
-						simplex->b = b;
-						simplex->num = 2;
-						*direction = triple_cross(ab, ao, ab);
-					} else {
-						// A region
-						simplex->a = a;
-						*direction = ao;
-					}
-				}
-			} else {
-				if (gm_vec3_dot(gm_vec3_cross(ab, abc), ao) >= 0.0f) {
-					if (gm_vec3_dot(ab, ao) >= 0.0f) {
-						// AB region
-						simplex->a = a;
-						simplex->b = b;
-						simplex->num = 2;
-						*direction = triple_cross(ab, ao, ab);
-					} else {
-						// A region
-						simplex->a = a;
-						*direction = ao;
-					}
-				} else {
-					// ABC region
-					simplex->a = a;
-					simplex->b = b;
-					simplex->c = c;
-					simplex->num = 3;
-					*direction = abc;
-				}
-			}
+			simplex->a = a;
+			simplex->b = b;
+			simplex->c = c;
+			simplex->num = 3;
+			return do_simplex_3(simplex, direction);
 		} break;
 		case 0x2: {
-			if (gm_vec3_dot(gm_vec3_cross(acd, ad), ao) >= 0.0f) {
-				if (gm_vec3_dot(ad, ao) >= 0.0f) {
-					// AD region
-					simplex->a = a;
-					simplex->b = d;
-					simplex->num = 2;
-					*direction = triple_cross(ad, ao, ad);
-				} else {
-					if (gm_vec3_dot(ac, ao) >= 0.0f) {
-						// AC region
-						simplex->a = a;
-						simplex->b = c;
-						simplex->num = 2;
-						*direction = triple_cross(ab, ao, ab);
-					} else {
-						// A region
-						simplex->a = a;
-						*direction = ao;
-					}
-				}
-			} else {
-				if (gm_vec3_dot(gm_vec3_cross(ac, acd), ao) >= 0.0f) {
-					if (gm_vec3_dot(ac, ao) >= 0.0f) {
-						// AC region
-						simplex->a = a;
-						simplex->b = c;
-						simplex->num = 2;
-						*direction = triple_cross(ac, ao, ac);
-					} else {
-						// A region
-						simplex->a = a;
-						*direction = ao;
-					}
-				} else {
-					// ACD region
-					simplex->a = a;
-					simplex->b = c;
-					simplex->c = d;
-					simplex->num = 3;
-					*direction = acd;
-				}
-			}
+			// Triangle ACD
+			simplex->a = a;
+			simplex->b = c;
+			simplex->c = d;
+			simplex->num = 3;
+			return do_simplex_3(simplex, direction);
 		} break;
 		case 0x3: {
 			// Line AC
@@ -277,50 +204,6 @@ static boolean do_simplex_4(GJK_Simplex* simplex, vec3* direction) {
 			simplex->c = b;
 			simplex->num = 3;
 			return do_simplex_3(simplex, direction);
-
-			// Triangle ADB
-			if (gm_vec3_dot(gm_vec3_cross(adb, ab), ao) >= 0.0f) {
-				if (gm_vec3_dot(ab, ao) >= 0.0f) {
-					// AB region
-					simplex->a = a;
-					simplex->b = b;
-					simplex->num = 2;
-					*direction = triple_cross(ab, ao, ab);
-				} else {
-					if (gm_vec3_dot(ad, ao) >= 0.0f) {
-						// AD region
-						simplex->a = a;
-						simplex->b = d;
-						simplex->num = 2;
-						*direction = triple_cross(ad, ao, ad);
-					} else {
-						// A region
-						simplex->a = a;
-						*direction = ao;
-					}
-				}
-			} else {
-				if (gm_vec3_dot(gm_vec3_cross(ad, adb), ao) >= 0.0f) {
-					if (gm_vec3_dot(ad, ao) >= 0.0f) {
-						// AD region
-						simplex->a = a;
-						simplex->b = d;
-						simplex->num = 2;
-						*direction = triple_cross(ad, ao, ad);
-					} else {
-						// A region
-						simplex->a = a;
-						*direction = ao;
-					}
-				} else {
-					// ADB region
-					simplex->a = a;
-					simplex->b = d;
-					simplex->c = b;
-					simplex->num = 3;
-					*direction = adb;
-				}
-			}
 		} break;
 		case 0x5: {
 			// Line AB
@@ -357,7 +240,7 @@ static boolean do_simplex(GJK_Simplex* simplex, vec3* direction) {
 	assert(0);
 }
 
-boolean gjk_collides(vec3* shape1, vec3* shape2) {
+boolean old_gjk_collides(vec3* shape1, vec3* shape2) {
 	GJK_Simplex simplex;
 
 	simplex.a = get_support_point_of_minkowski_difference(shape1, shape2, (vec3){0.0f, 0.0f, 1.0f});
