@@ -6,12 +6,15 @@
 #include "graphics.h"
 #include "obj.h"
 #include "menu.h"
+#include "gjk.h"
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
 
 static Perspective_Camera camera;
 static Light* lights;
-static Entity e;
+static Entity e1, e2;
+static boolean is_mouse_bound_to_joint_target_position;
+static Entity* bound_entity;
 
 static Perspective_Camera create_camera()
 {
@@ -51,8 +54,12 @@ int core_init()
 	// Create light
 	lights = create_lights();
 
-	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&e, m, (vec3){0.0f, 0.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	Mesh m = graphics_mesh_create_from_obj("./res/ico.obj", 0);
+	graphics_entity_create_with_color(&e1, m, (vec3){0.0f, 0.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+
+	Mesh m2 = graphics_mesh_create_from_obj("./res/ico.obj", 0);
+	graphics_entity_create_with_color(&e2, m2, (vec3){0.0f, 2.1f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 
 	menu_register_dummy_callback(menu_dummy_callback);
@@ -65,14 +72,54 @@ void core_destroy()
 	array_free(lights);
 }
 
+vec3* collect_vertices_of_entity(const Entity* e) {
+	vec3* vertices = array_new(vec3);
+
+	for (u32 i = 0; i < array_length(e->mesh.vertices); ++i) {
+		const Vertex* v = &e->mesh.vertices[i];
+		vec3 local_coords_position = v->position;
+		mat4 model_matrix = e->model_matrix;
+		vec3 world_coords_position = gm_mat4_multiply_vec3(&model_matrix, local_coords_position);
+
+		boolean already_exists = false;
+
+		for (u32 j = 0; j < array_length(vertices); ++j) {
+			vec3 existing_element = vertices[j];
+			if (gm_vec3_equal(world_coords_position, existing_element)) {
+				already_exists = true;
+				break;
+			}
+		}
+
+		if (!already_exists) {
+			array_push(vertices, world_coords_position);
+		}
+	}
+
+	return vertices;
+}
+
 void core_update(r32 delta_time)
 {
+	vec3* e1_vertices = collect_vertices_of_entity(&e1);
+	vec3* e2_vertices = collect_vertices_of_entity(&e2);
 
+	if (gjk_collides(e1_vertices, e2_vertices)) {
+		e1.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
+		e2.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
+	} else {
+		e1.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
+		e2.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
+	}
+
+	array_free(e1_vertices);
+	array_free(e2_vertices);
 }
 
 void core_render()
 {
-	graphics_entity_render_phong_shader(&camera, &e, lights);
+	graphics_entity_render_phong_shader(&camera, &e1, lights);
+	graphics_entity_render_phong_shader(&camera, &e2, lights);
     graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
     graphics_renderer_primitives_flush(&camera);
 }
@@ -80,12 +127,21 @@ void core_render()
 void core_input_process(boolean* key_state, r32 delta_time)
 {
 	r32 movement_speed = 3.0f;
-	r32 rotation_speed = 300.0f;
+	r32 rotation_speed = 60.0f;
 
-	if (key_state[GLFW_KEY_LEFT_SHIFT])
+	if (key_state[GLFW_KEY_LEFT_SHIFT]) {
 		movement_speed = 0.5f;
+		rotation_speed = 30.0f;
+	}
 	if (key_state[GLFW_KEY_RIGHT_SHIFT])
 		movement_speed = 0.1f;
+
+	is_mouse_bound_to_joint_target_position = false;
+	if (key_state[GLFW_KEY_1])
+	{
+		bound_entity = &e2;
+		is_mouse_bound_to_joint_target_position = true;
+	}
 
 	if (key_state[GLFW_KEY_W])
 		camera_move_forward(&camera, movement_speed * delta_time);
@@ -97,41 +153,41 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		camera_move_right(&camera, movement_speed * delta_time);
 	if (key_state[GLFW_KEY_X])
 	{
-		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
+		if (key_state[GLFW_KEY_RIGHT_SHIFT])
 		{
 			Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+			graphics_entity_set_rotation(&e2, quaternion_product(&rotation, &e2.world_rotation));
 		}
 		else
 		{
 			Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, -rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+			graphics_entity_set_rotation(&e2, quaternion_product(&rotation, &e2.world_rotation));
 		}
 	}
 	if (key_state[GLFW_KEY_Y])
 	{
-		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
+		if (key_state[GLFW_KEY_RIGHT_SHIFT])
 		{
 			Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+			graphics_entity_set_rotation(&e2, quaternion_product(&rotation, &e2.world_rotation));
 		}
 		else
 		{
 			Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, -rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+			graphics_entity_set_rotation(&e2, quaternion_product(&rotation, &e2.world_rotation));
 		}
 	}
 	if (key_state[GLFW_KEY_Z])
 	{
-		if (key_state[GLFW_KEY_LEFT_SHIFT] || key_state[GLFW_KEY_RIGHT_SHIFT])
+		if (key_state[GLFW_KEY_RIGHT_SHIFT])
 		{
 			Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+			graphics_entity_set_rotation(&e2, quaternion_product(&rotation, &e2.world_rotation));
 		}
 		else
 		{
 			Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, -rotation_speed * delta_time);
-			graphics_entity_set_rotation(&e, quaternion_product(&rotation, &e.world_rotation));
+			graphics_entity_set_rotation(&e2, quaternion_product(&rotation, &e2.world_rotation));
 		}
 	}
 	if (key_state[GLFW_KEY_L])
@@ -151,21 +207,37 @@ void core_input_process(boolean* key_state, r32 delta_time)
 void core_mouse_change_process(boolean reset, r64 x_pos, r64 y_pos)
 {
 	static r64 x_pos_old, y_pos_old;
-	// This constant is basically the mouse sensibility.
-	// @TODO: Allow mouse sensibility to be configurable.
-	static const r32 camera_mouse_speed = 0.1f;
 
-	if (!reset)
-	{
-		r64 x_difference = x_pos - x_pos_old;
-		r64 y_difference = y_pos - y_pos_old;
-
-		camera_rotate_x(&camera, camera_mouse_speed * (r32)x_difference);
-		camera_rotate_y(&camera, camera_mouse_speed * (r32)y_difference);
-	}
+	r64 x_difference = x_pos - x_pos_old;
+	r64 y_difference = y_pos - y_pos_old;
 
 	x_pos_old = x_pos;
 	y_pos_old = y_pos;
+
+	if (reset) return;
+
+	if (is_mouse_bound_to_joint_target_position && bound_entity != NULL)
+	{
+		// MOVE TARGET POSITIONS!
+		vec3 camera_y = camera_get_y_axis(&camera);
+		vec3 camera_x = camera_get_x_axis(&camera);
+
+		static const r32 target_point_move_speed = 0.001f;
+		vec3 y_diff = gm_vec3_scalar_product(-target_point_move_speed * (r32)y_difference, camera_y);
+		vec3 x_diff = gm_vec3_scalar_product(target_point_move_speed * (r32)x_difference, camera_x);
+
+		vec3 e_pos = bound_entity->world_position;
+		e_pos = gm_vec3_add(e_pos, y_diff);
+		e_pos = gm_vec3_add(e_pos, x_diff);
+		graphics_entity_set_position(bound_entity, e_pos);
+	}
+	else
+	{
+		// NORMAL CAMERA MOVEMENT!
+		static const r32 camera_mouse_speed = 0.1f;
+		camera_rotate_x(&camera, camera_mouse_speed * (r32)x_difference);
+		camera_rotate_y(&camera, camera_mouse_speed * (r32)y_difference);
+	}
 }
 
 void core_mouse_click_process(s32 button, s32 action, r64 x_pos, r64 y_pos)
