@@ -220,6 +220,7 @@ static boolean do_simplex_4(GJK_Simplex* simplex, vec3* direction) {
 			}
 		} break;
 		case 0x2: {
+			// Triangle ACD
 			if (gm_vec3_dot(gm_vec3_cross(acd, ad), ao) >= 0.0f) {
 				if (gm_vec3_dot(ad, ao) >= 0.0f) {
 					// AD region
@@ -265,19 +266,19 @@ static boolean do_simplex_4(GJK_Simplex* simplex, vec3* direction) {
 		} break;
 		case 0x3: {
 			// Line AC
-			simplex->a = a;
-			simplex->b = c;
-			simplex->num = 2;
-			return do_simplex_2(simplex, direction);
+			if (gm_vec3_dot(ac, ao) >= 0.0f) {
+				simplex->a = a;
+				simplex->b = c;
+				simplex->num = 2;
+				*direction = triple_cross(ac, ao, ac);
+			} else {
+				simplex->a = a;
+				simplex->num = 1;
+				*direction = ao;
+			}
+
 		} break;
 		case 0x4: {
-			// Triangle ADB
-			simplex->a = a;
-			simplex->b = d;
-			simplex->c = b;
-			simplex->num = 3;
-			return do_simplex_3(simplex, direction);
-
 			// Triangle ADB
 			if (gm_vec3_dot(gm_vec3_cross(adb, ab), ao) >= 0.0f) {
 				if (gm_vec3_dot(ab, ao) >= 0.0f) {
@@ -324,17 +325,29 @@ static boolean do_simplex_4(GJK_Simplex* simplex, vec3* direction) {
 		} break;
 		case 0x5: {
 			// Line AB
-			simplex->a = a;
-			simplex->b = b;
-			simplex->num = 2;
-			return do_simplex_2(simplex, direction);
+			if (gm_vec3_dot(ab, ao) >= 0.0f) {
+				simplex->a = a;
+				simplex->b = b;
+				simplex->num = 2;
+				*direction = triple_cross(ab, ao, ab);
+			} else {
+				simplex->a = a;
+				simplex->num = 1;
+				*direction = ao;
+			}
 		} break;
 		case 0x6: {
 			// Line AD
-			simplex->a = a;
-			simplex->b = d;
-			simplex->num = 2;
-			return do_simplex_2(simplex, direction);
+			if (gm_vec3_dot(ad, ao) >= 0.0f) {
+				simplex->a = a;
+				simplex->b = d;
+				simplex->num = 2;
+				*direction = triple_cross(ad, ao, ad);
+			} else {
+				simplex->a = a;
+				simplex->num = 1;
+				*direction = ao;
+			}
 		} break;
 		case 0x7: {
 			// Point A
