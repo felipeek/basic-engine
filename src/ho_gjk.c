@@ -258,3 +258,209 @@ ho_gjk_collides(GJK_Support_List* sup_list, vec3* b1, vec3* b2)
 	}
   }
 }
+
+typedef struct {
+  Support_Point a;
+  Support_Point b;
+} Edge;
+
+typedef struct {
+  Support_Point a;
+  Support_Point b;
+  Support_Point c;
+  vec3 normal;
+  r32 distance;
+} Face;
+
+vec3
+triangle_centroid(Face f)
+{
+  r32 ox = (f.a.v.x + f.b.v.x + f.c.v.x) / 3.0f;
+  r32 oy = (f.a.v.y + f.b.v.y + f.c.v.y) / 3.0f;
+  r32 oz = (f.a.v.z + f.b.v.z + f.c.v.z) / 3.0f;
+  return (vec3) {ox, oy, oz};
+}
+
+static Face
+face_new(Support_Point v1, Support_Point v2, Support_Point v3)
+{
+  Face f = { 0 };
+  f.a = v1;
+  f.b = v2;
+  f.c = v3;
+  return f;
+}
+
+static int
+closest_face(Face* faces, vec3* b1, vec3* b2, boolean invert_normals)
+{
+  r32 distance = FLT_MAX;
+  int index = -1;
+  for (int i = 0; i < array_length(faces); ++i)
+  {
+    Face f = faces[i];
+    vec3 ba = gm_vec3_subtract(f.b.v, f.a.v);
+    vec3 ca = gm_vec3_subtract(f.c.v, f.a.v);
+    vec3 normal = gm_vec3_cross(ba, ca);
+    normal = gm_vec3_normalize(normal);
+
+    if (invert_normals && gm_vec3_dot(normal, f.a.v) < 0.0f)
+    {
+      normal = gm_vec3_negative(normal);
+    }
+
+    r32 d = fabsf(gm_vec3_dot(f.a.v, normal));
+
+    if (invert_normals && d == 0.0f)
+    {
+      d = FLT_MAX;
+    }
+
+    faces[i].distance = d;
+    faces[i].normal = normal;
+    //faces[i].support = collision_gjk_support(b1, b2, normal);
+
+    if (d < distance)
+    {
+      distance = d;
+      index = i;
+    }
+  }
+
+  return index;
+}
+
+
+static int
+edge_in(Edge* edges, Edge e)
+{
+  for (int i = 0; i < array_length(edges); ++i)
+  {
+    Edge t = edges[i];
+
+    if (gm_vec3_equal(t.a.v, e.a.v) && gm_vec3_equal(t.b.v, e.b.v))
+      return i;
+    if (gm_vec3_equal(t.b.v, e.a.v) && gm_vec3_equal(t.a.v, e.b.v))
+      return i;
+  }
+  return -1;
+}
+
+void
+barycentric(vec3 p, vec3 a, vec3 b, vec3 c, r32 *u, r32 *v, r32 *w)
+{
+  // code from Crister Erickson's Real-Time Collision Detection
+  vec3 v0 = gm_vec3_subtract(b, a);
+  vec3 v1 = gm_vec3_subtract(c, a);
+  vec3 v2 = gm_vec3_subtract(p, a);
+  r32 d00 = gm_vec3_dot(v0, v0);
+  r32 d01 = gm_vec3_dot(v0, v1);
+  r32 d11 = gm_vec3_dot(v1, v1);
+  r32 d20 = gm_vec3_dot(v2, v0);
+  r32 d21 = gm_vec3_dot(v2, v1);
+  r32 denom = d00 * d11 - d01 * d01;
+  *v = (d11 * d20 - d01 * d21) / denom;
+  *w = (d00 * d21 - d01 * d20) / denom;
+  *u = 1.0f - *v - *w;
+}
+
+vec3
+ho_collision_epa(Support_Point* simplex, vec3* b1, vec3* b2)
+{
+  int index = -1;
+  Face *faces = array_new_len(Face, 4);
+  array_length(faces) = 4;
+  faces[0] = face_new(simplex[0], simplex[1], simplex[2]);
+  faces[1] = face_new(simplex[0], simplex[3], simplex[1]);
+  faces[2] = face_new(simplex[1], simplex[3], simplex[2]);
+  faces[3] = face_new(simplex[0], simplex[2], simplex[3]);
+
+  int kk = 0;
+  for (; kk < 128; kk++)
+  {
+    // closest face is the face at index
+    index = closest_face(faces, b1, b2, kk > 0);
+
+    // Whenever the distance is 0, 
+    if (faces[index].distance == 0.0f)
+    {
+      array_free(faces);
+      return (vec3) {0.0f, 0.0f, 0.0f};
+    }
+    // Find the new support in the normal direction of the closest face
+    Support_Point sup_p = collision_gjk_support(b1, b2, faces[index].normal);
+    vec3 p = sup_p.v;
+
+    if (gm_vec3_dot(p, faces[index].normal) - faces[index].distance < 0.01f)
+    {
+      if (gm_vec3_equal(faces[index].normal, (vec3) {0.0f, 0.0f, 0.0f}))
+      {
+        assert(0);
+      }
+
+      vec3 penetration = gm_vec3_scalar_product(faces[index].distance, gm_vec3_normalize(faces[index].normal));
+      array_free(faces);
+      return penetration;
+    }
+    // Expand polytope
+    Edge *edges = array_new_len(Edge, 16);
+    for (int i = 0; i < array_length(faces); ++i)
+    {
+      // If the face is facing in the direction of the support point
+      // it can be removed
+      vec3 centroid = triangle_centroid(faces[i]);
+      r32 r = gm_vec3_dot(faces[i].normal, gm_vec3_subtract(p, centroid));
+
+      if (r > 0.0f)
+      {
+        Face f = faces[i];
+        array_remove(faces, i);
+        i--;
+
+        Edge ea = { f.a, f.b };
+        int ea_in = edge_in(edges, ea);
+        if (ea_in != -1)
+        {
+          array_remove(edges, ea_in);
+        }
+        else
+        {
+          array_push(edges, ea);
+        }
+
+        Edge eb = { f.b, f.c };
+        int eb_in = edge_in(edges, eb);
+        if (eb_in != -1)
+        {
+          array_remove(edges, eb_in);
+        }
+        else
+        {
+          array_push(edges, eb);
+        }
+
+        Edge ec = { f.c, f.a };
+        int ec_in = edge_in(edges, ec);
+        if (ec_in != -1)
+        {
+          array_remove(edges, ec_in);
+        }
+        else
+        {
+          array_push(edges, ec);
+        }
+      }
+    }
+    for (int i = 0; i < array_length(edges); ++i)
+    {
+      Face f = face_new(edges[i].a, edges[i].b, sup_p);
+      array_push(faces, f);
+    }
+    array_free(edges);
+  }
+
+  array_free(faces);
+  printf("The EPA routine took %d iterations and didn't complete\n", kk);
+  assert(0); // this should be unreachable
+  return (vec3) {0};
+}

@@ -8,7 +8,6 @@
 #include "menu.h"
 #include "gjk.h"
 #include "ho_gjk.h"
-#include "old_gjk.h"
 #include <time.h>
 
 #define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
@@ -18,6 +17,10 @@ static Light* lights;
 static Entity e1, e2;
 static boolean is_mouse_bound_to_joint_target_position;
 static Entity* bound_entity;
+
+static boolean epa_render;
+static vec3 epa_normal;
+static r32 epa_penetration;
 
 static Perspective_Camera create_camera()
 {
@@ -57,12 +60,14 @@ int core_init()
 	// Create light
 	lights = create_lights();
 
-	Mesh m = graphics_mesh_create_from_obj("./res/monkey_hull.obj", 0);
+	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&e1, m, (vec3){0.0f, 0.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 
-	Mesh m2 = graphics_mesh_create_from_obj("./res/perf_sphere.obj", 0);
+	Mesh m2 = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&e2, m2, (vec3){0.0f, 2.1f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+	graphics_entity_create_with_color(&e2, m2, (vec3){-0.39f, 1.989f, 0.292f}, (Quaternion){-0.562f, -0.333f, -0.572f, 0.497f},
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 
 	menu_register_dummy_callback(menu_dummy_callback);
@@ -104,34 +109,59 @@ vec3* collect_vertices_of_entity(const Entity* e) {
 
 void core_update(r32 delta_time)
 {
+	GJK_Simplex gjk_simplex;
 	vec3* e1_vertices = collect_vertices_of_entity(&e1);
 	vec3* e2_vertices = collect_vertices_of_entity(&e2);
 
+	//printf("Position: <%.3f, %.3f, %.3f>\n", e2.world_position.x, e2.world_position.y, e2.world_position.z);
+	//printf("Rotation: <%.3f, %.3f, %.3f, %.3f>\n", e2.world_rotation.x, e2.world_rotation.y, e2.world_rotation.z, e2.world_rotation.w);
+
+#if 1
 	clock_t begin = clock();
-	if (gjk_collides(e1_vertices, e2_vertices)) {
+	if (gjk_collides(e1_vertices, e2_vertices, &gjk_simplex)) {
 		e1.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
 		e2.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
+
+		epa_render = true;
+		epa(e1_vertices, e2_vertices, &gjk_simplex, &epa_normal, &epa_penetration);
 	} else {
 		e1.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
 		e2.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
+		epa_render = false;
 	}
 
 	clock_t end = clock();
 	double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-	printf("MINE Time Spent: %f\n", time_spent);
-
-	begin = clock();
-	old_gjk_collides(e1_vertices, e2_vertices);
-	end = clock();
-	time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-	printf("MINE(OLD) Time Spent: %f\n", time_spent);
-
-	begin = clock();
+	//printf("MINE Time Spent: %f\n", time_spent);
+#else
 	GJK_Support_List sup = {0};
-	ho_gjk_collides(&sup, e1_vertices, e2_vertices);
-	end = clock();
-	time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-	printf("HO Time Spent: %f\n", time_spent);
+	if (ho_gjk_collides(&sup, e1_vertices, e2_vertices)) {
+		e1.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
+		e2.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
+
+		epa_render = true;
+		epa_normal = ho_collision_epa(sup.simplex, e1_vertices, e2_vertices);
+		epa_penetration = gm_vec3_length(epa_normal);
+		epa_normal = gm_vec3_normalize(epa_normal);
+	} else {
+		e1.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
+		e2.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
+		epa_render = false;
+	}
+#endif
+
+	//begin = clock();
+	//old_gjk_collides(e1_vertices, e2_vertices);
+	//end = clock();
+	//time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+	//printf("MINE(OLD) Time Spent: %f\n", time_spent);
+
+	//begin = clock();
+	//GJK_Support_List sup = {0};
+	//ho_gjk_collides(&sup, e1_vertices, e2_vertices);
+	//end = clock();
+	//time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+	//printf("HO Time Spent: %f\n", time_spent);
 
 	array_free(e1_vertices);
 	array_free(e2_vertices);
@@ -141,7 +171,10 @@ void core_render()
 {
 	graphics_entity_render_phong_shader(&camera, &e1, lights);
 	graphics_entity_render_phong_shader(&camera, &e2, lights);
-    graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+    //graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+	if (epa_render) {
+		graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, gm_vec3_scalar_product(epa_penetration, epa_normal), (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+	}
     graphics_renderer_primitives_flush(&camera);
 }
 
@@ -222,6 +255,12 @@ void core_input_process(boolean* key_state, r32 delta_time)
 
 		wireframe = !wireframe;
 		key_state[GLFW_KEY_L] = false;
+	}
+
+	if (key_state[GLFW_KEY_SPACE]) {
+		vec3 delta = gm_vec3_scalar_product(epa_penetration, epa_normal);
+		graphics_entity_set_position(&e2, gm_vec3_add(e2.world_position, delta));
+		key_state[GLFW_KEY_SPACE] = false;
 	}
 }
 

@@ -23,5 +23,6 @@ typedef struct {
 } GJK_Support_List;
 
 boolean ho_gjk_collides(GJK_Support_List* sup_list, vec3* b1, vec3* b2);
+vec3 ho_collision_epa(Support_Point* simplex, vec3* b1, vec3* b2);
 
 #endif
