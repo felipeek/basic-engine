@@ -477,6 +477,12 @@ void add_edge(dvec2** edges, dvec2 edge, vec3* polytope) {
 	array_push(*edges, edge);
 }
 
+static vec3 triangle_centroid(vec3 p1, vec3 p2, vec3 p3) {
+	vec3 centroid = gm_vec3_add(gm_vec3_add(p2, p3), p1);
+	centroid = gm_vec3_scalar_product(1.0f / 3.0f, centroid);
+	return centroid;
+}
+
 void epa(vec3* shape1, vec3* shape2, GJK_Simplex* simplex, vec3* _normal, r32* _penetration) {
 	vec3* polytope;
 	dvec3* faces;
@@ -527,9 +533,17 @@ void epa(vec3* shape1, vec3* shape2, GJK_Simplex* simplex, vec3* _normal, r32* _
 		dvec2* edges = array_new(dvec2);
 		for (u32 i = 0; i < array_length(normals); ++i) {
 			vec3 normal = normals[i];
+			dvec3 face = faces[i];
 
 			// If the face normal points towards the support point, we need to reconstruct it.
-			if (gm_vec3_dot(normal, support_point) > 0.0f) {
+			vec3 centroid = triangle_centroid(
+				polytope[face.x],
+				polytope[face.y],
+				polytope[face.z]
+			);
+
+			// If the face normal points towards the support point, we need to reconstruct it.
+			if (gm_vec3_dot(normal, gm_vec3_subtract(support_point, centroid)) > 0.0f) {
 				dvec3 face = faces[i];
 
 				dvec2 edge1 = (dvec2){face.x, face.y};
