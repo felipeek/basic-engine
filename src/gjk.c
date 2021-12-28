@@ -477,7 +477,13 @@ void add_edge(dvec2** edges, dvec2 edge, vec3* polytope) {
 	array_push(*edges, edge);
 }
 
-void epa(vec3* shape1, vec3* shape2, GJK_Simplex* simplex, vec3* _normal, r32* _penetration) {
+static vec3 triangle_centroid(vec3 p1, vec3 p2, vec3 p3) {
+	vec3 centroid = gm_vec3_add(gm_vec3_add(p2, p3), p1);
+	centroid = gm_vec3_scalar_product(1.0f / 3.0f, centroid);
+	return centroid;
+}
+
+EPA_Debug epa(vec3* shape1, vec3* shape2, GJK_Simplex* simplex, vec3* _normal, r32* _penetration, int num_iterations) {
 	vec3* polytope;
 	dvec3* faces;
 
@@ -507,7 +513,7 @@ void epa(vec3* shape1, vec3* shape2, GJK_Simplex* simplex, vec3* _normal, r32* _
 	}
 
 	boolean converged = false;
-	for (u32 it = 0; it < 1000; ++it) {
+	for (u32 it = 0; it < num_iterations; ++it) {
 		vec3 support_point = get_support_point_of_minkowski_difference(shape1, shape2, min_normal);
 
 		// If the support time lies on the face currently set as the closest to the origin, we are done.
@@ -516,7 +522,22 @@ void epa(vec3* shape1, vec3* shape2, GJK_Simplex* simplex, vec3* _normal, r32* _
 			*_normal = min_normal;
 			*_penetration = min_distance;
 			converged = true;
-			break;
+
+			EPA_Debug epa_debug;
+			epa_debug.converged = true;
+			epa_debug.faces = faces;
+			epa_debug.polytope = polytope;
+
+			r32 _min_distance = FLT_MAX;
+			for (u32 i = 0; i < array_length(faces_distance_to_origin); ++i) {
+				r32 _distance = faces_distance_to_origin[i];
+				if (_distance < _min_distance) {
+					_min_distance = _distance;
+					epa_debug.min_normal = normals[i];
+					epa_debug.min_normal_face = i;
+				}
+			}
+			return epa_debug;
 		}
 
 		// add new point to polytope
@@ -527,9 +548,15 @@ void epa(vec3* shape1, vec3* shape2, GJK_Simplex* simplex, vec3* _normal, r32* _
 		dvec2* edges = array_new(dvec2);
 		for (u32 i = 0; i < array_length(normals); ++i) {
 			vec3 normal = normals[i];
+			dvec3 face = faces[i];
 
 			// If the face normal points towards the support point, we need to reconstruct it.
-			if (gm_vec3_dot(normal, support_point) > 0.0f) {
+			vec3 centroid = triangle_centroid(
+				polytope[face.x],
+				polytope[face.y],
+				polytope[face.z]
+			);
+			if (gm_vec3_dot(normal, gm_vec3_subtract(support_point, centroid)) > 0.0f) {
 				dvec3 face = faces[i];
 
 				dvec2 edge1 = (dvec2){face.x, face.y};
@@ -576,6 +603,21 @@ void epa(vec3* shape1, vec3* shape2, GJK_Simplex* simplex, vec3* _normal, r32* _
 
 		array_free(edges);
 	}
+
+	EPA_Debug epa_debug;
+	epa_debug.converged = false;
+	epa_debug.faces = faces;
+	epa_debug.polytope = polytope;
+	r32 _min_distance = FLT_MAX;
+	for (u32 i = 0; i < array_length(faces_distance_to_origin); ++i) {
+		r32 _distance = faces_distance_to_origin[i];
+		if (_distance < _min_distance) {
+			_min_distance = _distance;
+			epa_debug.min_normal = normals[i];
+			epa_debug.min_normal_face = i;
+		}
+	}
+	return epa_debug;
 
 	array_free(faces);
 	array_free(polytope);

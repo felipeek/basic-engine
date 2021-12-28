@@ -53,33 +53,6 @@ static void menu_dummy_callback()
 	printf("dummy callback called!\n");
 }
 
-int core_init()
-{
-	// Create camera
-	camera = create_camera();
-	// Create light
-	lights = create_lights();
-
-	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&e1, m, (vec3){0.0f, 0.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
-
-	Mesh m2 = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&e2, m2, (vec3){0.0f, 2.1f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
-	graphics_entity_create_with_color(&e2, m2, (vec3){-0.39f, 1.989f, 0.292f}, (Quaternion){-0.562f, -0.333f, -0.572f, 0.497f},
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
-
-	menu_register_dummy_callback(menu_dummy_callback);
-
-	return 0;
-}
-
-void core_destroy()
-{
-	array_free(lights);
-}
-
 vec3* collect_vertices_of_entity(const Entity* e) {
 	vec3* vertices = array_new(vec3);
 
@@ -107,74 +80,110 @@ vec3* collect_vertices_of_entity(const Entity* e) {
 	return vertices;
 }
 
+static vec3* e1_vertices;
+static vec3* e2_vertices;
+static GJK_Simplex gjk_simplex;
+static int num_iterations = 1;
+static EPA_Debug epa_debug;
+static vec4* colors;
+
+vec4 rand_color() {
+	r32 f1 = (r32)rand() / RAND_MAX;
+	r32 f2 = (r32)rand() / RAND_MAX;
+	r32 f3 = (r32)rand() / RAND_MAX;
+	vec4 c = (vec4){f1, f2, 0.5f, 1.0f};
+	return c;
+}
+
+int core_init()
+{
+	// Create camera
+	camera = create_camera();
+	// Create light
+	lights = create_lights();
+
+	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	graphics_entity_create_with_color(&e1, m, (vec3){0.0f, 0.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+
+	Mesh m2 = graphics_mesh_create_from_obj("./res/cube.obj", 0);
+	//graphics_entity_create_with_color(&e2, m2, (vec3){0.0f, 2.1f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	//	(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+	graphics_entity_create_with_color(&e2, m2, (vec3){-0.39f, 1.989f, 0.292f}, (Quaternion){-0.562f, -0.333f, -0.572f, 0.497f},
+		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+
+	menu_register_dummy_callback(menu_dummy_callback);
+
+	e1_vertices = collect_vertices_of_entity(&e1);
+	e2_vertices = collect_vertices_of_entity(&e2);
+
+	assert(gjk_collides(e1_vertices, e2_vertices, &gjk_simplex) == true);
+	e1.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
+	e2.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
+
+	epa_debug = epa(e1_vertices, e2_vertices, &gjk_simplex, &epa_normal, &epa_penetration, num_iterations++);
+
+	colors = array_new(vec4);
+	vec4 c = rand_color();
+	array_push(colors, c);
+	c = rand_color();
+	array_push(colors, c);
+	c = rand_color();
+	array_push(colors, c);
+	c = rand_color();
+	array_push(colors, c);
+
+	return 0;
+}
+
+void core_destroy()
+{
+	array_free(lights);
+}
+
 void core_update(r32 delta_time)
 {
-	GJK_Simplex gjk_simplex;
-	vec3* e1_vertices = collect_vertices_of_entity(&e1);
-	vec3* e2_vertices = collect_vertices_of_entity(&e2);
-
 	//printf("Position: <%.3f, %.3f, %.3f>\n", e2.world_position.x, e2.world_position.y, e2.world_position.z);
 	//printf("Rotation: <%.3f, %.3f, %.3f, %.3f>\n", e2.world_rotation.x, e2.world_rotation.y, e2.world_rotation.z, e2.world_rotation.w);
-
-#if 1
-	clock_t begin = clock();
-	if (gjk_collides(e1_vertices, e2_vertices, &gjk_simplex)) {
-		e1.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
-		e2.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
-
-		epa_render = true;
-		epa(e1_vertices, e2_vertices, &gjk_simplex, &epa_normal, &epa_penetration);
-	} else {
-		e1.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
-		e2.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
-		epa_render = false;
-	}
-
-	clock_t end = clock();
-	double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-	//printf("MINE Time Spent: %f\n", time_spent);
-#else
-	GJK_Support_List sup = {0};
-	if (ho_gjk_collides(&sup, e1_vertices, e2_vertices)) {
-		e1.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
-		e2.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
-
-		epa_render = true;
-		epa_normal = ho_collision_epa(sup.simplex, e1_vertices, e2_vertices);
-		epa_penetration = gm_vec3_length(epa_normal);
-		epa_normal = gm_vec3_normalize(epa_normal);
-	} else {
-		e1.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
-		e2.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};
-		epa_render = false;
-	}
-#endif
-
-	//begin = clock();
-	//old_gjk_collides(e1_vertices, e2_vertices);
-	//end = clock();
-	//time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-	//printf("MINE(OLD) Time Spent: %f\n", time_spent);
-
-	//begin = clock();
-	//GJK_Support_List sup = {0};
-	//ho_gjk_collides(&sup, e1_vertices, e2_vertices);
-	//end = clock();
-	//time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-	//printf("HO Time Spent: %f\n", time_spent);
-
-	array_free(e1_vertices);
-	array_free(e2_vertices);
 }
 
 void core_render()
 {
-	graphics_entity_render_phong_shader(&camera, &e1, lights);
-	graphics_entity_render_phong_shader(&camera, &e2, lights);
+	//graphics_entity_render_phong_shader(&camera, &e1, lights);
+	//graphics_entity_render_phong_shader(&camera, &e2, lights);
     //graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
-	if (epa_render) {
-		graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, gm_vec3_scalar_product(epa_penetration, epa_normal), (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+	for (u32 i = 0; i < array_length(epa_debug.faces); ++i) {
+		dvec3 face = epa_debug.faces[i];
+		vec3 p1 = epa_debug.polytope[face.x];
+		vec3 p2 = epa_debug.polytope[face.y];
+		vec3 p3 = epa_debug.polytope[face.z];
+
+		graphics_renderer_debug_triangle(p1, p2, p3, colors[i]);
 	}
+
+
+	for (u32 i = 0; i < array_length(e1_vertices); ++i) {
+		for (u32 j = 0; j < array_length(e2_vertices); ++j) {
+			vec3 v1 = e1_vertices[i];
+			vec3 v2 = e2_vertices[j];
+
+			vec3 md = gm_vec3_subtract(v1, v2);
+			graphics_renderer_debug_points(&md, 1, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+		}
+	}
+
+	dvec3 normal_face = epa_debug.faces[epa_debug.min_normal_face];
+	vec3 p = (vec3){0.0f, 0.0f, 0.0f};
+	p = gm_vec3_add(epa_debug.polytope[normal_face.x], epa_debug.polytope[normal_face.y]);
+	p = gm_vec3_add(p, epa_debug.polytope[normal_face.z]);
+	p = gm_vec3_scalar_product(1.0f / 3.0f, p);
+	graphics_renderer_debug_vector(p, gm_vec3_add(epa_debug.min_normal, p), (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+
+	// render origin
+	vec3 origin = {0};
+	graphics_renderer_debug_points(&origin, 1, (vec4){1.0f, 1.0f, 1.0f, 1.0f});
+
+	//graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, gm_vec3_scalar_product(epa_penetration, epa_normal), (vec4){1.0f, 0.0f, 0.0f, 1.0f});
     graphics_renderer_primitives_flush(&camera);
 }
 
@@ -261,6 +270,16 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		vec3 delta = gm_vec3_scalar_product(epa_penetration, epa_normal);
 		graphics_entity_set_position(&e2, gm_vec3_add(e2.world_position, delta));
 		key_state[GLFW_KEY_SPACE] = false;
+	}
+
+	if (key_state[GLFW_KEY_M]) {
+		epa_debug = epa(e1_vertices, e2_vertices, &gjk_simplex, &epa_normal, &epa_penetration, num_iterations++);
+		if (epa_debug.converged) {
+			printf("Finished.\n");
+		}
+		vec4 c = rand_color();
+		array_push(colors, c);
+		key_state[GLFW_KEY_M] = false;
 	}
 }
 

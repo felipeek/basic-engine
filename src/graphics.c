@@ -601,6 +601,12 @@ typedef struct {
   void* point_data_ptr;
   int point_count;
 
+  u32 triangle_vao;
+  u32 triangle_vbo;
+  
+  void* triangle_data_ptr;
+  int triangle_vertex_count;
+
   int initialized;
 } Render_Primitives_Context;
 
@@ -643,6 +649,17 @@ void graphics_renderer_primitives_init()
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Primitive_3D_Vertex), &((Primitive_3D_Vertex *) 0)->position);
 	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Primitive_3D_Vertex), &((Primitive_3D_Vertex *) 0)->color);
 
+	glGenVertexArrays(1, &primitives_ctx.triangle_vao);
+	glBindVertexArray(primitives_ctx.triangle_vao);
+	glGenBuffers(1, &primitives_ctx.triangle_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, primitives_ctx.triangle_vbo);
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(Primitive_3D_Vertex) * batch_size * 3, 0, GL_DYNAMIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Primitive_3D_Vertex), &((Primitive_3D_Vertex *) 0)->position);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Primitive_3D_Vertex), &((Primitive_3D_Vertex *) 0)->color);
+
 	glUseProgram(0);
 }
 
@@ -652,7 +669,7 @@ void graphics_renderer_primitives_flush(const Perspective_Camera* camera)
 	glUseProgram(primitives_ctx.shader);
 
 	// Vector
-	glDisable(GL_DEPTH_TEST);
+	//glDisable(GL_DEPTH_TEST);
 	glBindVertexArray(primitives_ctx.vector_vao);
 	glBindBuffer(GL_ARRAY_BUFFER, primitives_ctx.vector_vbo);
 	glUnmapBuffer(GL_ARRAY_BUFFER);
@@ -669,10 +686,10 @@ void graphics_renderer_primitives_flush(const Perspective_Camera* camera)
 	glDrawArrays(GL_LINES, 0, primitives_ctx.vertex_count);
 	primitives_ctx.vertex_count = 0;
 	primitives_ctx.data_ptr = 0;
-	glEnable(GL_DEPTH_TEST);
+	//glEnable(GL_DEPTH_TEST);
 
 	// Points
-	glDisable(GL_DEPTH_TEST);
+	//glDisable(GL_DEPTH_TEST);
 	glBindVertexArray(primitives_ctx.point_vao);
 	glBindBuffer(GL_ARRAY_BUFFER, primitives_ctx.point_vbo);
 	glUnmapBuffer(GL_ARRAY_BUFFER);
@@ -684,7 +701,22 @@ void graphics_renderer_primitives_flush(const Perspective_Camera* camera)
 	glDrawArrays(GL_POINTS, 0, primitives_ctx.point_count);
 	primitives_ctx.point_count = 0;
 	primitives_ctx.point_data_ptr = 0;
-	glEnable(GL_DEPTH_TEST);
+	//glEnable(GL_DEPTH_TEST);
+
+	// Triangles
+	//glDisable(GL_DEPTH_TEST);
+	glBindVertexArray(primitives_ctx.triangle_vao);
+	glBindBuffer(GL_ARRAY_BUFFER, primitives_ctx.triangle_vbo);
+	glUnmapBuffer(GL_ARRAY_BUFFER);
+
+	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat *) camera->view_matrix.data);
+	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat *) camera->projection_matrix.data);
+
+	glPointSize(10.0f);
+	glDrawArrays(GL_TRIANGLES, 0, primitives_ctx.triangle_vertex_count);
+	primitives_ctx.triangle_vertex_count = 0;
+	primitives_ctx.triangle_data_ptr = 0;
+	//glEnable(GL_DEPTH_TEST);
 
 	glUseProgram(0);
 }
@@ -706,6 +738,16 @@ static void setup_primitives_point_render()
 		glBindVertexArray(primitives_ctx.point_vao);
 		glBindBuffer(GL_ARRAY_BUFFER, primitives_ctx.point_vbo);
 		primitives_ctx.point_data_ptr = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+	}
+}
+
+static void setup_primitives_triangle_render()
+{
+	if (primitives_ctx.triangle_data_ptr == 0)
+	{
+		glBindVertexArray(primitives_ctx.triangle_vao);
+		glBindBuffer(GL_ARRAY_BUFFER, primitives_ctx.triangle_vbo);
+		primitives_ctx.triangle_data_ptr = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
 	}
 }
 
@@ -738,4 +780,23 @@ void graphics_renderer_debug_vector(vec3 p1, vec3 p2, vec4 color)
 	verts[1].color = color;
 
 	primitives_ctx.vertex_count += 2;
+}
+
+void graphics_renderer_debug_triangle(vec3 p1, vec3 p2, vec3 p3, vec4 color)
+{
+    graphics_renderer_primitives_init();
+	setup_primitives_triangle_render();
+
+	Primitive_3D_Vertex *verts = (Primitive_3D_Vertex *)primitives_ctx.triangle_data_ptr + primitives_ctx.triangle_vertex_count;
+
+	verts[0].position = p1;
+	verts[0].color = color;
+
+	verts[1].position = p2;
+	verts[1].color = color;
+
+	verts[2].position = p3;
+	verts[2].color = color;
+
+	primitives_ctx.triangle_vertex_count += 3;
 }
