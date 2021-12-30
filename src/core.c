@@ -61,14 +61,14 @@ int core_init()
 	lights = create_lights();
 
 	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&e1, m, (vec3){0.0f, 0.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	graphics_entity_create_with_color(&e1, m, (vec3){0.0f, -2.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 
-	Mesh m2 = graphics_mesh_create_from_obj("./res/ico.obj", 0);
+	Mesh m2 = graphics_mesh_create_from_obj("./res/cube.obj", 0);
 	graphics_entity_create_with_color(&e2, m2, (vec3){0.0f, 2.1f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
-	graphics_entity_create_with_color(&e2, m2, (vec3){-0.39f, 1.989f, 0.292f}, (Quaternion){-0.562f, -0.333f, -0.572f, 0.497f},
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+	vec3 p = (vec3){0.000000, -0.002887, 0.000000};
+	graphics_entity_set_position(&e2, p);
 
 	menu_register_dummy_callback(menu_dummy_callback);
 
@@ -123,6 +123,18 @@ void core_update(r32 delta_time)
 		e2.diffuse_info.diffuse_color = (vec4){0.0f, 1.0f, 0.0f, 1.0f};
 
 		epa_render = true;
+
+		//GJK_Support_List sup = {0};
+		//sup.simplex[0].v = gjk_simplex.a;
+		//sup.simplex[1].v = gjk_simplex.b;
+		//sup.simplex[2].v = gjk_simplex.c;
+		//sup.simplex[3].v = gjk_simplex.d;
+		//sup.current_index = 0;
+		//epa_render = true;
+		//epa_normal = ho_collision_epa(sup.simplex, e1_vertices, e2_vertices);
+		//epa_penetration = gm_vec3_length(epa_normal);
+		//epa_normal = gm_vec3_normalize(epa_normal);
+
 		epa(e1_vertices, e2_vertices, &gjk_simplex, &epa_normal, &epa_penetration);
 	} else {
 		e1.diffuse_info.diffuse_color = (vec4){1.0f, 0.0f, 0.0f, 1.0f};

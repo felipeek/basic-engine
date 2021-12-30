@@ -83,6 +83,9 @@ static boolean do_simplex_3(GJK_Simplex* simplex, vec3* direction) {
 	vec3 ab = gm_vec3_subtract(b, a);
 	vec3 ac = gm_vec3_subtract(c, a);
 	vec3 abc = gm_vec3_cross(ab, ac);
+	r32 i1 = gm_vec3_dot(ab, ao);
+	vec3 aaa= gm_vec3_cross(ab, abc);
+	r32 i2 = gm_vec3_dot(gm_vec3_cross(ab, abc), ao);
 
 	if (gm_vec3_dot(gm_vec3_cross(abc, ac), ao) >= 0.0f) {
 		if (gm_vec3_dot(ac, ao) >= 0.0f) {
@@ -152,6 +155,10 @@ static boolean do_simplex_4(GJK_Simplex* simplex, vec3* direction) {
 	vec3 abc = gm_vec3_cross(ab, ac);
 	vec3 acd = gm_vec3_cross(ac, ad);
 	vec3 adb = gm_vec3_cross(ad, ab);
+	vec3 bc = gm_vec3_subtract(c, b);
+	vec3 bd = gm_vec3_subtract(d, b);
+	vec3 bcd = gm_vec3_cross(bc, bd);
+	r32 a1 = gm_vec3_dot(bcd, gm_vec3_negative(b));
 
 	unsigned char plane_information = 0x0;
 
@@ -438,6 +445,19 @@ void get_face_normal_and_distance_to_origin(dvec3 face, vec3* polytope, vec3* _n
 		// this way, we don't need to worry about face's winding
 		normal = gm_vec3_negative(normal);
 		distance = -distance;
+	} else if (distance == 0.0f) {
+		// if the distance is exactly 0.0, then it means that the origin is lying exactly on the face.
+		// in this case, we can't directly infer the orientation of the normal.
+		// since our shape is convex, we analyze the other vertices of the hull to deduce the orientation
+		for (u32 i = 0; i < array_length(polytope); ++i) {
+			vec3 current = polytope[i];
+			r32 auxiliar_distance = gm_vec3_dot(normal, current);
+			if (auxiliar_distance != 0.0f) {
+				// since the shape is convex, the other vertices should always be "behind" the normal plane
+				normal = auxiliar_distance < 0.0f ? normal : gm_vec3_negative(normal);
+				break;
+			}
+		}
 	}
 
 	*_normal = normal;
