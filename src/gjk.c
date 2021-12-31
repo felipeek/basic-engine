@@ -3,6 +3,8 @@
 #include <float.h>
 #include <math.h>
 
+static const r32 EPA_EPSILON = 0.00001f;
+
 static vec3 get_support_point(vec3* shape, vec3 direction) {
 	vec3 selected_vertex;
 	r32 max_dot = -FLT_MAX;
@@ -445,16 +447,16 @@ void get_face_normal_and_distance_to_origin(dvec3 face, vec3* polytope, vec3* _n
 		// this way, we don't need to worry about face's winding
 		normal = gm_vec3_negative(normal);
 		distance = -distance;
-	} else if (distance == 0.0f) {
+	} else if (distance > -EPA_EPSILON && distance < EPA_EPSILON) {
 		// if the distance is exactly 0.0, then it means that the origin is lying exactly on the face.
 		// in this case, we can't directly infer the orientation of the normal.
 		// since our shape is convex, we analyze the other vertices of the hull to deduce the orientation
 		for (u32 i = 0; i < array_length(polytope); ++i) {
 			vec3 current = polytope[i];
 			r32 auxiliar_distance = gm_vec3_dot(normal, current);
-			if (auxiliar_distance != 0.0f) {
+			if (auxiliar_distance < -EPA_EPSILON || auxiliar_distance > EPA_EPSILON) {
 				// since the shape is convex, the other vertices should always be "behind" the normal plane
-				normal = auxiliar_distance < 0.0f ? normal : gm_vec3_negative(normal);
+				normal = auxiliar_distance < -EPA_EPSILON ? normal : gm_vec3_negative(normal);
 				break;
 			}
 		}
@@ -538,7 +540,7 @@ void epa(vec3* shape1, vec3* shape2, GJK_Simplex* simplex, vec3* _normal, r32* _
 
 		// If the support time lies on the face currently set as the closest to the origin, we are done.
 		r32 d = gm_vec3_dot(min_normal, support_point);
-		if (fabsf(d - min_distance) < 0.001f) {
+		if (fabsf(d - min_distance) < EPA_EPSILON) {
 			*_normal = min_normal;
 			*_penetration = min_distance;
 			converged = true;
