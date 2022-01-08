@@ -142,7 +142,7 @@ static void init_predefined_shaders()
 Mesh graphics_quad_create()
 {
 	r32 size = 1.0f;
-	Vertex* vertices = array_new(vertices);
+	Vertex* vertices = array_new(Vertex);
 	u32* indices = array_new(u32);
 
 	Vertex v;
