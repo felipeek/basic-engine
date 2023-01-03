@@ -23,26 +23,6 @@ extern "C" void menu_register_dummy_callback(Dummy_Callback f)
 	dummy_callback = f;
 }
 
-extern "C" void menu_char_click_process(GLFWwindow* window, u32 c)
-{
-	ImGui_ImplGlfw_CharCallback(window, c);
-}
-
-extern "C" void menu_key_click_process(GLFWwindow* window, s32 key, s32 scan_code, s32 action, s32 mods)
-{
-	ImGui_ImplGlfw_KeyCallback(window, key, scan_code, action, mods);
-}
-
-extern "C" void menu_mouse_click_process(GLFWwindow* window, s32 button, s32 action, s32 mods)
-{
-	ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
-}
-
-extern "C" void menu_scroll_change_process(GLFWwindow* window, s64 x_offset, s64 y_offset)
-{
-	ImGui_ImplGlfw_ScrollCallback(window, x_offset, y_offset);
-}
-
 extern "C" void menu_init(GLFWwindow* window)
 {
 	// Setup Dear ImGui binding
@@ -50,7 +30,7 @@ extern "C" void menu_init(GLFWwindow* window)
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 
-	ImGui_ImplGlfw_InitForOpenGL(window, false);
+	ImGui_ImplGlfw_InitForOpenGL(window, true);
 	ImGui_ImplOpenGL3_Init(GLSL_VERSION);
 
 	// Setup style

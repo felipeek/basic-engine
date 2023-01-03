@@ -58,17 +58,13 @@ static void glfw_mouse_button_callback(GLFWwindow* window, s32 button, s32 actio
 	r64 x_pos, y_pos;
 	glfwGetCursorPos(window, &x_pos, &y_pos);
 	y_pos = window_height - y_pos;
-	if (is_menu_visible)
-		menu_mouse_click_process(window, button, action, mods);
-	else
+	if (!is_menu_visible)
 		core_mouse_click_process(button, action, x_pos, y_pos);
 }
 
 static void glfw_scroll_callback(GLFWwindow* window, r64 x_offset, r64 y_offset)
 {
-	if (is_menu_visible)
-		menu_scroll_change_process(window, x_offset, y_offset);
-	else
+	if (!is_menu_visible)
 		core_scroll_change_process(x_offset, y_offset);
 }
 
@@ -82,8 +78,6 @@ static void glfw_resize_callback(GLFWwindow* window, s32 width, s32 height)
 
 static void glfw_char_callback(GLFWwindow* window, u32 c)
 {
-	if (is_menu_visible)
-		menu_char_click_process(window, c);
 }
 
 static GLFWwindow* init_glfw()

@@ -7,8 +7,6 @@
 #include "obj.h"
 #include "menu.h"
 
-#define GIM_ENTITY_COLOR (vec4) {1.0f, 1.0f, 1.0f, 1.0f}
-
 static Perspective_Camera camera;
 static Light* lights;
 static Entity e;
