@@ -12,6 +12,7 @@
 #include "core.h"
 #include "gm.h"
 #include "menu.h"
+#include "util.h"
 
 #define WINDOW_TITLE "basic-engine"
 
@@ -72,7 +73,7 @@ static void glfw_resize_callback(GLFWwindow* window, s32 width, s32 height)
 {
 	window_width = width;
 	window_height = height;
-	glViewport(0, 0, width, height);
+	util_viewport_based_on_window_size(0, 0, width, height);
 	core_window_resize_process(width, height);
 }
 
@@ -111,8 +112,13 @@ static void init_glew()
 s32 main(s32 argc, s8** argv)
 {
 	r32 delta_time = 0.0f;
+
 	main_window = init_glfw();
 	init_glew();
+
+	s32 effective_window_width, effective_window_height;
+	glfwGetWindowSize(main_window, &effective_window_width, &effective_window_height);
+	util_viewport_based_on_window_size(0, 0, effective_window_width, effective_window_height);
 
 	if (core_init())
 		return -1;
