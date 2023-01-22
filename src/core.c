@@ -169,6 +169,15 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		wireframe = !wireframe;
 		key_state[GLFW_KEY_L] = false;
 	}
+	if (key_state[GLFW_KEY_KP_DECIMAL])
+	{
+		if (camera.type == CAMERA_LOOKAT)
+		{
+			vec3 lookat_position = (vec3){0.0f, 0.0f, 0.0f};
+			lookat_camera_set_lookat_position(&camera.lookat_camera, lookat_position);
+			key_state[GLFW_KEY_KP_DECIMAL] = false;
+		}
+	}
 }
 
 void core_mouse_change_process(boolean reset, r64 x_pos, r64 y_pos)
