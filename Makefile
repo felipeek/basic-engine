@@ -16,10 +16,10 @@ else
 	LIBS=-lm -lGLEW -lGL -lpng -lz -lglfw -ldl
 endif
 
-_DEPS = camera.h common.h core.h gm.h graphics.h menu.h obj.h quaternion.h util.h
+_DEPS = camera/camera.h camera/common.h camera/free.h camera/lookat.h common.h core.h gm.h graphics.h menu.h obj.h quaternion.h util.h
 DEPS = $(patsubst %,$(SRCDIR)/%,$(_DEPS))
 
-_OBJ = camera.o core.o graphics.o main.o menu.o obj.o quaternion.o util.o
+_OBJ = camera/camera.o camera/common.o camera/free.o camera/lookat.o core.o graphics.o main.o menu.o obj.o quaternion.o util.o
 OBJ = $(patsubst %,$(OBJDIR)/%,$(_OBJ))
 
 _VENDOR = imgui.o imgui_demo.o imgui_draw.o imgui_impl_glfw.o imgui_impl_opengl3.o imgui_tables.o imgui_widgets.o

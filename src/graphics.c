@@ -399,7 +399,7 @@ void graphics_entity_set_scale(Entity* entity, vec3 world_scale)
 	recalculate_model_matrix(entity);
 }
 
-void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const Entity* entity)
+void graphics_entity_render_basic_shader(const Camera* camera, const Entity* entity)
 {
 	init_predefined_shaders();
 	Shader shader = predefined_shaders.basic_shader;
@@ -407,14 +407,18 @@ void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const
 	GLint model_matrix_location = glGetUniformLocation(shader, "model_matrix");
 	GLint view_matrix_location = glGetUniformLocation(shader, "view_matrix");
 	GLint projection_matrix_location = glGetUniformLocation(shader, "projection_matrix");
+
+	mat4 view_matrix = camera_get_view_matrix(camera);
+	mat4 projection_matrix = camera_get_projection_matrix(camera);
+
 	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)entity->model_matrix.data);
-	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)camera->view_matrix.data);
-	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)camera->projection_matrix.data);
+	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)view_matrix.data);
+	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)projection_matrix.data);
 	graphics_mesh_render(shader, entity->mesh);
 	glUseProgram(0);
 }
 
-void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const Entity* entity, const Light* lights)
+void graphics_entity_render_phong_shader(const Camera* camera, const Entity* entity, const Light* lights)
 {
 	init_predefined_shaders();
 	Shader shader = predefined_shaders.phong_shader;
@@ -425,11 +429,16 @@ void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const
 	GLint model_matrix_location = glGetUniformLocation(shader, "model_matrix");
 	GLint view_matrix_location = glGetUniformLocation(shader, "view_matrix");
 	GLint projection_matrix_location = glGetUniformLocation(shader, "projection_matrix");
-	glUniform3f(camera_position_location, camera->position.x, camera->position.y, camera->position.z);
+
+	mat4 view_matrix = camera_get_view_matrix(camera);
+	mat4 projection_matrix = camera_get_projection_matrix(camera);
+	vec3 camera_position = camera_get_position(camera);
+
+	glUniform3f(camera_position_location, camera_position.x, camera_position.y, camera_position.z);
 	glUniform1f(shineness_location, 128.0f);
 	glUniformMatrix4fv(model_matrix_location, 1, GL_TRUE, (GLfloat*)entity->model_matrix.data);
-	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)camera->view_matrix.data);
-	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)camera->projection_matrix.data);
+	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat*)view_matrix.data);
+	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat*)projection_matrix.data);
 	diffuse_update_uniforms(&entity->diffuse_info, shader);
 	graphics_mesh_render(shader, entity->mesh);
 	glUseProgram(0);
@@ -646,7 +655,7 @@ void graphics_renderer_primitives_init()
 	glUseProgram(0);
 }
 
-void graphics_renderer_primitives_flush(const Perspective_Camera* camera)
+void graphics_renderer_primitives_flush(const Camera* camera)
 {
     graphics_renderer_primitives_init();
 	glUseProgram(primitives_ctx.shader);
@@ -663,8 +672,11 @@ void graphics_renderer_primitives_flush(const Perspective_Camera* camera)
 	GLint view_matrix_location = glGetUniformLocation(primitives_ctx.shader, "view_matrix");
 	GLint projection_matrix_location = glGetUniformLocation(primitives_ctx.shader, "projection_matrix");
 
-	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat *) camera->view_matrix.data);
-	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat *) camera->projection_matrix.data);
+	mat4 view_matrix = camera_get_view_matrix(camera);
+	mat4 projection_matrix = camera_get_projection_matrix(camera);
+
+	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat *) view_matrix.data);
+	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat *) projection_matrix.data);
 
 	glDrawArrays(GL_LINES, 0, primitives_ctx.vertex_count);
 	primitives_ctx.vertex_count = 0;
@@ -677,8 +689,8 @@ void graphics_renderer_primitives_flush(const Perspective_Camera* camera)
 	glBindBuffer(GL_ARRAY_BUFFER, primitives_ctx.point_vbo);
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 
-	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat *) camera->view_matrix.data);
-	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat *) camera->projection_matrix.data);
+	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE, (GLfloat *) view_matrix.data);
+	glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE, (GLfloat *) projection_matrix.data);
 
 	glPointSize(10.0f);
 	glDrawArrays(GL_POINTS, 0, primitives_ctx.point_count);

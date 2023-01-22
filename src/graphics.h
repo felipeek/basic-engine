@@ -1,7 +1,7 @@
 #ifndef BASIC_ENGINE_GRAPHICS_H
 #define BASIC_ENGINE_GRAPHICS_H
 #include "gm.h"
-#include "camera.h"
+#include "camera/camera.h"
 
 typedef u32 Shader;
 
@@ -92,8 +92,8 @@ void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_norm
 void graphics_entity_set_position(Entity* entity, vec3 world_position);
 void graphics_entity_set_rotation(Entity* entity, Quaternion world_rotation);
 void graphics_entity_set_scale(Entity* entity, vec3 world_scale);
-void graphics_entity_render_basic_shader(const Perspective_Camera* camera, const Entity* entity);
-void graphics_entity_render_phong_shader(const Perspective_Camera* camera, const Entity* entity, const Light* lights);
+void graphics_entity_render_basic_shader(const Camera* camera, const Entity* entity);
+void graphics_entity_render_phong_shader(const Camera* camera, const Entity* entity, const Light* lights);
 void graphics_light_create(Light* light, vec3 position, vec4 ambient_color, vec4 diffuse_color, vec4 specular_color);
 u32 graphics_texture_create(const s8* texture_path);
 u32 graphics_texture_create_from_data(const Image_Data* image_data);
@@ -103,7 +103,7 @@ Float_Image_Data graphics_image_data_to_float_image_data(Image_Data* image_data,
 Image_Data graphics_float_image_data_to_image_data(const Float_Image_Data* float_image_Data, u8* memory);
 
 // Render primitives
-void graphics_renderer_primitives_flush(const Perspective_Camera* camera);
+void graphics_renderer_primitives_flush(const Camera* camera);
 void graphics_renderer_debug_points(vec3* points, int point_count, vec4 color);
 void graphics_renderer_debug_vector(vec3 p1, vec3 p2, vec4 color);
 

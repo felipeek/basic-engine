@@ -16,6 +16,7 @@
 
 #define WINDOW_TITLE "basic-engine"
 
+const boolean use_lookat_camera = true;
 s32 window_width = 1366;
 s32 window_height = 768;
 GLFWwindow* main_window;
@@ -31,7 +32,7 @@ static void glfw_key_callback(GLFWwindow* window, s32 key, s32 scanCode, s32 act
 		key_state[key] = false;
 	if (key_state[GLFW_KEY_ESCAPE])
 	{
-		if (is_menu_visible)
+		if (is_menu_visible && !use_lookat_camera)
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 		else
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
