@@ -24,7 +24,7 @@ void free_camera_set_position(Free_Camera* camera, vec3 position);
 void free_camera_set_near_plane(Free_Camera* camera, r32 near_plane);
 void free_camera_set_far_plane(Free_Camera* camera, r32 far_plane);
 void free_camera_set_fov(Free_Camera* camera, r32 fov);
-vec3 free_camera_rotate(Free_Camera* camera, r32 x_diff, r32 y_diff, r32 mouse_x, r32 mouse_y);
+void free_camera_rotate(Free_Camera* camera, r32 x_diff, r32 y_diff, r32 mouse_x, r32 mouse_y);
 void free_camera_force_matrix_recalculation(Free_Camera* camera);
 
 // Free Camera specific functions

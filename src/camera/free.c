@@ -59,7 +59,7 @@ void free_camera_set_fov(Free_Camera* camera, r32 fov)
 	free_camera_recalculate_projection_matrix(camera);
 }
 
-vec3 free_camera_rotate(Free_Camera* camera, r32 x_diff, r32 y_diff, r32 mouse_x, r32 mouse_y)
+void free_camera_rotate(Free_Camera* camera, r32 x_diff, r32 y_diff, r32 mouse_x, r32 mouse_y)
 {
 	if (camera->lock_rotation)
 	{

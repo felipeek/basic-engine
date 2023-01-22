@@ -2,6 +2,7 @@ IDIR=include
 CC=gcc
 CCXX=g++
 CFLAGS=-I$(IDIR) -g
+CXXFLAGS=-I$(IDIR) -g -std=c++11
 
 SRCDIR=src
 OUTDIR=bin
@@ -29,11 +30,11 @@ all: basic-engine
 
 $(OBJDIR)/%.o: $(VENDORDIR)/%.cpp $(DEPS)
 	$(shell mkdir -p $(@D))
-	$(CCXX) -c -o $@ $< $(CFLAGS)
+	$(CCXX) -c -o $@ $< $(CXXFLAGS)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp $(DEPS)
 	$(shell mkdir -p $(@D))
-	$(CCXX) -c -o $@ $< $(CFLAGS)
+	$(CCXX) -c -o $@ $< $(CXXFLAGS)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c $(DEPS)
 	$(shell mkdir -p $(@D))

@@ -55,7 +55,7 @@ void lookat_camera_set_fov(Lookat_Camera* camera, r32 fov)
 	lookat_camera_recalculate_projection_matrix(camera);
 }
 
-vec3 lookat_camera_rotate(Lookat_Camera* camera, r32 x_diff, r32 y_diff, r32 mouse_x, r32 mouse_y)
+void lookat_camera_rotate(Lookat_Camera* camera, r32 x_diff, r32 y_diff, r32 mouse_x, r32 mouse_y)
 {
 	if (camera->consider_roll)
 		camera->rotation = camera_common_rotate_considering_click_coords(&camera->rotation, x_diff, y_diff, mouse_x, mouse_y);

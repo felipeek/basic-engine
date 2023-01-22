@@ -26,7 +26,7 @@ void lookat_camera_set_position(Lookat_Camera* camera, vec3 position);
 void lookat_camera_set_near_plane(Lookat_Camera* camera, r32 near_plane);
 void lookat_camera_set_far_plane(Lookat_Camera* camera, r32 far_plane);
 void lookat_camera_set_fov(Lookat_Camera* camera, r32 fov);
-vec3 lookat_camera_rotate(Lookat_Camera* camera, r32 x_diff, r32 y_diff, r32 mouse_x, r32 mouse_y);
+void lookat_camera_rotate(Lookat_Camera* camera, r32 x_diff, r32 y_diff, r32 mouse_x, r32 mouse_y);
 void lookat_camera_force_matrix_recalculation(Lookat_Camera* camera);
 
 // Look At Camera specific functions
