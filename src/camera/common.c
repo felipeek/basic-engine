@@ -38,7 +38,7 @@ Quaternion camera_common_rotate(const Quaternion* camera_rotation, r32 x_diff, r
 
 Quaternion camera_common_rotate_considering_click_coords(const Quaternion* camera_rotation, r32 x_diff, r32 y_diff, r32 mouse_x, r32 mouse_y)
 {
-	Quaternion intermediary = camera_common_rotate_x_considering_click_coords(camera_rotation, x_diff, mouse_y);
+	Quaternion intermediary = camera_common_rotate_x_considering_click_coords(camera_rotation, x_diff, -mouse_y);
 	return camera_common_rotate_y_considering_click_coords(&intermediary, y_diff, -mouse_x);
 }
 

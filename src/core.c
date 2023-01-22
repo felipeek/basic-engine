@@ -193,12 +193,12 @@ void core_mouse_change_process(boolean reset, r64 x_pos, r64 y_pos)
 		if (is_panning_camera)
 		{
 			vec3 y_axis = camera_get_y_axis(&camera);
-			vec3 inc = gm_vec3_scalar_product(-panning_speed * lookat_camera_get_lookat_distance(&camera.lookat_camera) * y_difference, y_axis);
-			lookat_camera_set_position(&camera.lookat_camera, gm_vec3_add(lookat_camera_get_lookat_position(&camera.lookat_camera), inc));
+			vec3 inc = gm_vec3_scalar_product(panning_speed * lookat_camera_get_lookat_distance(&camera.lookat_camera) * y_difference, y_axis);
+			lookat_camera_set_lookat_position(&camera.lookat_camera, gm_vec3_add(lookat_camera_get_lookat_position(&camera.lookat_camera), inc));
 
 			vec3 x_axis = camera_get_x_axis(&camera);
 			inc = gm_vec3_scalar_product(-panning_speed * lookat_camera_get_lookat_distance(&camera.lookat_camera) * x_difference, x_axis);
-			lookat_camera_set_position(&camera.lookat_camera, gm_vec3_add(lookat_camera_get_lookat_position(&camera.lookat_camera), inc));
+			lookat_camera_set_lookat_position(&camera.lookat_camera, gm_vec3_add(lookat_camera_get_lookat_position(&camera.lookat_camera), inc));
 		}
 	}
 
