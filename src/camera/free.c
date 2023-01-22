@@ -63,7 +63,6 @@ vec3 free_camera_rotate(Free_Camera* camera, r32 x_diff, r32 y_diff, r32 mouse_x
 {
 	if (camera->lock_rotation)
 	{
-		x_diff = -x_diff;
 		// If the location is locked, we need to rotate using two different quaternions
 		camera->y_rotation = camera_common_rotate_x(&camera->y_rotation, x_diff);
 
