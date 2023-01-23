@@ -1,43 +1,39 @@
 #include "camera.h"
-#include "common.h"
+#include "free.h"
+#include "lookat.h"
 
-void camera_init_free(Camera* camera, vec3 position, r32 near_plane, r32 far_plane, r32 fov, int lock_rotation)
-{
-	*camera = (Camera){0};
-	camera->type = CAMERA_FREE;
-	free_camera_init(&camera->free_camera, position, near_plane, far_plane, fov, lock_rotation);
-}
-
-void camera_init_lookat(Camera* camera, vec3 lookat_position, r32 lookat_distance, r32 near_plane, r32 far_plane, r32 fov,
-	int consider_mouse_coords_when_rotating)
-{
-	*camera = (Camera){0};
-	camera->type = CAMERA_LOOKAT;
-	lookat_camera_init(&camera->lookat_camera, lookat_position, lookat_distance, near_plane, far_plane, fov, consider_mouse_coords_when_rotating);
-}
+extern s32 window_width;
+extern s32 window_height;
 
 vec3 camera_get_view(const Camera* camera)
 {
-	mat4 view_matrix = camera_get_view_matrix(camera);
-	return camera_common_get_view(&view_matrix);
+	mat4 view_matrix = camera->view_matrix;
+	vec3 camera_view = (vec3) { -view_matrix.data[2][0], -view_matrix.data[2][1], -view_matrix.data[2][2] };
+	return gm_vec3_normalize(camera_view);
 }
 
 vec3 camera_get_x_axis(const Camera* camera)
 {
 	Quaternion camera_rotation = camera_get_rotation(camera);
-	return camera_common_get_x_axis(&camera_rotation);
+	vec3 right = quaternion_get_right_inverted(&camera_rotation);
+	right = gm_vec3_normalize(right);
+	return (vec3) { right.x, right.y, right.z };
 }
 
 vec3 camera_get_y_axis(const Camera* camera)
 {
 	Quaternion camera_rotation = camera_get_rotation(camera);
-	return camera_common_get_y_axis(&camera_rotation);
+	vec3 up = quaternion_get_up_inverted(&camera_rotation);
+	up = gm_vec3_normalize(up);
+	return (vec3) { up.x, up.y, up.z };
 }
 
 vec3 camera_get_z_axis(const Camera* camera)
 {
 	Quaternion camera_rotation = camera_get_rotation(camera);
-	return camera_common_get_z_axis(&camera_rotation);
+	vec3 forward = quaternion_get_forward_inverted(&camera_rotation);
+	forward = gm_vec3_normalize(forward);
+	return (vec3) { forward.x, forward.y, forward.z };
 }
 
 void camera_move_forward(Camera* camera, r32 amount)
@@ -60,100 +56,109 @@ void camera_move_right(Camera* camera, r32 amount)
 
 vec3 camera_get_position(const Camera* camera)
 {
-	switch (camera->type)
-	{
-		case CAMERA_FREE: return free_camera_get_position(&camera->free_camera);
-		case CAMERA_LOOKAT: return lookat_camera_get_position(&camera->lookat_camera);
-		default: assert(0);
-	}
+	return camera->position;
 }
 
 Quaternion camera_get_rotation(const Camera* camera)
 {
 	switch (camera->type)
 	{
-		case CAMERA_FREE: return free_camera_get_rotation(&camera->free_camera);
-		case CAMERA_LOOKAT: return lookat_camera_get_rotation(&camera->lookat_camera);
+		case CAMERA_FREE: return free_camera_get_rotation(camera);
+		case CAMERA_LOOKAT: return lookat_camera_get_rotation(camera);
 		default: assert(0);
 	}
 }
 
 mat4 camera_get_view_matrix(const Camera* camera)
 {
-	switch (camera->type)
-	{
-		case CAMERA_FREE: return free_camera_get_view_matrix(&camera->free_camera);
-		case CAMERA_LOOKAT: return lookat_camera_get_view_matrix(&camera->lookat_camera);
-		default: assert(0);
-	}
+	return camera->view_matrix;
 }
 
 mat4 camera_get_projection_matrix(const Camera* camera)
 {
-	switch (camera->type)
-	{
-		case CAMERA_FREE: return free_camera_get_projection_matrix(&camera->free_camera);
-		case CAMERA_LOOKAT: return lookat_camera_get_projection_matrix(&camera->lookat_camera);
-		default: assert(0);
-	}
+	return camera->projection_matrix;
 }
 
 void camera_set_position(Camera* camera, vec3 position)
 {
-	switch (camera->type)
-	{
-		case CAMERA_FREE: free_camera_set_position(&camera->free_camera, position); break;
-		case CAMERA_LOOKAT: lookat_camera_set_position(&camera->lookat_camera, position); break;
-		default: assert(0);
-	}
+	camera->position = position;
+	camera_recalculate_view_matrix(camera);
 }
 
 void camera_set_near_plane(Camera* camera, r32 near_plane)
 {
-	switch (camera->type)
-	{
-		case CAMERA_FREE: free_camera_set_near_plane(&camera->free_camera, near_plane); break;
-		case CAMERA_LOOKAT: lookat_camera_set_near_plane(&camera->lookat_camera, near_plane); break;
-		default: assert(0);
-	}
+	camera->near_plane = near_plane;
+	camera_recalculate_projection_matrix(camera);
 }
 
 void camera_set_far_plane(Camera* camera, r32 far_plane)
 {
-	switch (camera->type)
-	{
-		case CAMERA_FREE: free_camera_set_far_plane(&camera->free_camera, far_plane); break;
-		case CAMERA_LOOKAT: lookat_camera_set_far_plane(&camera->lookat_camera, far_plane); break;
-		default: assert(0);
-	}
+	camera->far_plane = far_plane;
+	camera_recalculate_projection_matrix(camera);
 }
 
 void camera_set_fov(Camera* camera, r32 fov)
 {
-	switch (camera->type)
-	{
-		case CAMERA_FREE: free_camera_set_fov(&camera->free_camera, fov); break;
-		case CAMERA_LOOKAT: lookat_camera_set_fov(&camera->lookat_camera, fov); break;
-		default: assert(0);
-	}
+	camera->fov = fov;
+	camera_recalculate_projection_matrix(camera);
 }
 
 void camera_rotate(Camera* camera, r32 x_diff, r32 y_diff, r32 mouse_x, r32 mouse_y)
 {
 	switch (camera->type)
 	{
-		case CAMERA_FREE: free_camera_rotate(&camera->free_camera, x_diff, y_diff, mouse_x, mouse_y); break;
-		case CAMERA_LOOKAT: lookat_camera_rotate(&camera->lookat_camera, x_diff, y_diff, mouse_x, mouse_y); break;
+		case CAMERA_FREE: free_camera_rotate(camera, x_diff, y_diff, mouse_x, mouse_y); break;
+		case CAMERA_LOOKAT: lookat_camera_rotate(camera, x_diff, y_diff, mouse_x, mouse_y); break;
 		default: assert(0);
 	}
 }
 
 void camera_force_matrix_recalculation(Camera* camera)
 {
-	switch (camera->type)
-	{
-		case CAMERA_FREE: free_camera_force_matrix_recalculation(&camera->free_camera); break;
-		case CAMERA_LOOKAT: lookat_camera_force_matrix_recalculation(&camera->lookat_camera); break;
-		default: assert(0);
-	}
+	camera_recalculate_view_matrix(camera);
+	camera_recalculate_projection_matrix(camera);
+}
+
+void camera_recalculate_view_matrix(Camera* camera)
+{
+	Quaternion camera_rotation = camera_get_rotation(camera);
+
+	mat4 translation_matrix = (mat4) {
+		1.0f, 0.0f, 0.0f, -camera->position.x,
+		0.0f, 1.0f, 0.0f, -camera->position.y,
+		0.0f, 0.0f, 1.0f, -camera->position.z,
+		0.0f, 0.0f, 0.0f, 1.0f
+	};
+
+	mat4 rotation_matrix = quaternion_get_matrix(&camera_rotation);
+	camera->view_matrix = gm_mat4_multiply(&rotation_matrix, &translation_matrix);
+}
+
+void camera_recalculate_projection_matrix(Camera* camera)
+{
+	r32 near = camera->near_plane;
+	r32 far = camera->far_plane;
+	r32 fov = camera->fov;
+	r32 top = (r32)fabs(near) * atanf(gm_radians(fov) / 2.0f);
+	r32 bottom = -top;
+	r32 right = top * ((r32)window_width / (r32)window_height);
+	r32 left = -right;
+
+	mat4 p = (mat4) {
+		near, 0.0f, 0.0f, 0.0f,
+		0.0f, near, 0.0f, 0.0f,
+		0.0f, 0.0f, near + far, -near * far,
+		0.0f, 0.0f, 1.0f, 0.0f
+	};
+
+	mat4 m = (mat4) {
+		2.0f / (right - left), 0.0f, 0.0f, -(right + left) / (right - left),
+		0.0f, 2.0f / (top - bottom), 0.0f, -(top + bottom) / (top - bottom),
+		0.0f, 0.0f, 2.0f / (far - near), -(far + near) / (far - near),
+		0.0f, 0.0f, 0.0f, 1.0f
+	};
+
+	// Need to transpose when sending to shader
+	mat4 mp = gm_mat4_multiply(&m, &p);
+	camera->projection_matrix = gm_mat4_scalar_product(-1.0f, &mp);
 }

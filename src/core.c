@@ -7,6 +7,8 @@
 #include "obj.h"
 #include "menu.h"
 #include "util.h"
+#include "camera/lookat.h"
+#include "camera/free.h"
 
 extern s32 window_width;
 extern s32 window_height;
@@ -29,7 +31,7 @@ static Camera create_lookat_camera()
 	r32 near_plane = -0.01f;
 	r32 far_plane = -1000.0f;
 	r32 fov = 45.0f;
-	camera_init_lookat(&camera, lookat_position, lookat_distance, near_plane, far_plane, fov, true);
+	lookat_camera_init(&camera, lookat_position, lookat_distance, near_plane, far_plane, fov, true);
 	return camera;
 }
 
@@ -40,7 +42,7 @@ static Camera create_free_camera()
 	r32 near_plane = -0.01f;
 	r32 far_plane = -1000.0f;
 	r32 fov = 45.0f;
-	camera_init_free(&camera, position, near_plane, far_plane, fov, true);
+	free_camera_init(&camera, position, near_plane, far_plane, fov, true);
 	return camera;
 }
 
@@ -174,7 +176,7 @@ void core_input_process(boolean* key_state, r32 delta_time)
 		if (camera.type == CAMERA_LOOKAT)
 		{
 			vec3 lookat_position = (vec3){0.0f, 0.0f, 0.0f};
-			lookat_camera_set_lookat_position(&camera.lookat_camera, lookat_position);
+			lookat_camera_set_lookat_position(&camera, lookat_position);
 			key_state[GLFW_KEY_KP_DECIMAL] = false;
 		}
 	}
@@ -202,12 +204,12 @@ void core_mouse_change_process(boolean reset, r64 x_pos, r64 y_pos)
 		if (is_panning_camera)
 		{
 			vec3 y_axis = camera_get_y_axis(&camera);
-			vec3 inc = gm_vec3_scalar_product(panning_speed * lookat_camera_get_lookat_distance(&camera.lookat_camera) * y_difference, y_axis);
-			lookat_camera_set_lookat_position(&camera.lookat_camera, gm_vec3_add(lookat_camera_get_lookat_position(&camera.lookat_camera), inc));
+			vec3 inc = gm_vec3_scalar_product(panning_speed * lookat_camera_get_lookat_distance(&camera) * y_difference, y_axis);
+			lookat_camera_set_lookat_position(&camera, gm_vec3_add(lookat_camera_get_lookat_position(&camera), inc));
 
 			vec3 x_axis = camera_get_x_axis(&camera);
-			inc = gm_vec3_scalar_product(-panning_speed * lookat_camera_get_lookat_distance(&camera.lookat_camera) * x_difference, x_axis);
-			lookat_camera_set_lookat_position(&camera.lookat_camera, gm_vec3_add(lookat_camera_get_lookat_position(&camera.lookat_camera), inc));
+			inc = gm_vec3_scalar_product(-panning_speed * lookat_camera_get_lookat_distance(&camera) * x_difference, x_axis);
+			lookat_camera_set_lookat_position(&camera, gm_vec3_add(lookat_camera_get_lookat_position(&camera), inc));
 		}
 	}
 
@@ -249,8 +251,8 @@ void core_scroll_change_process(r64 x_offset, r64 y_offset)
 
 	if (camera.type == CAMERA_LOOKAT)
 	{
-		r32 current_lookat_distance = lookat_camera_get_lookat_distance(&camera.lookat_camera);
-		lookat_camera_set_lookat_distance(&camera.lookat_camera, current_lookat_distance - y_offset * zoom_speed);
+		r32 current_lookat_distance = lookat_camera_get_lookat_distance(&camera);
+		lookat_camera_set_lookat_distance(&camera, current_lookat_distance - y_offset * zoom_speed);
 	}
 }
 
