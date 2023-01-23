@@ -29,7 +29,7 @@ Quaternion free_camera_get_rotation(const Camera* camera)
 	return free_camera->rotation;
 }
 
-vec3 free_camera_rotate(Camera* camera, r32 x_diff, r32 y_diff, r32 mouse_x, r32 mouse_y)
+void free_camera_rotate(Camera* camera, r32 x_diff, r32 y_diff, r32 mouse_x, r32 mouse_y)
 {
 	assert(camera->type == CAMERA_FREE);
 	Free_Camera* free_camera = &camera->free_camera;

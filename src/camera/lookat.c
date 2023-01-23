@@ -31,7 +31,7 @@ Quaternion lookat_camera_get_rotation(const Camera* camera)
 	return lookat_camera->rotation;
 }
 
-vec3 lookat_camera_rotate(Camera* camera, r32 x_diff, r32 y_diff, r32 mouse_x, r32 mouse_y)
+void lookat_camera_rotate(Camera* camera, r32 x_diff, r32 y_diff, r32 mouse_x, r32 mouse_y)
 {
 	assert(camera->type == CAMERA_LOOKAT);
 	Lookat_Camera* lookat_camera = &camera->lookat_camera;
