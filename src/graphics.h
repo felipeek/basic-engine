@@ -16,14 +16,14 @@ typedef struct
 
 typedef struct
 {
-	boolean use_normal_map;
-	boolean tangent_space;		// @TODO: Not implemented yet.
+	bool use_normal_map;
+	bool tangent_space;		// @TODO: Not implemented yet.
 	u32 normal_map_texture;
 } Normal_Mapping_Info;
 
 typedef struct
 {
-	boolean use_diffuse_map;
+	bool use_diffuse_map;
 	u32 diffuse_map;
 	vec4 diffuse_color;
 } Diffuse_Info;
@@ -83,12 +83,12 @@ void graphics_entity_create_with_texture(Entity* entity, Mesh mesh, vec3 world_p
 void graphics_entity_destroy(Entity* entity);
 // If entity already has a diffuse map, the older diffuse map will be deleted if delete_diffuse_map is true.
 // If entity has a color instead of a diffuse map, the mesh will lose the color and be set to use the diffuse map.
-void graphics_entity_change_diffuse_map(Entity* entity, u32 diffuse_map, boolean delete_diffuse_map);
+void graphics_entity_change_diffuse_map(Entity* entity, u32 diffuse_map, bool delete_diffuse_map);
 // If the entity already has a color, the older color will be deleted.
 // If entity has a diffuse map instead of a color, the diffuse map will be deleted if delete_diffuse_map is true
 // The entity will be set to use the color.
-void graphics_entity_change_color(Entity* entity, vec4 color, boolean delete_diffuse_map);
-void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_normal_map);
+void graphics_entity_change_color(Entity* entity, vec4 color, bool delete_diffuse_map);
+void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, bool delete_normal_map);
 void graphics_entity_set_position(Entity* entity, vec3 world_position);
 void graphics_entity_set_rotation(Entity* entity, Quaternion world_rotation);
 void graphics_entity_set_scale(Entity* entity, vec3 world_scale);

@@ -2,8 +2,7 @@
 #include "free.h"
 #include "lookat.h"
 
-extern s32 window_width;
-extern s32 window_height;
+extern dvec2 window_size;
 
 vec3 camera_get_view(const Camera* camera)
 {
@@ -40,7 +39,7 @@ void camera_move_forward(Camera* camera, r32 amount)
 {
 	Quaternion camera_rotation = camera_get_rotation(camera);
 	vec3 forward = quaternion_get_forward_inverted(&camera_rotation);
-	forward = gm_vec3_scalar_product(amount, gm_vec3_normalize(forward));
+	forward = gm_vec3_scalar_product(camera->movement_speed * amount, gm_vec3_normalize(forward));
 	vec3 new_position = gm_vec3_add(gm_vec3_negative(forward), camera_get_position(camera));
 	camera_set_position(camera, new_position);
 }
@@ -49,7 +48,7 @@ void camera_move_right(Camera* camera, r32 amount)
 {
 	Quaternion camera_rotation = camera_get_rotation(camera);
 	vec3 right = quaternion_get_right_inverted(&camera_rotation);
-	right = gm_vec3_scalar_product(amount, gm_vec3_normalize(right));
+	right = gm_vec3_scalar_product(camera->movement_speed * amount, gm_vec3_normalize(right));
 	vec3 new_position = gm_vec3_add(right, camera_get_position(camera));
 	camera_set_position(camera, new_position);
 }
@@ -67,6 +66,16 @@ Quaternion camera_get_rotation(const Camera* camera)
 		case CAMERA_LOOKAT: return lookat_camera_get_rotation(camera);
 		default: assert(0);
 	}
+}
+
+r32 camera_get_movement_speed(const Camera* camera)
+{
+	return camera->movement_speed;
+}
+
+r32 camera_get_rotation_speed(const Camera* camera)
+{
+	return camera->rotation_speed;
 }
 
 mat4 camera_get_view_matrix(const Camera* camera)
@@ -107,10 +116,22 @@ void camera_rotate(Camera* camera, r32 x_diff, r32 y_diff, r32 mouse_x, r32 mous
 {
 	switch (camera->type)
 	{
-		case CAMERA_FREE: free_camera_rotate(camera, x_diff, y_diff, mouse_x, mouse_y); break;
-		case CAMERA_LOOKAT: lookat_camera_rotate(camera, x_diff, y_diff, mouse_x, mouse_y); break;
+		case CAMERA_FREE: free_camera_rotate(camera, x_diff * camera->rotation_speed, y_diff * camera->rotation_speed,
+			mouse_x, mouse_y); break;
+		case CAMERA_LOOKAT: lookat_camera_rotate(camera, x_diff * camera->rotation_speed, y_diff * camera->rotation_speed,
+			mouse_x, mouse_y); break;
 		default: assert(0);
 	}
+}
+
+void camera_set_movement_speed(Camera* camera, r32 movement_speed)
+{
+	camera->movement_speed = movement_speed;
+}
+
+void camera_set_rotation_speed(Camera* camera, r32 rotation_speed)
+{
+	camera->rotation_speed = rotation_speed;
 }
 
 void camera_force_matrix_recalculation(Camera* camera)
@@ -141,7 +162,7 @@ void camera_recalculate_projection_matrix(Camera* camera)
 	r32 fov = camera->fov;
 	r32 top = (r32)fabs(near) * atanf(gm_radians(fov) / 2.0f);
 	r32 bottom = -top;
-	r32 right = top * ((r32)window_width / (r32)window_height);
+	r32 right = top * ((r32)window_size.x / (r32)window_size.y);
 	r32 left = -right;
 
 	mat4 p = (mat4) {

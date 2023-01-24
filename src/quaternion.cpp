@@ -18,17 +18,17 @@ quaternion_new_radians(vec3 axis, r32 angle) {
 Quaternion
 quaternion_new(vec3 axis, r32 angle)
 {
-  if (gm_vec3_length(axis) != 0.0f)
-    axis = gm_vec3_normalize(axis);
-  r32 sang = sinf(gm_radians(angle) / 2.0f);
+	if (gm_vec3_length(axis) != 0.0f)
+		axis = gm_vec3_normalize(axis);
+	r32 sang = sinf(gm_radians(angle) / 2.0f);
 
-  Quaternion quat;
-  quat.w = cosf(gm_radians(angle) / 2.0f);
-  quat.x = axis.x * sang;
-  quat.y = axis.y * sang;
-  quat.z = axis.z * sang;
+	Quaternion quat;
+	quat.w = cosf(gm_radians(angle) / 2.0f);
+	quat.x = axis.x * sang;
+	quat.y = axis.y * sang;
+	quat.z = axis.z * sang;
 
-  return quat;
+	return quat;
 }
 
 vec3 quaternion_get_right_inverted(const Quaternion* quat)
@@ -222,7 +222,7 @@ Quaternion quaternion_from_matrix(const mat4* m)
 	Quaternion q = { 0 };
 	mat4 a = *m;
 
-	r32 trace = a.data[0][0] + a.data[1][1] + a.data[2][2];       // I removed + 1.0f; see discussion with Ethan
+	r32 trace = a.data[0][0] + a.data[1][1] + a.data[2][2];			 // I removed + 1.0f; see discussion with Ethan
 
 	if (trace > 0) // I changed M_EPSILON to 0
 	{

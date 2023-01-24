@@ -1,15 +1,19 @@
 #include "free.h"
 #include "util.h"
+#include <memory.h>
 
-void free_camera_init(Camera* camera, vec3 position, r32 near_plane, r32 far_plane, r32 fov, int lock_rotation)
+void free_camera_init(Camera* camera, vec3 position, r32 near_plane, r32 far_plane, r32 fov, int lock_rotation,
+	r32 movement_speed, r32 rotation_speed)
 {
-	*camera = (Camera){0};
+	memset(camera, 0, sizeof(Camera));
 
 	camera->type = CAMERA_FREE;
 	camera->position = position;
 	camera->near_plane = near_plane;
 	camera->far_plane = far_plane;
 	camera->fov = fov;
+	camera->movement_speed = movement_speed;
+	camera->rotation_speed = rotation_speed;
 
 	camera->free_camera.rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f);
 	camera->free_camera.y_rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, 0.0f);

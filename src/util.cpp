@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <GL/glew.h>
+#include <GLFW/glfw3.h>
+
+extern dvec2 framebuffer_size;
 
 r32 util_random_float(r32 min, r32 max)
 {
@@ -48,17 +51,7 @@ void util_normalize_window_coords_to_ndc(r32 x, r32 y, s32 window_width, s32 win
 	*y_ndc = y;
 }
 
-void util_viewport_based_on_window_size(s32 x, s32 y, s32 width, s32 height)
+void util_viewport_for_complete_window()
 {
-#if defined(__APPLE__)
-	// When apple retina displays are used, the window size reported by GLFW is half the size of the framebuffer
-	glViewport(x, y, 2 * width, 2 * height);
-#else
-	glViewport(x, y, width, height);
-#endif
-}
-
-void util_viewport_based_on_framebuffer_size(s32 x, s32 y, s32 width, s32 height)
-{
-	glViewport(x, y, width, height);
+	glViewport(0, 0, framebuffer_size.x, framebuffer_size.y);
 }

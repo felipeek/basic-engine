@@ -46,7 +46,7 @@ Float_Image_Data graphics_float_image_copy(const Float_Image_Data* image_data)
 
 	fid = *image_data;
 
-	fid.data = malloc(sizeof(r32) * fid.width * fid.height * fid.channels);
+	fid.data = (r32*)malloc(sizeof(r32) * fid.width * fid.height * fid.channels);
 	memcpy(fid.data, image_data->data, sizeof(r32) * fid.width * fid.height * fid.channels);
 	
 	return fid;
@@ -124,7 +124,7 @@ Shader graphics_shader_create(const s8* vertex_shader_path, const s8* fragment_s
 typedef struct {
 	Shader phong_shader;
 	Shader basic_shader;
-	boolean initialized;
+	bool initialized;
 } Predefined_Shaders;
 
 Predefined_Shaders predefined_shaders;
@@ -300,7 +300,7 @@ void graphics_mesh_render(Shader shader, Mesh mesh)
 	glBindVertexArray(0);
 }
 
-void graphics_entity_change_diffuse_map(Entity* entity, u32 diffuse_map, boolean delete_diffuse_map)
+void graphics_entity_change_diffuse_map(Entity* entity, u32 diffuse_map, bool delete_diffuse_map)
 {
 	if (delete_diffuse_map && entity->diffuse_info.use_diffuse_map)
 		glDeleteTextures(1, &entity->diffuse_info.diffuse_map);
@@ -309,7 +309,7 @@ void graphics_entity_change_diffuse_map(Entity* entity, u32 diffuse_map, boolean
 	entity->diffuse_info.use_diffuse_map = true;
 }
 
-void graphics_entity_change_color(Entity* entity, vec4 color, boolean delete_diffuse_map)
+void graphics_entity_change_color(Entity* entity, vec4 color, bool delete_diffuse_map)
 {
 	if (delete_diffuse_map && entity->diffuse_info.use_diffuse_map)
 		glDeleteTextures(1, &entity->diffuse_info.diffuse_map);
@@ -324,18 +324,18 @@ static void recalculate_model_matrix(Entity* entity)
 
 	mat4 scale_matrix = (mat4) {
 		entity->world_scale.x, 0.0f, 0.0f, 0.0f,
-			0.0f, entity->world_scale.y, 0.0f, 0.0f,
-			0.0f, 0.0f, entity->world_scale.z, 0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f
+		0.0f, entity->world_scale.y, 0.0f, 0.0f,
+		0.0f, 0.0f, entity->world_scale.z, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
 	};
 
 	mat4 rotation_matrix = quaternion_get_matrix(&entity->world_rotation);
 
 	mat4 translation_matrix = (mat4) {
 		1.0f, 0.0f, 0.0f, entity->world_position.x,
-			0.0f, 1.0f, 0.0f, entity->world_position.y,
-			0.0f, 0.0f, 1.0f, entity->world_position.z,
-			0.0f, 0.0f, 0.0f, 1.0f
+		0.0f, 1.0f, 0.0f, entity->world_position.y,
+		0.0f, 0.0f, 1.0f, entity->world_position.z,
+		0.0f, 0.0f, 0.0f, 1.0f
 	};
 
 	entity->model_matrix = gm_mat4_multiply(&rotation_matrix, &scale_matrix);
@@ -370,7 +370,7 @@ void graphics_entity_destroy(Entity* entity)
 		glDeleteTextures(1, &entity->diffuse_info.diffuse_map);
 }
 
-void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, boolean delete_normal_map)
+void graphics_entity_mesh_replace(Entity* entity, Mesh mesh, bool delete_normal_map)
 {
 	glDeleteBuffers(1, &entity->mesh.VBO);
 	glDeleteBuffers(1, &entity->mesh.EBO);
@@ -527,7 +527,6 @@ void graphics_light_create(Light* light, vec3 position, vec4 ambient_color, vec4
 // If memory is null, new memory will be allocated
 Float_Image_Data graphics_image_data_to_float_image_data(Image_Data* image_data, r32* memory)
 {
-	// @TODO: check WHY this is happening
 	s32 image_channels = image_data->channels;
 
 	if (!memory)
@@ -558,7 +557,6 @@ Float_Image_Data graphics_image_data_to_float_image_data(Image_Data* image_data,
 
 Image_Data graphics_float_image_data_to_image_data(const Float_Image_Data* float_image_data, u8* memory)
 {
-	// @TODO: check WHY this is happening
 	s32 image_channels = float_image_data->channels;
 
 	if (!memory)
@@ -596,21 +594,21 @@ Mesh graphics_mesh_create_from_obj(const s8* obj_path, Normal_Mapping_Info* norm
 // Render primitives
 
 typedef struct {
-  u32 shader;
-  // Vector rendering
-  u32 vector_vao;
-  u32 vector_vbo;
+	u32 shader;
+	// Vector rendering
+	u32 vector_vao;
+	u32 vector_vbo;
 
-  void* data_ptr;
-  int vertex_count;
+	void* data_ptr;
+	int vertex_count;
 
-  // Point rendering
-  u32 point_vao;
-  u32 point_vbo;
-  void* point_data_ptr;
-  int point_count;
+	// Point rendering
+	u32 point_vao;
+	u32 point_vbo;
+	void* point_data_ptr;
+	int point_count;
 
-  int initialized;
+	int initialized;
 } Render_Primitives_Context;
 
 typedef struct {
@@ -622,8 +620,8 @@ static Render_Primitives_Context primitives_ctx;
 
 void graphics_renderer_primitives_init()
 {
-    if (primitives_ctx.initialized) return;
-    primitives_ctx.initialized = true;
+	if (primitives_ctx.initialized) return;
+	primitives_ctx.initialized = true;
 
 	int batch_size = 1024 * 1024;
 
@@ -657,7 +655,7 @@ void graphics_renderer_primitives_init()
 
 void graphics_renderer_primitives_flush(const Camera* camera)
 {
-    graphics_renderer_primitives_init();
+	graphics_renderer_primitives_init();
 	glUseProgram(primitives_ctx.shader);
 
 	// Vector
@@ -723,7 +721,7 @@ static void setup_primitives_point_render()
 
 void graphics_renderer_debug_points(vec3* points, int point_count, vec4 color)
 {
-    graphics_renderer_primitives_init();
+	graphics_renderer_primitives_init();
 	setup_primitives_point_render();
 	Primitive_3D_Vertex *verts = (Primitive_3D_Vertex *)primitives_ctx.point_data_ptr + primitives_ctx.point_count;
 
@@ -738,7 +736,7 @@ void graphics_renderer_debug_points(vec3* points, int point_count, vec4 color)
 
 void graphics_renderer_debug_vector(vec3 p1, vec3 p2, vec4 color)
 {
-    graphics_renderer_primitives_init();
+	graphics_renderer_primitives_init();
 	setup_primitives_render();
 
 	Primitive_3D_Vertex *verts = (Primitive_3D_Vertex *)primitives_ctx.data_ptr + primitives_ctx.vertex_count;
