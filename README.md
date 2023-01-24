@@ -1,6 +1,6 @@
 # basic-engine
 
-A very simple graphics engine written in C. It can be extended to be used in graphics projects.
+A very simple graphics engine written in C++ (but almost C-compatible; C++ used to ease integration with imgui). It can be extended to be used in graphics projects.
 
 ## Building
 
