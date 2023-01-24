@@ -96,8 +96,8 @@ void core_update(Core_Ctx* ctx, r32 delta_time)
 void core_render(Core_Ctx* ctx)
 {
 	graphics_entity_render_phong_shader(&ctx->camera, &ctx->e, ctx->lights);
-    graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
-    graphics_renderer_primitives_flush(&ctx->camera);
+	graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+	graphics_renderer_primitives_flush(&ctx->camera);
 	ui_render(&ctx->ui_ctx, ctx->is_ui_active);
 }
 
