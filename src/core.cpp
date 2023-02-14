@@ -58,6 +58,13 @@ static Light* create_lights()
 	graphics_light_create(&light, light_position, ambient_color, diffuse_color, specular_color);
 	array_push(lights, light);
 
+	light_position = (vec3) {0.0f, 0.0f, -15.0f};
+	ambient_color = (vec4) {0.1f, 0.1f, 0.1f, 1.0f};
+	diffuse_color = (vec4) {0.8, 0.8, 0.8, 1.0f};
+	specular_color = (vec4) {0.5f, 0.5f, 0.5f, 1.0f};
+	graphics_light_create(&light, light_position, ambient_color, diffuse_color, specular_color);
+	array_push(lights, light);
+
 	return lights;
 }
 
@@ -74,12 +81,14 @@ Core_Ctx core_init(GLFWwindow* window)
 	// Create light
 	ctx.lights = create_lights();
 
-	u32 texture = graphics_texture_create("res/squiggly-artifacts-debug/plane_debug_tex.png");
+	//u32 texture = graphics_texture_create("res/squiggly-artifacts-debug/plane_debug_tex.png");
+	u32 texture = graphics_texture_create("res/squiggly-artifacts-debug/wall_full_Material_BaseColor.png");
 
-	Mesh m = graphics_mesh_create_from_obj("res/squiggly-artifacts-debug/plane_debug.obj", 0);
-	graphics_entity_create_with_texture(&ctx.e, m, (vec3){1.0f, 0.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	Mesh m1 = graphics_mesh_create_from_obj("res/squiggly-artifacts-debug/wall_full.obj", 0);
+	Mesh m2 = graphics_mesh_create_from_obj("res/squiggly-artifacts-debug/wall_short_half.obj", 0);
+	graphics_entity_create_with_texture(&ctx.e, m1, (vec3){1.0f, -1.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, texture);
-	graphics_entity_create_with_texture(&ctx.e2, m, (vec3){-1.0f, 0.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+	graphics_entity_create_with_texture(&ctx.e2, m2, (vec3){-1.0f, -1.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
 		(vec3){1.0f, 1.0f, 1.0f}, texture);
 
 	ctx.window = window;
@@ -133,11 +142,13 @@ void core_input_process(Core_Ctx* ctx, r32 delta_time)
 		{
 			Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, rotation_speed * delta_time);
 			graphics_entity_set_rotation(&ctx->e, quaternion_product(&rotation, &ctx->e.world_rotation));
+			graphics_entity_set_rotation(&ctx->e2, quaternion_product(&rotation, &ctx->e2.world_rotation));
 		}
 		else
 		{
 			Quaternion rotation = quaternion_new((vec3){1.0f, 0.0f, 0.0f}, -rotation_speed * delta_time);
 			graphics_entity_set_rotation(&ctx->e, quaternion_product(&rotation, &ctx->e.world_rotation));
+			graphics_entity_set_rotation(&ctx->e2, quaternion_product(&rotation, &ctx->e2.world_rotation));
 		}
 	}
 	if (ctx->key_state[GLFW_KEY_Y])
@@ -146,11 +157,13 @@ void core_input_process(Core_Ctx* ctx, r32 delta_time)
 		{
 			Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, rotation_speed * delta_time);
 			graphics_entity_set_rotation(&ctx->e, quaternion_product(&rotation, &ctx->e.world_rotation));
+			graphics_entity_set_rotation(&ctx->e2, quaternion_product(&rotation, &ctx->e2.world_rotation));
 		}
 		else
 		{
 			Quaternion rotation = quaternion_new((vec3){0.0f, 1.0f, 0.0f}, -rotation_speed * delta_time);
 			graphics_entity_set_rotation(&ctx->e, quaternion_product(&rotation, &ctx->e.world_rotation));
+			graphics_entity_set_rotation(&ctx->e2, quaternion_product(&rotation, &ctx->e2.world_rotation));
 		}
 	}
 	if (ctx->key_state[GLFW_KEY_Z])
@@ -159,11 +172,13 @@ void core_input_process(Core_Ctx* ctx, r32 delta_time)
 		{
 			Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, rotation_speed * delta_time);
 			graphics_entity_set_rotation(&ctx->e, quaternion_product(&rotation, &ctx->e.world_rotation));
+			graphics_entity_set_rotation(&ctx->e2, quaternion_product(&rotation, &ctx->e2.world_rotation));
 		}
 		else
 		{
 			Quaternion rotation = quaternion_new((vec3){0.0f, 0.0f, 1.0f}, -rotation_speed * delta_time);
 			graphics_entity_set_rotation(&ctx->e, quaternion_product(&rotation, &ctx->e.world_rotation));
+			graphics_entity_set_rotation(&ctx->e2, quaternion_product(&rotation, &ctx->e2.world_rotation));
 		}
 	}
 	if (ctx->key_state[GLFW_KEY_L])
