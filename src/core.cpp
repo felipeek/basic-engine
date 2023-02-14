@@ -74,9 +74,13 @@ Core_Ctx core_init(GLFWwindow* window)
 	// Create light
 	ctx.lights = create_lights();
 
-	Mesh m = graphics_mesh_create_from_obj("./res/cube.obj", 0);
-	graphics_entity_create_with_color(&ctx.e, m, (vec3){0.0f, 0.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
-		(vec3){1.0f, 1.0f, 1.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+	u32 texture = graphics_texture_create("res/squiggly-artifacts-debug/plane_debug_tex.png");
+
+	Mesh m = graphics_mesh_create_from_obj("res/squiggly-artifacts-debug/plane_debug.obj", 0);
+	graphics_entity_create_with_texture(&ctx.e, m, (vec3){1.0f, 0.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, texture);
+	graphics_entity_create_with_texture(&ctx.e2, m, (vec3){-1.0f, 0.0f, 0.0f}, quaternion_new((vec3){0.0f, 1.0f, 0.0f}, 0.0f),
+		(vec3){1.0f, 1.0f, 1.0f}, texture);
 
 	ctx.window = window;
 	ctx.alternative_panning_method = false;
@@ -96,7 +100,8 @@ void core_update(Core_Ctx* ctx, r32 delta_time)
 void core_render(Core_Ctx* ctx)
 {
 	graphics_entity_render_phong_shader(&ctx->camera, &ctx->e, ctx->lights);
-	graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
+	graphics_entity_render_phong_shader(&ctx->camera, &ctx->e2, ctx->lights);
+	//graphics_renderer_debug_vector((vec3){0.0f, 0.0f, 0.0f}, (vec3){1.0f, 0.0f, 0.0f}, (vec4){1.0f, 0.0f, 0.0f, 1.0f});
 	graphics_renderer_primitives_flush(&ctx->camera);
 	ui_render(&ctx->ui_ctx, ctx->is_ui_active);
 }

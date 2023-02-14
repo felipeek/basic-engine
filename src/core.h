@@ -12,6 +12,7 @@ typedef struct {
 	Camera camera;
 	Light* lights;
 	Entity e;
+	Entity e2;
 
 	// Relevant for lookat camera
 	bool is_rotating_camera;

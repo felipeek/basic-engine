@@ -1,0 +1,113 @@
+Entity {
+	Name:    "Floor"
+	Position: { 0.000000, -1.026535, 0.000000 }
+	Orientation: { 0.000000, 0.000000, 0.000000, 1.000000 }
+	Scale:{ 1.000000, 1.000000, 1.000000 }
+	Flags: 0x8
+	Components: 
+	{
+		Type: PBREC
+		Mesh: "./res/models/example_room/floor.bin"
+		Albedo: { 1.000000, 1.000000, 1.000000 }
+		Metallic: 0.000000
+		Roughness: 1.000000
+		AO: 0.000000
+	}
+	{
+		Type: Collider
+		Mesh: "./res/models/example_room/floor.bin"
+		Check: false
+	}
+}
+Entity {
+	Name:    "Camera1"
+	Position: { -0.525431, 1.173465, 0.532006 }
+	Orientation: { 0.000000, 0.721595, 0.000000, 0.695619 }
+	Scale:{ 0.400000, 0.400000, 0.400000 }
+	Flags: 0x78
+	Components: 
+	{
+		Type: Controller
+		Speed: 5.000000
+		Inverted: true
+		Active: true
+	}
+	{
+		Type: Camera
+		Flags: 0x1
+		Sensitivity: { 0.100000, 0.100000 }
+		FPSCamera {
+			Rotation: { -0.037134, 0.000000, 0.000000, 1.001055 }
+			YRotation: { 0.000000, 0.721595, 0.000000, -0.695619 }
+			Position: { -0.525431, 1.173465, 0.532006 }
+			FOV: 90.000008
+			Near_Plane: -0.050000
+			Far_Plane: -1000.000000
+		}
+
+	}
+	{
+		Type: POEC
+		Mesh: "./res/models/player_bbox.bin"
+		Color: { 1.000000, 0.300000, 0.300000, 1.000000 }
+	}
+	{
+		Type: Collider
+		Mesh: "./res/models/player_bbox.bin"
+		Check: true
+	}
+}
+Entity {
+	Name:    "wall_full2324"
+	Position: { -7.000000, 0.000000, 1.000000 }
+	Orientation: { 0.000000, 0.000000, 0.000000, 1.000000 }
+	Scale:{ 1.000000, 1.000000, 1.000000 }
+	Flags: 0x8
+	Components: 
+	{
+		Type: POEC
+		Mesh: "./res/models/wall_full_uv_adjusted.bin"
+		Diffuse: "./res/textures/walls/wall_full_Material_BaseColor.png"
+	}
+}
+Entity {
+	Name:    "wall_short_half55"
+	Position: { -9.000000, 0.000000, 1.000000 }
+	Orientation: { 0.000000, 0.000000, 0.000000, -1.000000 }
+	Scale:{ 1.000000, 1.000000, 1.000000 }
+	Flags: 0x8
+	Components: 
+	{
+		Type: POEC
+		Mesh: "./res/models/wall_full_uv_adjusted.bin"
+		Diffuse: "./res/textures/walls/wall_full_Material_BaseColor.png"
+	}
+}
+Entity {
+	Name:    "New Light"
+	Position: { -0.510046, 1.730524, -2.159439 }
+	Orientation: { 0.000000, 0.000000, 0.000000, 1.000000 }
+	Scale:{ 0.100000, 0.100000, 0.100000 }
+	Flags: 0x8
+	Components: 
+	{
+		Type: BOEC
+		Mesh: "./res/models/preset/light_point_pbr.bin"
+		Color: { 0.000000, 0.000000, 0.000000, 0.000000 }
+		ColorTexture: "./res/textures/preset/light_pbr.png"
+	}
+	{
+		Type: PHLIGHTEC
+		SMIEnabled: false
+		SMIResolution: 0
+		SMIFarPlane: 0.000000
+		SMINearPlane: 0.000000
+		SMIBoxSize: 0.000000
+		SMIBias: 0.000000
+		PointLight {
+			AmbientColor: { 0.100000, 0.100000, 0.100000, 1.000000 }
+			DiffuseColor: { 1.000000, 1.000000, 1.000000, 1.000000 }
+			SpecularColor: { 1.000000, 1.000000, 1.000000, 1.000000 }
+		}
+	}
+}
